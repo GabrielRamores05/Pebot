@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="40" fill="#92400e"/>
+  <text x="50%" y="55%" font-size="100" text-anchor="middle" dominant-baseline="middle" font-family="serif">☕</text>
+  <text x="50%" y="82%" font-size="22" text-anchor="middle" fill="#fde68a" font-family="sans-serif" font-weight="bold">CaféOS</text>
+</svg>

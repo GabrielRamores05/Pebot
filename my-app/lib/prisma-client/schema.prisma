@@ -1,0 +1,555 @@
+// Prisma schema for CafeOS - Enterprise Coffee Shop POS
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/prisma-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User / Auth ────────────────────────────────────────────────────────────
+model User {
+  id              Int              @id @default(autoincrement())
+  name            String
+  email           String           @unique
+  password        String
+  role            String           @default("STAFF") // ADMIN, STAFF, KITCHEN
+  active          Boolean          @default(true)
+  permissions     String           @default("{\"liveOrders\":true,\"terminal\":false,\"tables\":false,\"analytics\":false,\"products\":false,\"inventory\":false,\"kitchen\":false,\"loyalty\":false,\"staff\":false,\"settings\":false}") // JSON string of permissions
+  subscriptionId  Int?             @unique
+  subscription    Subscription?    @relation("UserSubscription", fields: [subscriptionId], references: [id])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  POSLicense      POSLicense[]     @relation("UserPOSLicense")
+  auditLogs       AuditLog[]
+  aiConversations AIConversation[]
+  expenses        Expense[]
+}
+
+// ─── Subscription ───────────────────────────────────────────────────────────
+// Tracks user subscription tier and features
+model Subscription {
+  id           Int       @id @default(autoincrement())
+  tier         String    @default("REGULAR") // REGULAR, MEDIUM, PREMIUM
+  features     String    @default("{\"analytics\":false,\"inventory\":false,\"staff\":false,\"settings\":false,\"kitchen\":false,\"loyalty\":false}") // JSON string of enabled features
+  price        Float     @default(0) // Monthly price in PHP
+  billingCycle String    @default("MONTHLY") // MONTHLY, QUARTERLY, YEARLY
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User?     @relation("UserSubscription")
+
+  @@index([tier])
+  @@index([isActive])
+}
+
+// ─── POS License ────────────────────────────────────────────────────────────
+// One-time permanent license for POS system (separate from subscription)
+model POSLicense {
+  id          Int       @id @default(autoincrement())
+  licenseKey  String    @unique
+  isActivated Boolean   @default(false)
+  activatedAt DateTime?
+  activatedBy Int?
+  activator   User?     @relation("UserPOSLicense", fields: [activatedBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([licenseKey])
+  @@index([isActivated])
+}
+
+// ─── Category ────────────────────────────────────────────────────────────────
+model Category {
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  icon            String?
+  sortOrder       Int              @default(0)
+  products        Product[]
+  loyaltySettings LoyaltySetting[]
+  loyaltyCards    LoyaltyCard[]
+  createdAt       DateTime         @default(now())
+}
+
+// ─── Product ─────────────────────────────────────────────────────────────────
+model Product {
+  id              Int                 @id @default(autoincrement())
+  name            String
+  description     String?
+  price           Float
+  imageUrl        String?
+  available       Boolean             @default(true)
+  prepTimeMinutes Int                 @default(5)
+  stationType     String              @default("general")
+  categoryId      Int
+  category        Category            @relation(fields: [categoryId], references: [id])
+  orderItems      OrderItem[]
+  inventory       Inventory?
+  reviews         Review[]
+  ingredients     ProductIngredient[]
+  // BIR-compliant pricing fields
+  capitalCost     Float               @default(0) // Raw material cost per item
+  marginType      String              @default("PERCENTAGE") // "PERCENTAGE" or "PESOS"
+  marginValue     Float               @default(30) // 30% or ₱30 default margin
+  vatExempt       Boolean             @default(false) // true if VAT-exempt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+// ─── Product Review ───────────────────────────────────────────────────────────
+model Review {
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerName    String
+  rating          Int      @default(5) // 1-5 stars
+  comment         String?
+  tasteSuggestion String? // Optional taste improvement suggestion
+  imageUrl        String? // Customer uploaded photo (1:1 ratio)
+  createdAt       DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+// ─── Ingredients for Purchase Invoice ────────────────────────────────────────
+// All quantities stored in base units (g, ml, pcs)
+model Ingredient {
+  id           Int                     @id @default(autoincrement())
+  name         String // e.g., "Espresso Beans", "Fresh Milk"
+  category     String                  @default("General") // Coffee, Dairy, Syrup, Powder, Food, Packaging, etc.
+  baseUnit     String // e.g., "g", "ml", "pcs" — internal storage unit
+  purchaseUnit String                  @default("g") // Unit used when purchasing (kg, L, pcs, etc.)
+  currentStock Float                   @default(0) // Current inventory in base units
+  minStock     Float                   @default(0) // Minimum threshold for alerts
+  costPerUnit  Float                   @default(0) // Price per 1 base unit
+  supplierId   Int? // Foreign key to Supplier
+  supplier     Supplier?               @relation(fields: [supplierId], references: [id])
+  transactions IngredientTransaction[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  products     ProductIngredient[]
+}
+
+// ─── Ingredient Transaction History ──────────────────────────────────────────
+// Records every stock movement: purchases, usage (sales), adjustments/waste
+model IngredientTransaction {
+  id            Int        @id @default(autoincrement())
+  ingredientId  Int
+  ingredient    Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  type          String     @default("PURCHASE") // PURCHASE | USAGE | ADJUSTMENT | OPENING
+  quantity      Float // signed: positive=add, negative=subtract; in base units
+  purchaseCost  Float? // total pesos paid (PURCHASE only)
+  unitCost      Float? // per-base-unit cost at transaction time (PURCHASE only)
+  purchaseUnit  String? // unit the quantity was recorded in at transaction time (for display)
+  referenceId   Int? // order ID for USAGE; null otherwise
+  referenceType String? // "order" | null
+  notes         String? // e.g. "Waste: spoiled milk" for ADJUSTMENT
+  userId        Int? // who made the change (manual adjustments)
+  createdAt     DateTime   @default(now())
+
+  @@index([ingredientId])
+  @@index([createdAt])
+  @@index([type])
+  @@index([referenceId, referenceType])
+}
+
+// ─── Supplier ───────────────────────────────────────────────────────────────────
+model Supplier {
+  id            Int          @id @default(autoincrement())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  notes         String?
+  status        String       @default("ACTIVE") // ACTIVE | INACTIVE
+  ingredients   Ingredient[]
+  expenses      Expense[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([name])
+}
+
+// Links products to their ingredients (the Recipe/BOM).
+// `quantity` is how much of the ingredient (in base units) ONE product consumes.
+// `required` = false marks an ingredient as optional (does not gate sellable quantity).
+model ProductIngredient {
+  id           Int        @id @default(autoincrement())
+  productId    Int
+  ingredientId Int
+  quantity     Float // Quantity consumed per 1 product (in base units)
+  required     Boolean    @default(true) // Required = gates availability; Optional = add-on
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+}
+
+// ─── RestaurantTable ─────────────────────────────────────────────────────────
+// status: AVAILABLE | OCCUPIED | NEEDS_CLEANING
+model RestaurantTable {
+  id               Int            @id @default(autoincrement())
+  name             String         @unique
+  slug             String         @unique
+  capacity         Int            @default(4)
+  status           String         @default("AVAILABLE")
+  assignedOrderId  Int?
+  section          String         @default("Indoor") // Indoor, Patio, Bar, etc.
+  positionX        Float          @default(0) // X coordinate on floor plan (0-1000)
+  positionY        Float          @default(0) // Y coordinate on floor plan (0-1000)
+  occupiedSince    DateTime? // Timestamp when table became OCCUPIED
+  currentOccupants Int            @default(0) // Number of people currently seated
+  sessions         TableSession[]
+  guests           TableGuest[]
+  orders           Order[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+// ─── TableSession ────────────────────────────────────────────────────────────
+// Track when customers enter and exit tables for occupancy analytics
+model TableSession {
+  id           Int             @id @default(autoincrement())
+  tableId      Int
+  table        RestaurantTable @relation(fields: [tableId], references: [id])
+  occupants    Int // Number of people who checked in
+  entryTime    DateTime        @default(now())
+  exitTime     DateTime? // Null if still occupied
+  dwellMinutes Int? // Calculated: (exitTime - entryTime) in minutes
+  guests       TableGuest[]
+  orders       Order[]
+  createdAt    DateTime        @default(now())
+}
+
+// ─── Order ───────────────────────────────────────────────────────────────────
+// status: PENDING | PREPARING | COMPLETED | CANCELLED
+// paymentMethod: CASH | GCASH | BANK_TRANSFER
+model Order {
+  id                  Int                  @id @default(autoincrement())
+  orderNumber         String               @unique
+  customerName        String
+  loyaltyCustomerName String?
+  tableId             Int?
+  table               RestaurantTable?     @relation(fields: [tableId], references: [id])
+  status              String               @default("PENDING")
+  totalAmount         Float
+  barcodeValue        String               @unique
+  notes               String?
+  loyaltyPromo        Boolean              @default(false) // true if order used loyalty reward
+  paymentMethod       String               @default("CASH") // CASH | GCASH | PAYMAYA
+  paymentScreenshot   String? // uploaded screenshot URL for GCash/PayMaya
+  queueNumber         Int? // Kitchen queue position number for customer tracking
+  orderType           String               @default("DINE_IN") // DINE_IN | TAKEOUT | DELIVERY
+  deliveryAddress     String?
+  sessionId           Int?
+  session             TableSession?        @relation(fields: [sessionId], references: [id])
+  items               OrderItem[]
+  messages            OrderMessage[]
+  payment             PaymentTransaction?
+  loyaltyTransactions LoyaltyTransaction[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+// ─── OrderItem ───────────────────────────────────────────────────────────────
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+  notes     String?
+}
+
+// ─── OrderMessage ────────────────────────────────────────────────────────────
+// Customer follow-up messages (voice or text) attached to an order
+model OrderMessage {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      String   @default("text") // "text" | "voice"
+  content   String // text message or audio file URL
+  sender    String   @default("customer") // "customer" | "staff"
+  createdAt DateTime @default(now())
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+model Inventory {
+  id                Int      @id @default(autoincrement())
+  productId         Int      @unique
+  product           Product  @relation(fields: [productId], references: [id])
+  quantity          Int      @default(0)
+  lowStockThreshold Int      @default(10)
+  unit              String   @default("pcs")
+  updatedAt         DateTime @updatedAt
+}
+
+// ─── Setting ─────────────────────────────────────────────────────────────────
+// Key-value store for app settings (logoUrl, shopName, etc.)
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// ─── BusinessSettings ──────────────────────────────────────────────────────────
+// BIR-compliant business information for receipts/invoices
+model BusinessSettings {
+  id                  Int      @id @default(autoincrement())
+  businessName        String   @default("CaféOS Coffee Shop")
+  businessAddress     String   @default("")
+  tin                 String   @default("") // Tax Identification Number
+  branchCode          String   @default("0000") // 4-digit branch code
+  vatRate             Float    @default(12) // Default 12% VAT
+  receiptSerialPrefix String   @default("INV") // Receipt serial prefix
+  lastReceiptNumber   Int      @default(0) // Last used receipt number
+  footerMessage       String   @default("Thank you for your visit!")
+  loyaltyEnabled      Boolean  @default(true) // Global loyalty program toggle
+  // Payment method settings
+  gcashAccountName    String? // GCash account name
+  gcashQrImage        String? // Base64 or file URL of uploaded GCash QR image
+  paymayaAccountName  String? // PayMaya account name
+  paymayaQrImage      String? // Base64 or file URL of uploaded PayMaya QR image
+  // AI Consultant settings
+  aiApiKey            String? // OpenRouter API key
+  aiModel             String?  @default("google/gemma-4-31b-it")
+  aiSystemPrompt      String?  @default("You are CaféOS Assistant, a helpful AI consultant for coffee shop management.")
+  aiFolderAccess      Boolean  @default(false) // Toggle: allow AI to read business data
+  aiReadBirPricing    Boolean  @default(false) // Allow AI to access BIR pricing data
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ─── LoyaltySettings ─────────────────────────────────────────────────────────
+// Support unique loyalty configurations per category
+model LoyaltySetting {
+  id                     Int       @id @default(autoincrement())
+  categoryId             Int?      @unique
+  category               Category? @relation(fields: [categoryId], references: [id])
+  coffeesRequiredForFree Int       @default(10) // 10 paid items = 1 free voucher
+  enabled                Boolean   @default(true) // Is loyalty program enabled
+  cardColor              String    @default("#8B4513") // Card background color
+  cardTitle              String    @default("Loyalty Card") // Card title
+  cardDescription        String    @default("Earn a free coffee after ordering 10 coffees") // Card description
+
+  // Flexible reward types: FREE, PERCENTAGE, FIXED_AMOUNT
+  rewardType  String @default("FREE") // FREE | PERCENTAGE | FIXED_AMOUNT
+  rewardValue Float  @default(0) // Percentage (10 = 10%) or fixed amount (50 = ₱50)
+
+  // Milestone Rewards
+  isMilestoneMode Boolean @default(false)
+  milestones      String  @default("[]") // JSON string of {target: number, rewardType: string, rewardValue: number}
+
+  updated DateTime @updatedAt
+}
+
+// ─── LoyaltyCard ─────────────────────────────────────────────────────────────
+// Track customer's paid item count per category
+model LoyaltyCard {
+  id                  Int                  @id @default(autoincrement())
+  customerName        String
+  membershipCode      String?              @unique
+  memberSince         DateTime?
+  categoryId          Int?
+  category            Category?            @relation(fields: [categoryId], references: [id])
+  paidCoffeesCount    Int                  @default(0) // Total paid items
+  loyaltyPoints       Int                  @default(0) // Points earned (1 coffee = 1 point)
+  claimedMilestones   String               @default("[]") // JSON string of milestone targets already awarded
+  vouchers            LoyaltyVoucher[]
+  loyaltyTransactions LoyaltyTransaction[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([customerName, categoryId])
+}
+
+// ─── LoyaltyTransaction ───────────────────────────────────────────────────────
+// Tracks each point-earning and point-redemption event for loyalty transparency
+model LoyaltyTransaction {
+  id          Int         @id @default(autoincrement())
+  cardId      Int
+  card        LoyaltyCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  orderId     Int?
+  order       Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  type        String      @default("EARNED") // EARNED | REDEEMED
+  points      Int         @default(1)
+  description String?
+  createdAt   DateTime    @default(now())
+
+  @@index([cardId])
+  @@index([orderId])
+}
+
+// ─── LoyaltyVoucher ──────────────────────────────────────────────────────────
+// Free coffee voucher that customer can use anytime
+// Once used, marked as REDEEMED
+model LoyaltyVoucher {
+  id           Int          @id @default(autoincrement())
+  code         String       @unique
+  customerName String       @default("Guest")
+  cardId       Int?
+  loyaltyCard  LoyaltyCard? @relation(fields: [cardId], references: [id])
+
+  // Voucher type and value
+  discountType  String @default("FREE") // FREE | PERCENTAGE | FIXED_AMOUNT
+  discountValue Float  @default(0) // Percentage (10 = 10%) or fixed amount (50 = ₱50)
+  rewardName    String @default("Free Coffee") // Display name
+
+  // Usage rules
+  minPurchase    Float   @default(0) // Minimum order amount to use (0 = no minimum)
+  maxRedemptions Int     @default(1) // Max times this voucher can be used
+  usedCount      Int     @default(0) // How many times already used
+  validDays      String? // Comma-separated days: "MON,TUE,WED,THU,FRI" or "WEEKENDS" or null = any day
+
+  // Targeting rules
+  targetType       String @default("ALL") // ALL | CATEGORY | PRODUCT
+  targetCategoryId Int? // Category ID if targetType is CATEGORY
+  targetProductId  Int? // Product ID if targetType is PRODUCT
+
+  status          String    @default("ACTIVE") // ACTIVE | REDEEMED | EXPIRED
+  issuedDate      DateTime  @default(now())
+  expiryDate      DateTime? // Optional expiry date
+  redeemedDate    DateTime?
+  redeemedOrderId Int?
+  updatedAt       DateTime  @updatedAt
+}
+
+// ─── RewardHistory ───────────────────────────────────────────────────────────
+// (Optional) Tracks when customers earn and redeem rewards for transparency
+model RewardHistory {
+  id           Int      @id @default(autoincrement())
+  customerName String
+  action       String // EARNED | REDEEMED | EXPIRED
+  rewardCount  Int      @default(1)
+  rewardType   String   @default("FREE_COFFEE")
+  voucherCode  String?
+  orderId      Int?
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
+// ─── PaymentTransaction ──────────────────────────────────────────────────────
+// method: CASH | CARD | EWALLET
+// status: PENDING | COMPLETED | FAILED | REFUNDED
+model PaymentTransaction {
+  id          Int       @id @default(autoincrement())
+  orderId     Int       @unique
+  order       Order     @relation(fields: [orderId], references: [id])
+  amount      Float
+  method      String    @default("CASH")
+  status      String    @default("PENDING")
+  referenceNo String?
+  terminalId  String?
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// ─── Table Guest ───────────────────────────────────────────────────────────
+// Individual guests who check in at a table
+model TableGuest {
+  id          Int             @id @default(autoincrement())
+  tableId     Int
+  table       RestaurantTable @relation(fields: [tableId], references: [id])
+  sessionId   Int
+  session     TableSession    @relation(fields: [sessionId], references: [id])
+  displayName String
+  moodEmoji   String?
+  moodNote    String?
+  active      Boolean         @default(true)
+  exitedAt    DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+// ─── Staff Station Control ───────────────────────────────────────────────────
+// Tracks how many staff are working at each preparation station
+model StaffStationControl {
+  id          Int      @id @default(autoincrement())
+  stationType String   @unique
+  emoji       String   @default("📦") // Emoji icon for the station
+  staffCount  Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── AuditLog ───────────────────────────────────────────────────────────────────
+// Tracks all user actions for transparency and debugging
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String // e.g., "ORDER_CREATE", "LOYALTY_AWARD", "SETTINGS_UPDATE"
+  resource   String // e.g., "order", "loyalty_card", "business_settings"
+  resourceId Int?
+  details    String? // JSON string with additional context
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([resource, resourceId])
+}
+
+// ─── AI Conversation ──────────────────────────────────────────────────────────
+model AIConversation {
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  user      User        @relation(fields: [userId], references: [id])
+  title     String
+  messages  AIMessage[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId])
+}
+
+// ─── AI Message ───────────────────────────────────────────────────────────────
+model AIMessage {
+  id             Int            @id @default(autoincrement())
+  conversationId Int
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // assistant | user
+  content        String
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId])
+}
+
+// ─── Expense Category ──────────────────────────────────────────────────────────
+model ExpenseCategory {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  expenses    Expense[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── Expense ────────────────────────────────────────────────────────────────────
+model Expense {
+  id          Int             @id @default(autoincrement())
+  categoryId  Int
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  userId      Int
+  user        User            @relation(fields: [userId], references: [id])
+  supplierId  Int?
+  supplier    Supplier?       @relation(fields: [supplierId], references: [id])
+  amount      Float
+  description String?
+  expenseDate DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([categoryId])
+  @@index([supplierId])
+  @@index([userId])
+}

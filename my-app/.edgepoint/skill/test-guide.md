@@ -1,0 +1,491 @@
+---
+description: Produce a printable step-by-step guide, with screenshots, telling the people who will test the software what to try and what they should see. Use it when the builder wants to check the software themselves, hand it to staff, or send it to a client before it goes live.
+---
+
+`/check` proves the software works to a machine. This is the other half: a guide
+that tells a **person** what to try, in what order, and what they should see — so
+the builder, their staff, or their client can sit down with the software and know
+they have covered everything, rather than clicking around hoping.
+
+The artifact is a PDF, one per spec, at `test-guide/<spec>.pdf`. It is generated,
+never written by hand: the steps come from the spec, the screenshots come from a
+real browser driving a real copy of the app, and the whole thing is rebuilt from
+scratch whenever the software changes. A hand-written guide goes stale silently,
+and a tester following a stale guide reports faults that aren't there.
+
+## When to make one
+
+- The builder asks how they can test it, or wants to hand it to someone else.
+- After `/check` passes on a spec, before `/ship`.
+- Before anything goes in front of a client — this is the document that gets
+  handed over with it.
+
+If some acceptance tests are failing, say which ones and ask before generating.
+A guide built from a broken build teaches the tester to expect the wrong thing.
+
+## Where the steps come from
+
+**The acceptance criteria in `spec.md`, in the builder's own sentences.** Each
+criterion becomes a heading, quoted word for word, followed by the steps a person
+takes to satisfy it and the verdict box where they record whether it worked.
+
+Every criterion appears exactly once. Nothing appears that is not a criterion.
+`tasks.md` already maps each criterion to its Playwright test, and that test
+already knows the route, the labels, and the order — so the walkthrough follows
+the same path. What it does not carry over is the assertions: the machine checks;
+the guide *shows*, and the person decides.
+
+Some criteria cannot be walked by hand — a nightly job, a webhook from a payment
+provider, an email that arrives an hour later. Those still get their heading, with
+one line saying it is tested automatically and there is nothing to click. Leaving
+them out makes the guide look complete when it isn't; inventing steps for them
+makes the tester report a failure they cannot cause.
+
+## Never photograph the builder's real data
+
+The screenshots get printed and handed to other people. That makes this a
+disclosure, not a screenshot.
+
+So the guide is always captured against a throwaway environment seeded with
+**made-up** data — invented names, invented mobile numbers, `@example.com`
+addresses, amounts that are obviously not real. Never the builder's local
+database, never a copy of production, never "just this once because the seed data
+is thin". See `standard/privacy.md`: a printed page with a real customer's name,
+number, and appointment on it is a personal-data breach that no one can recall.
+
+Made-up data also makes the guide reproducible. The tester is comparing their
+screen to a picture, so the picture has to be of something that will still be
+there tomorrow.
+
+## How it runs
+
+```
+./edge guide                                build every walkthrough in the project
+./edge guide tests/guide/<spec>.guide.ts    just the one
+```
+
+That is the only entry point — never `npx playwright` and never `docker compose`
+directly, for the reasons in `standard/environment.md`. What it does:
+
+1. Starts a **separate** environment — its own compose project, its own database,
+   no published ports. The builder's own `./edge dev` and their local data are
+   untouched, and both can be running at the same time.
+2. Applies the migrations, then `tests/guide/seed.sql`.
+3. Runs the walkthrough in a real Chromium, capturing a screenshot at each step.
+4. Renders the PDF into `test-guide/`.
+5. **Tears the environment down**, however it ended — including a cancelled run.
+   The database exists in memory only, so nothing survives it.
+
+The database being fresh every time is the point: the guide always shows the
+software as a new customer would find it, not as it looks after a fortnight of
+the builder poking at it.
+
+On a `site` project there is no database and no seed step, so what appears in the
+screenshots is whatever content is in the project. That puts the same duty
+somewhere else: anything standing in for copy the builder has not written yet must
+be visibly a draft, because a guide is read as a picture of the finished thing.
+
+If `./edge` does not recognise `guide`, this project's scaffolding predates test
+guides. Say so plainly and stop — that needs a developer to refresh those files.
+Do not work around it by running Playwright on the builder's machine; the browsers
+are not there, and telling them to install some is exactly what this framework
+exists to avoid.
+
+## The files
+
+```
+playwright.guide.config.ts     separate from playwright.config.ts, so ./edge test
+                               never runs the walkthrough by accident
+compose.guide.yaml             the throwaway environment (shipped in the scaffold)
+tests/guide/
+  guide.ts                     the helper: captures steps, renders the PDF
+  seed.sql                     the made-up data
+  <spec>.guide.ts              one walkthrough per spec
+test-guide/<spec>.pdf          the artifact — commit it, it is a deliverable
+```
+
+Nothing else is written to the project. The screenshots never touch the disk:
+they go into the PDF as embedded images, so there is no folder of stray PNGs for
+the builder to wonder about.
+
+## Reference implementation
+
+Adapt the walkthrough to the spec. Keep the helper and the config close to this —
+every awkward line in them is load-bearing, and the comments say why.
+
+**`playwright.guide.config.ts`**
+
+```ts
+import { defineConfig, devices } from '@playwright/test'
+
+export default defineConfig({
+  testDir: './tests/guide',
+  testMatch: /.*\.guide\.ts$/,
+  // One at a time. Every screenshot is of one shared seeded database, and two
+  // walkthroughs running at once photograph each other's changes.
+  workers: 1,
+  fullyParallel: false,
+  retries: 0,
+  reporter: 'line',
+  // The dev server compiles each route on first visit, which is slow once and
+  // fast after. A short timeout here fails the first run on every fresh
+  // environment — which is every run.
+  timeout: 180_000,
+  use: {
+    baseURL: process.env.BASE_URL ?? 'http://app:3000',
+    // Chromium only: printing to PDF is a Chromium feature.
+    ...devices['Desktop Chrome'],
+    viewport: { width: 1280, height: 820 },
+    // These get printed. At 1x the text in them looks soft on paper.
+    deviceScaleFactor: 2,
+  },
+})
+```
+
+**`tests/guide/guide.ts`**
+
+```ts
+import type { Locator, Page } from '@playwright/test'
+import { mkdir } from 'node:fs/promises'
+
+type Step = { instruction: string; expected: string; image: string; width: number }
+type Section = { criterion: string; steps: Step[]; automatic?: string }
+
+export type GuideMeta = {
+  /** The spec folder name — becomes the file name. */
+  spec: string
+  /** What the builder calls this. Appears on the cover. */
+  title: string
+  /** Two or three sentences: what this covers, and roughly how long it takes. */
+  intro: string
+  /** Where the tester does this, in words: "the test site your developer sent you". */
+  where: string
+  /** Sign-in details for the environment being tested, if any are needed. */
+  signIn?: { who: string; email: string; password: string }[]
+}
+
+export async function startGuide(page: Page, meta: GuideMeta) {
+  const sections: Section[] = []
+
+  // First contact with a dev server that started seconds ago, and the one place
+  // that has to be patient. Until it is listening, a goto fails outright rather
+  // than waiting; after that it compiles on demand and serves a blank page while
+  // it does. Both are absorbed here, so no screenshot below is of a half-built
+  // page — and a genuinely dead app still reports as one.
+  const deadline = Date.now() + 120_000
+  for (;;) {
+    try {
+      await page.goto('/', { waitUntil: 'domcontentloaded' })
+      break
+    } catch (error) {
+      if (Date.now() > deadline) throw error
+      await page.waitForTimeout(1_000)
+    }
+  }
+
+  const current = () => {
+    const section = sections.at(-1)
+    if (!section) throw new Error('Call criterion() before step().')
+    return section
+  }
+
+  return {
+    /** The builder's own sentence from spec.md, word for word. */
+    criterion(sentence: string) {
+      sections.push({ criterion: sentence, steps: [] })
+    },
+
+    /** A criterion nobody can click — a nightly job, a webhook, a later email. */
+    automatic(sentence: string, why: string) {
+      sections.push({ criterion: sentence, steps: [], automatic: why })
+    },
+
+    async step(s: {
+      /** What the tester does, as an instruction: "Choose the first free slot." */
+      instruction: string
+      /** What they should see afterwards, in their words, not the code's. */
+      expected: string
+      run: () => Promise<void>
+      /** Photograph one part of the page instead of all of it — a dialog, a row. */
+      focus?: Locator
+      fullPage?: boolean
+    }) {
+      await s.run()
+      // Settle the page before the shutter: a screenshot taken mid-request
+      // catches a spinner, and then the tester is comparing their screen to a
+      // spinner. Bounded and swallowed on purpose — an app that polls anything
+      // (a dashboard that refreshes, a notifications check) never goes quiet, and
+      // waiting for silence forever would make the guide impossible to produce.
+      // A picture taken a moment early beats no guide at all. Keep the bound
+      // short: on an app that polls, every step pays it, and twenty steps at ten
+      // seconds each would run the whole walkthrough out of time.
+      await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
+      const shot = s.focus
+        ? await s.focus.screenshot({ animations: 'disabled', caret: 'hide' })
+        : await page.screenshot({
+            animations: 'disabled',
+            caret: 'hide',
+            fullPage: s.fullPage ?? false,
+          })
+      // Screenshots are taken at 2x so they print sharply, which makes the image
+      // twice the size the browser showed. Carrying the width it was seen at is
+      // what stops a photographed dialog printing twice the size of a page.
+      const box = s.focus ? await s.focus.boundingBox() : page.viewportSize()
+      current().steps.push({
+        instruction: s.instruction,
+        expected: s.expected,
+        image: `data:image/png;base64,${shot.toString('base64')}`,
+        width: Math.round(box?.width ?? 1280),
+      })
+    },
+
+    /** Renders the PDF. Returns where it went. */
+    async finish() {
+      const out = `test-guide/${meta.spec}.pdf`
+      await mkdir('test-guide', { recursive: true })
+      const sheet = await page.context().newPage()
+      await sheet.setContent(render(meta, sections), { waitUntil: 'load' })
+      await sheet.emulateMedia({ media: 'print' })
+      await sheet.pdf({
+        path: out,
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '14mm', bottom: '16mm', left: '14mm', right: '14mm' },
+        displayHeaderFooter: true,
+        headerTemplate: '<span></span>',
+        footerTemplate: `<div style="width:100%;padding:0 14mm;font:9px sans-serif;
+          color:#767676;display:flex;justify-content:space-between">
+          <span>${esc(meta.title)} — test guide</span>
+          <span><span class="pageNumber"></span> / <span class="totalPages"></span></span>
+        </div>`,
+      })
+      await sheet.close()
+      return out
+    },
+  }
+}
+
+const esc = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+function render(meta: GuideMeta, sections: Section[]) {
+  // Only the fonts inside the container exist here, so this names families the
+  // Playwright image actually has. A missing family prints as boxes.
+  const step = (s: Step, n: number) => `
+    <section class="step">
+      <h3><span class="n">${n}</span>${esc(s.instruction)}</h3>
+      <p class="expected"><strong>You should see:</strong> ${esc(s.expected)}</p>
+      <img src="${s.image}" style="width:${s.width}px" alt="">
+    </section>`
+
+  let n = 0
+  const body = sections
+    .map((section) => {
+      const steps = section.automatic
+        ? `<p class="automatic">${esc(section.automatic)}</p>`
+        : section.steps.map((s) => step(s, ++n)).join('')
+      return `
+        <div class="criterion">
+          <h2>${esc(section.criterion)}</h2>
+          ${steps}
+          ${
+            section.automatic
+              ? ''
+              : `<div class="verdict">
+                   <!-- The box names what it is judging, because a long criterion
+                        can push it onto the page after its own steps — where an
+                        unlabelled tick box looks like it belongs to whatever
+                        heading follows it. -->
+                   <p class="what">${esc(section.criterion)}</p>
+                   <p><span class="box"></span> This worked
+                      <span class="box"></span> This did not work</p>
+                   <p class="wrote">If it did not work, what happened — and at which
+                      step number?</p>
+                   <div class="rule"></div><div class="rule"></div>
+                 </div>`
+          }
+        </div>`
+    })
+    .join('')
+
+  return `<!doctype html><meta charset="utf-8"><title>${esc(meta.title)}</title>
+<style>
+  body { font: 11pt/1.5 "DejaVu Sans", "Liberation Sans", sans-serif; color: #1a1a1a; margin: 0 }
+  h1 { font-size: 24pt; margin: 0 0 4mm }
+  /* Both avoids are load-bearing. Without break-inside the sentence splits over
+     two pages and its grey panel stretches down the rest of the first one;
+     without break-after the heading is stranded away from its own steps. */
+  h2 { font-size: 13pt; margin: 0 0 4mm; padding: 3mm 4mm; background: #f2f1ee;
+       border-left: 3px solid #1a1a1a; break-inside: avoid; break-after: avoid }
+  h3 { font-size: 11pt; margin: 0 0 2mm; display: flex; gap: 3mm; align-items: baseline }
+  .n { display: inline-block; min-width: 7mm; height: 7mm; border-radius: 50%;
+       background: #1a1a1a; color: #fff; font-size: 9pt; text-align: center;
+       line-height: 7mm; flex: none }
+  /* Its own page. The first criterion won't fit under it anyway — a criterion
+     and its first step don't split — so the choice is a deliberate cover or an
+     accidental half-empty one. */
+  .cover { break-after: page }
+  .cover dt { font-size: 9pt; text-transform: uppercase; letter-spacing: .06em;
+              color: #767676; margin-top: 4mm }
+  .criterion { margin-bottom: 10mm }
+  /* A step split across a page break puts the instruction on one page and the
+     picture on the next, which is the one thing a tester cannot follow. */
+  .step { break-inside: avoid; margin-bottom: 6mm }
+  .step img { display: block; max-width: 100%; border: 1px solid #d8d5cf; margin-top: 2mm }
+  .expected { margin: 0 0 1mm; padding-left: 10mm }
+  .automatic { padding: 3mm 4mm; background: #f7f6f4; color: #555; margin: 0 }
+  .verdict { break-inside: avoid; padding: 4mm; border: 1px solid #d8d5cf }
+  .verdict p { margin: 0 0 2mm }
+  .box { display: inline-block; width: 4mm; height: 4mm; border: 1.5px solid #1a1a1a;
+         vertical-align: -0.5mm; margin-right: 1.5mm }
+  .what { font-size: 9pt; color: #767676 }
+  .wrote { font-size: 9pt; color: #767676 }
+  .rule { border-bottom: 1px solid #c9c5bd; height: 7mm }
+  table { border-collapse: collapse; font-size: 10pt }
+  td, th { border: 1px solid #d8d5cf; padding: 1.5mm 3mm; text-align: left }
+</style>
+<div class="cover">
+  <h1>${esc(meta.title)}</h1>
+  <p>${esc(meta.intro)}</p>
+  <dl>
+    <dt>Where to do this</dt><dd>${esc(meta.where)}</dd>
+    ${
+      meta.signIn?.length
+        ? `<dt>Sign in with</dt><dd><table><tr><th>Who</th><th>Email</th><th>Password</th></tr>
+           ${meta.signIn
+             .map(
+               (s) =>
+                 `<tr><td>${esc(s.who)}</td><td>${esc(s.email)}</td><td>${esc(s.password)}</td></tr>`
+             )
+             .join('')}</table></dd>`
+        : ''
+    }
+    <dt>How to use this</dt>
+    <dd>Work top to bottom. Each grey heading is something the software is
+    supposed to do; the numbered steps under it are how to try it. Compare what
+    you see to the picture, then tick whether it worked. If it did not, write down
+    the step number — that is all anyone needs to find it.</dd>
+    <dt>The data in here is made up</dt>
+    <dd>Every name, number and amount you see is invented for testing. Nothing you
+    do here reaches a real customer.</dd>
+  </dl>
+</div>
+${body}`
+}
+```
+
+**`tests/guide/<spec>.guide.ts`** — one per spec, adapted to it:
+
+```ts
+import { test } from '@playwright/test'
+import { startGuide } from './guide'
+
+test('Booking an appointment', async ({ page }) => {
+  const guide = await startGuide(page, {
+    spec: '003-online-booking',
+    title: 'Booking an appointment',
+    intro:
+      'This walks through booking an appointment the way a patient would, then ' +
+      'finding it on the day sheet. It takes about ten minutes.',
+    where: 'The test site — the address sent to you with this guide.',
+    signIn: [{ who: 'Reception', email: 'reception@example.com', password: 'test-password' }],
+  })
+
+  guide.criterion(
+    'When a patient picks a free slot and confirms, they see a confirmation with the date and time'
+  )
+
+  await guide.step({
+    instruction: 'Open the booking page and choose Cleaning.',
+    expected: 'A calendar of the next two weeks, with Cleaning shown as the treatment.',
+    run: async () => {
+      await page.goto('/book')
+      await page.getByRole('button', { name: 'Cleaning' }).click()
+    },
+  })
+
+  await guide.step({
+    // The instruction and the picture have to agree: this step stops at choosing
+    // the slot, so it must not click Continue as well.
+    instruction: 'Choose the first free slot.',
+    expected: 'The slot you chose is marked as selected, and Continue is no longer greyed out.',
+    run: async () => {
+      await page.getByRole('button', { name: /free/i }).first().click()
+    },
+  })
+
+  guide.automatic(
+    'The patient gets a reminder the day before',
+    'Sent automatically the day before the appointment, so there is nothing to click here. This one is checked by the automated tests.'
+  )
+
+  await guide.finish()
+})
+```
+
+**`tests/guide/seed.sql`**
+
+```sql
+-- Made-up data for the test guide's screenshots. Applied to a throwaway database
+-- that is destroyed as soon as the guide is finished.
+--
+-- Nothing real belongs in this file. These screenshots get printed and handed to
+-- other people — see standard/privacy.md.
+--
+-- Dates are relative to today so the guide never shows a date in the past.
+insert into patients (id, full_name, mobile, email) values
+  ('11111111-1111-1111-1111-111111111111', 'Maria Santos', '+63 917 555 0142', 'maria@example.com'),
+  ('22222222-2222-2222-2222-222222222222', 'Ramon Dela Cruz', '+63 917 555 0188', 'ramon@example.com');
+
+insert into appointments (patient_id, treatment, starts_at, price_php) values
+  ('11111111-1111-1111-1111-111111111111', 'Cleaning', current_date + 1 + time '10:00', 1500.00),
+  ('22222222-2222-2222-2222-222222222222', 'Filling',  current_date + 2 + time '14:30', 3200.00);
+```
+
+## Screenshots that survive being printed
+
+- **Nothing in the guide names a fixed date.** "Tuesday 18 August" is wrong within
+  a week and the tester then reports a fault that does not exist. Seed with
+  `current_date + n`, and write the step as "the first free slot".
+- **One picture per step, taken after the action** — the tester's confirmation
+  that they did it right, not a preview of what to click.
+- **Photograph the part that matters.** A dialog or a single row is clearer at
+  print size than a full page with the dialog somewhere in it. That is what
+  `focus` is for. `fullPage` only when the step really is about the whole page.
+  A focused shot prints at the size it really is, so focus on something with
+  substance — a dialog, a card, a table. A single button prints the size of a
+  single button.
+- **If a screenshot needs an arrow drawn on it to make sense, it is two steps.**
+- **Hide anything that changes on its own** — a live clock, "2 minutes ago", a
+  random avatar. The tester is comparing pixels to paper; anything that moves
+  reads as a fault.
+- **Capture at the size the person will actually use.** A customer-facing
+  walkthrough belongs at a phone viewport, because that is where Philippine
+  customers will be; an admin walkthrough belongs at desktop. Override `viewport`
+  per walkthrough with `test.use({ viewport: { width: 390, height: 844 } })`.
+
+## The words in it
+
+The tester may be a receptionist, a warehouse supervisor, or the builder's
+brother-in-law. Write for them:
+
+- The builder's vocabulary throughout. If they say "enquiry", the guide says
+  enquiry — never "record", "entity", or "row".
+- Instructions are things a person does: "Choose the first free slot." Not
+  "navigate to the booking route" and not "trigger the confirmation flow".
+- No file names, no URLs beyond the one on the cover, no field names from the
+  database, no mention of Playwright or Docker. They are testing software, not
+  reading about how it was made.
+- `₱1,500.00`, `11 Aug 2026`, `+63 917 555 0142`.
+
+## Telling the builder
+
+One or two sentences about what they now have, and what to do with it:
+
+> There's a 9-page guide in `test-guide/003-online-booking.pdf` — 14 things to
+> try, with a picture of what each one should look like, and a box to tick. Print
+> it or send it to whoever is testing. If anything fails, the step number is all
+> I need.
+
+Not how it was generated, not what the walkthrough file contains, and no
+screenshots pasted into the chat.

@@ -1,0 +1,1 @@
+docker compose exec db psql -U postgres -d postgres -c "SELECT id, email, active, role, password FROM users;"

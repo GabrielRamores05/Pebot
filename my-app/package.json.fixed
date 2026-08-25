@@ -1,0 +1,143 @@
+{
+  "name": "cafeos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise QR Ordering & POS System for coffee shops",
+  "author": "CaféOS",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "NODE_ENV=development node --max-old-space-size=1536 server.js",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 next build && node scripts/sync-prisma-next-runtime.js",
+    "start": "NODE_ENV=production node --max-old-space-size=2048 server.js",
+    "start:win": "NODE_ENV=production node --max-old-space-size=2048 server.js",
+    "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "setup": "prisma generate && prisma db push && npm run db:seed",
+    "generate-icon": "node scripts/generate-icon.js",
+    "electron": "electron .",
+    "electron:build": "CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && electron-builder",
+    "electron:build:win": "CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && electron-builder --win",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:linux": "npm run build && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.cafeos.pos",
+    "productName": "CaféOS",
+    "copyright": "Copyright © 2026 CaféOS",
+    "asar": false,
+    "directories": {
+      "output": "../dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "server.js",
+      ".next/**/*",
+      "public/**/*",
+      "node_modules/.prisma/**/*",
+      "node_modules/**/*",
+      "prisma/schema.prisma",
+      "prisma/dev.db"
+    ],
+    "extraResources": [
+      {
+        "from": "prisma/dev.db",
+        "to": "prisma/dev.db"
+      },
+      {
+        "from": "public/icons/icon-192.png",
+        "to": "icon.png"
+      },
+      {
+        "from": "public/icons/icon-32.png",
+        "to": "icon-32.png"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icons/icon-192.png",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg"
+        },
+        {
+          "target": "zip"
+        }
+      ],
+      "icon": "public/icons/icon-192.png",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage"
+        },
+        {
+          "target": "deb"
+        }
+      ],
+      "icon": "public/icons/icon-192.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CaféOS POS"
+    }
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/qrcode": "^1.5.6",
+    "@zxing/library": "^0.21.3",
+    "bcryptjs": "^3.0.3",
+    "html2canvas": "^1.4.1",
+    "internal-ip": "^9.0.0",
+    "jose": "^6.1.3",
+    "jsbarcode": "^3.12.3",
+    "jsonwebtoken": "^9.0.3",
+    "jspdf": "^4.2.1",
+    "next": "^16.2.1",
+    "prisma": "^5.22.0",
+    "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "^3.7.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/qrcode.react": "^1.0.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "electron": "^40.7.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5"
+  }
+}
