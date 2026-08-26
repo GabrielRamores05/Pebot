@@ -95,12 +95,22 @@ function migrateDatabase() {
 
     await ensureSchema();
     log('Running prisma db push...');
+    // Prisma writes its cache relative to the CLI's node_modules — inside
+    // Program Files on installed builds, which is read-only for normal users.
+    // Point every writable location at the user-data folder instead.
+    const userDataDir = app.getPath('userData');
+    const cacheDir = path.join(userDataDir, '.cache');
     const proc = spawn(process.execPath, [prismaCli, 'db', 'push', '--skip-generate', `--schema=${schemaPath}`], {
-      cwd: APP_DIR,
+      cwd: userDataDir,
       env: {
         ...process.env,
         ELECTRON_RUN_AS_NODE: '1',
         DATABASE_URL: process.env.DATABASE_URL,
+        USERPROFILE: userDataDir,
+        HOME: userDataDir,
+        APPDATA: path.join(userDataDir, 'AppData', 'Roaming'),
+        XDG_CACHE_HOME: cacheDir,
+        npm_config_cache: path.join(cacheDir, 'npm'),
       },
       stdio: 'pipe',
       shell: false,

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import type { SubscriptionTier } from '@/lib/subscription';
+import AdminToolsSection from '../AdminToolsSection';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface AppUser {
@@ -17,9 +18,9 @@ interface AppUser {
 const ROLES: AppUser['role'][] = ['ADMIN', 'STAFF', 'KITCHEN'];
 
 const ROLE_COLORS: Record<AppUser['role'], string> = {
-  ADMIN: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  STAFF: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  KITCHEN: 'bg-green-500/20 text-green-400 border-green-500/30',
+  ADMIN: 'bg-amber-50 text-amber-600 border-amber-200',
+  STAFF: 'bg-blue-50 text-blue-600 border-blue-200',
+  KITCHEN: 'bg-green-50 text-green-600 border-green-200',
 };
 
 const ROLE_DESC: Record<AppUser['role'], string> = {
@@ -32,7 +33,7 @@ const BRANDING_UPDATED_EVENT = 'branding:updated';
 
 // ── Settings Page ────────────────────────────────────────────────────────────
 export default function SettingsPage() {
-  const [tab, setTab] = useState<'branding' | 'business' | 'loyalty' | 'payments' | 'ai'>('business');
+  const [tab, setTab] = useState<'branding' | 'business' | 'loyalty' | 'payments' | 'ai' | 'tools'>('business');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   // Branding
@@ -337,39 +338,39 @@ export default function SettingsPage() {
   // ────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-950 p-6">
+    <div className="flex-1 overflow-y-auto bg-gray-50 min-h-screen p-4 md:p-6">
       <div className="max-w-3xl mx-auto">
 
          {/* Header */}
-         <div className="mb-6">
-           <h1 className="text-2xl font-bold text-white">Settings</h1>
-           <p className="text-gray-400 text-sm mt-1">Manage branding and user accounts</p>
+         <div className="mb-4">
+           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+           <p className="text-gray-500 text-sm mt-1">Manage branding and user accounts</p>
          </div>
 
          {/* Tabs */}
-        <div className="flex gap-1 bg-gray-900 rounded-xl p-1 mb-6 w-fit">
-          {(['business', 'branding', 'loyalty', 'payments', 'ai'] as const).map((t) => (
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 mb-4 w-fit shadow-sm">
+          {(['business', 'branding', 'loyalty', 'payments', 'ai', 'tools'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
-                tab === t ? 'bg-amber-600 text-white' : 'text-gray-400 hover:text-white'
+                tab === t ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {t === 'business' ? '🏢 Business' : t === 'branding' ? 'Branding' : t === 'loyalty' ? 'Loyalty' : t === 'payments' ? '💳 Payments' : '🤖 AI Consultant'}
+              {t === 'business' ? '🏢 Business' : t === 'branding' ? 'Branding' : t === 'loyalty' ? 'Loyalty' : t === 'payments' ? '💳 Payments' : t === 'tools' ? '🧰 Account & Data' : '🤖 AI Consultant'}
             </button>
           ))}
         </div>
 
         {/* ── BRANDING TAB ────────────────────────────────────────────────── */}
         {tab === 'branding' && (
-          <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 space-y-6">
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
 
             {/* Logo */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-3">Shop Logo</label>
+              <label className="block text-sm font-medium text-gray-600 mb-3">Shop Logo</label>
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-20 h-20 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
                   {logoUrl
                     ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                     : <span className="text-3xl">☕</span>}
@@ -385,7 +386,7 @@ export default function SettingsPage() {
                   <button
                     onClick={() => logoInputRef.current?.click()}
                     disabled={logoUploading}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+                    className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
                   >
                     {logoUploading ? 'Uploading...' : 'Upload Logo'}
                   </button>
@@ -408,11 +409,11 @@ export default function SettingsPage() {
 
             {/* Shop Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Shop Name</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Shop Name</label>
               <input
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500"
+                className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500"
                 placeholder="Your cafe name"
               />
               <p className="text-xs text-gray-500 mt-1">Shown in the admin sidebar and login page.</p>
@@ -427,7 +428,7 @@ export default function SettingsPage() {
                 {brandingSaving ? 'Saving...' : 'Save Changes'}
               </button>
               {brandingMsg && (
-                <span className={`text-sm ${brandingMsg === 'Saved!' ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`text-sm ${brandingMsg === 'Saved!' ? 'text-green-600' : 'text-red-600'}`}>
                   {brandingMsg}
                 </span>
               )}
@@ -437,32 +438,32 @@ export default function SettingsPage() {
 
         {/* ── BIR BUSINESS TAB ────────────────────────────────────────────────── */}
         {tab === 'business' && (
-          <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 space-y-6">
-            <div className="border-b border-gray-800 pb-4">
-              <h3 className="text-lg font-bold text-white">🏢 BIR Business Settings</h3>
-              <p className="text-gray-400 text-sm mt-1">Business information for BIR-compliant receipts/invoices</p>
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
+            <div className="border-b border-gray-200 pb-4">
+              <h3 className="text-lg font-bold text-gray-900">🏢 BIR Business Settings</h3>
+              <p className="text-gray-500 text-sm mt-1">Business information for BIR-compliant receipts/invoices</p>
             </div>
 
             {/* Business Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Registered Business Name</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Registered Business Name</label>
               <input
                 type="text"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                 placeholder="CaféOS Coffee Shop"
               />
             </div>
 
             {/* Business Address */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Business Address</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Business Address</label>
               <textarea
                 value={businessAddress}
                 onChange={(e) => setBusinessAddress(e.target.value)}
                 rows={2}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 resize-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500 resize-none"
                 placeholder="123 Main Street, City, Province"
               />
             </div>
@@ -470,23 +471,23 @@ export default function SettingsPage() {
             {/* TIN & Branch */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">TIN (Tax Identification Number)</label>
+                <label className="block text-sm font-medium text-gray-600 mb-2">TIN (Tax Identification Number)</label>
                 <input
                   type="text"
                   value={tin}
                   onChange={(e) => setTin(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                   placeholder="123-456-789-000"
                 />
                 <p className="text-gray-500 text-xs mt-1">9-digit TIN</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Branch Code</label>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Branch Code</label>
                 <input
                   type="text"
                   value={branchCode}
                   onChange={(e) => setBranchCode(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                   placeholder="0000"
                   maxLength={4}
                 />
@@ -496,11 +497,11 @@ export default function SettingsPage() {
 
             {/* VAT Rate */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">VAT Rate (%)</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">VAT Rate (%)</label>
               <select
                 value={vatRate}
                 onChange={(e) => setVatRate(parseFloat(e.target.value))}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
               >
                 <option value={0}>0% (VAT Exempt)</option>
                 <option value={12}>12% (Standard)</option>
@@ -509,12 +510,12 @@ export default function SettingsPage() {
 
             {/* Receipt Prefix */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Receipt Serial Prefix</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Receipt Serial Prefix</label>
               <input
                 type="text"
                 value={receiptPrefix}
                 onChange={(e) => setReceiptPrefix(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                 placeholder="INV"
               />
               <p className="text-gray-500 text-xs mt-1">e.g., INV, ORD, RCPT</p>
@@ -522,27 +523,27 @@ export default function SettingsPage() {
 
             {/* Footer Message */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Receipt Footer Message</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Receipt Footer Message</label>
               <input
                 type="text"
                 value={footerMessage}
                 onChange={(e) => setFooterMessage(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                 placeholder="Thank you for your visit!"
               />
             </div>
 
             {/* Save Button */}
-            <div className="flex items-center gap-4 pt-4 border-t border-gray-800">
+            <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
               <button
                 onClick={saveBusinessSettings}
                 disabled={businessSaving}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
                 {businessSaving ? 'Saving...' : '💾 Save Business Settings'}
               </button>
               {businessMsg && (
-                <span className="text-white text-sm">{businessMsg}</span>
+                <span className="text-emerald-600 text-sm font-medium">{businessMsg}</span>
               )}
             </div>
           </div>
@@ -550,35 +551,35 @@ export default function SettingsPage() {
 
         {/* ── LOYALTY TAB ───────────────────────────────────────────────────── */}
         {tab === 'loyalty' && (
-          <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 space-y-6">
-            <div className="border-b border-gray-800 pb-4">
-              <h3 className="text-lg font-bold text-white">🎁 Loyalty Program</h3>
-              <p className="text-gray-400 text-sm mt-1">Enable or disable the loyalty program globally</p>
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
+            <div className="border-b border-gray-200 pb-4">
+              <h3 className="text-lg font-bold text-gray-900">🎁 Loyalty Program</h3>
+              <p className="text-gray-500 text-sm mt-1">Enable or disable the loyalty program globally</p>
             </div>
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white font-medium">Loyalty Program</p>
-                <p className="text-gray-400 text-sm">When disabled, cashiers cannot assign loyalty members and no points are awarded.</p>
+                <p className="text-gray-900 font-medium">Loyalty Program</p>
+                <p className="text-gray-500 text-sm">When disabled, cashiers cannot assign loyalty members and no points are awarded.</p>
               </div>
               <button
                 onClick={() => setLoyaltyEnabled(!loyaltyEnabled)}
-                className={`relative h-7 w-12 rounded-full transition-colors ${loyaltyEnabled ? 'bg-amber-600' : 'bg-gray-700'}`}
+                className={`relative h-7 w-12 rounded-full transition-colors ${loyaltyEnabled ? 'bg-amber-600' : 'bg-gray-300'}`}
               >
                 <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform ${loyaltyEnabled ? 'translate-x-6' : 'left-1'}`} />
               </button>
             </div>
 
-            <div className="flex items-center gap-4 pt-4 border-t border-gray-800">
+            <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
               <button
                 onClick={saveBusinessSettings}
                 disabled={businessSaving}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
                 {businessSaving ? 'Saving...' : '💾 Save Loyalty Settings'}
               </button>
               {businessMsg && (
-                <span className="text-white text-sm">{businessMsg}</span>
+                <span className="text-emerald-600 text-sm font-medium">{businessMsg}</span>
               )}
             </div>
           </div>
@@ -586,30 +587,30 @@ export default function SettingsPage() {
 
         {/* 💳 PAYMENTS TAB */}
         {tab === 'payments' && (
-          <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 space-y-6">
-            <div className="border-b border-gray-800 pb-4">
-              <h3 className="text-lg font-bold text-white">💳 Payment Methods</h3>
-              <p className="text-gray-400 text-sm mt-1">Configure QR codes for GCash and PayMaya</p>
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
+            <div className="border-b border-gray-200 pb-4">
+              <h3 className="text-lg font-bold text-gray-900">💳 Payment Methods</h3>
+              <p className="text-gray-500 text-sm mt-1">Configure QR codes for GCash and PayMaya</p>
             </div>
 
             {/* GCash */}
-            <div className="border border-gray-800 rounded-xl p-4 space-y-4">
-              <h4 className="text-md font-semibold text-white">GCash</h4>
+            <div className="border border-gray-200 rounded-xl p-4 space-y-4">
+              <h4 className="text-md font-semibold text-gray-900">GCash</h4>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Account Name</label>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Account Name</label>
                 <input
                   type="text"
                   value={gcashAccountName}
                   onChange={(e) => setGcashAccountName(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                   placeholder="Juan Dela Cruz"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">QR Image</label>
+                <label className="block text-sm font-medium text-gray-600 mb-2">QR Image</label>
                 {gcashQrImage ? (
                   <div className="flex items-center gap-3">
-                    <img src={gcashQrImage} alt="GCash QR" className="w-20 h-20 rounded border border-gray-700 object-contain bg-white p-1" />
+                    <img src={gcashQrImage} alt="GCash QR" className="w-20 h-20 rounded border border-gray-200 object-contain bg-white p-1" />
                     <button
                       onClick={() => setGcashQrImage(null)}
                       className="text-red-400 hover:text-red-300 text-sm"
@@ -618,7 +619,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 ) : (
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-700 bg-gray-800 py-4 text-sm font-medium text-gray-400 transition hover:bg-gray-700">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-4 text-sm font-medium text-gray-500 transition hover:bg-gray-100">
                     <input
                       type="file"
                       accept="image/*"
@@ -640,23 +641,23 @@ export default function SettingsPage() {
             </div>
 
             {/* PayMaya */}
-            <div className="border border-gray-800 rounded-xl p-4 space-y-4">
-              <h4 className="text-md font-semibold text-white">PayMaya</h4>
+            <div className="border border-gray-200 rounded-xl p-4 space-y-4">
+              <h4 className="text-md font-semibold text-gray-900">PayMaya</h4>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Account Name</label>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Account Name</label>
                 <input
                   type="text"
                   value={paymayaAccountName}
                   onChange={(e) => setPaymayaAccountName(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                   placeholder="Juan Dela Cruz"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">QR Image</label>
+                <label className="block text-sm font-medium text-gray-600 mb-2">QR Image</label>
                 {paymayaQrImage ? (
                   <div className="flex items-center gap-3">
-                    <img src={paymayaQrImage} alt="PayMaya QR" className="w-20 h-20 rounded border border-gray-700 object-contain bg-white p-1" />
+                    <img src={paymayaQrImage} alt="PayMaya QR" className="w-20 h-20 rounded border border-gray-200 object-contain bg-white p-1" />
                     <button
                       onClick={() => setPaymayaQrImage(null)}
                       className="text-red-400 hover:text-red-300 text-sm"
@@ -665,7 +666,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 ) : (
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-700 bg-gray-800 py-4 text-sm font-medium text-gray-400 transition hover:bg-gray-700">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-4 text-sm font-medium text-gray-500 transition hover:bg-gray-100">
                     <input
                       type="file"
                       accept="image/*"
@@ -686,16 +687,16 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 pt-4 border-t border-gray-800">
+            <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
               <button
                 onClick={saveBusinessSettings}
                 disabled={businessSaving}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
                 {businessSaving ? 'Saving...' : '💾 Save Payment Settings'}
               </button>
               {businessMsg && (
-                <span className="text-white text-sm">{businessMsg}</span>
+                <span className="text-emerald-600 text-sm font-medium">{businessMsg}</span>
               )}
             </div>
           </div>
@@ -703,51 +704,51 @@ export default function SettingsPage() {
 
         {/* 🤖 AI CONSULTANT TAB */}
         {tab === 'ai' && (
-          <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 space-y-6">
-            <div className="border-b border-gray-800 pb-4">
-              <h3 className="text-lg font-bold text-white">🤖 AI Consultant</h3>
-              <p className="text-gray-400 text-sm mt-1">Configure your AI assistant powered by OpenRouter</p>
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
+            <div className="border-b border-gray-200 pb-4">
+              <h3 className="text-lg font-bold text-gray-900">🤖 AI Consultant</h3>
+              <p className="text-gray-500 text-sm mt-1">Configure your AI assistant powered by OpenRouter</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">OpenRouter API Key</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">OpenRouter API Key</label>
               <input
                 type="password"
                 value={aiApiKey}
                 onChange={(e) => setAiApiKey(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 font-mono text-sm"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500 font-mono text-sm"
                 placeholder="sk-or-v1-..."
               />
-              <p className="text-xs text-gray-500 mt-1">Get your API key from <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300">openrouter.ai</a></p>
+              <p className="text-xs text-gray-500 mt-1">Get your API key from <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:text-amber-700">openrouter.ai</a></p>
               <p className="text-xs text-gray-500 mt-1">The key is stored securely in your local database and never sent to the client.</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">AI Model</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">AI Model</label>
               <input
                 type="text"
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 font-mono text-sm"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500 font-mono text-sm"
                 placeholder="google/gemma-4-31b-it"
               />
               <p className="text-xs text-gray-500 mt-1">Model identifier from OpenRouter. Default: google/gemma-4-31b-it</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">System Prompt</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">System Prompt</label>
               <textarea
                 value={aiSystemPrompt}
                 onChange={(e) => setAiSystemPrompt(e.target.value)}
                 rows={4}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 resize-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500 resize-none"
                 placeholder="You are a helpful AI assistant..."
               />
               <p className="text-xs text-gray-500 mt-1">Instructions the AI sees before each conversation to set its personality and behavior.</p>
             </div>
 
             {/* AI Folder Access Toggle */}
-            <div className="space-y-4 pt-4 border-t border-gray-800">
+            <div className="space-y-4 pt-4 border-t border-gray-200">
               <div>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <div className="relative inline-block w-12 h-6">
@@ -769,7 +770,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-white">Allow AI to access business data</span>
+                    <span className="text-sm font-medium text-gray-700">Allow AI to access business data</span>
                     <p className="text-xs text-gray-500 mt-0.5">
                       When enabled, the AI consultant can read products, inventory, orders, and settings to provide better assistance.
                     </p>
@@ -798,7 +799,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-white">Include BIR pricing data</span>
+                    <span className="text-sm font-medium text-gray-700">Include BIR pricing data</span>
                     <p className="text-xs text-gray-500 mt-0.5">
                       Allow the AI to access capital costs, margins, and VAT data. Only available when "Allow AI to access business data" is enabled.
                     </p>
@@ -807,16 +808,16 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 pt-4 border-t border-gray-800">
+            <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
               <button
                 onClick={saveBusinessSettings}
                 disabled={businessSaving}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
                 {businessSaving ? 'Saving...' : '💾 Save AI Settings'}
               </button>
               {businessMsg && (
-                <span className="text-white text-sm">{businessMsg}</span>
+                <span className="text-emerald-600 text-sm font-medium">{businessMsg}</span>
               )}
             </div>
           </div>
@@ -828,10 +829,10 @@ export default function SettingsPage() {
       {/* ── Delete User Modal ──────────────────────────────────────────────── */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setDeleteTarget(null)}>
-          <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-red-800/60 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white mb-1">Delete User</h2>
-            <p className="text-sm text-gray-400 mb-4">
-              This will permanently delete <span className="text-white font-medium">{deleteTarget.name}</span>.
+          <div className="bg-white rounded-2xl p-5 w-full max-w-md border border-red-800/60 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Delete User</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              This will permanently delete <span className="text-gray-900 font-medium">{deleteTarget.name}</span>.
             </p>
             <p className="text-xs text-red-300 bg-red-900/30 border border-red-700/50 rounded-lg px-3 py-2 mb-3">
               To confirm, type this email exactly: <span className="font-mono font-semibold">{deleteTarget.email}</span>
@@ -839,7 +840,7 @@ export default function SettingsPage() {
             <input
               value={deleteConfirm}
               onChange={(e) => { setDeleteConfirm(e.target.value); setDeleteError(''); }}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-500 mb-3"
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-500 mb-3"
               placeholder={deleteTarget.email}
               autoFocus
             />
@@ -848,7 +849,7 @@ export default function SettingsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 text-sm hover:bg-gray-700 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-gray-50 text-gray-600 text-sm hover:bg-gray-100 transition-colors"
               >
                 Cancel
               </button>
@@ -867,45 +868,45 @@ export default function SettingsPage() {
       {/* ── Create User Modal ──────────────────────────────────────────────── */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowCreate(false)}>
-          <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-gray-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white mb-5">New User</h2>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-md border border-gray-200 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900 mb-5">New User</h2>
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-gray-400 mb-1 block">Full Name</label>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Full Name</label>
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
                   placeholder="Juan dela Cruz"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-400 mb-1 block">Email</label>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Email</label>
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
                   placeholder="juan@cafe.com"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-400 mb-1 block">Password</label>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Password</label>
                 <input
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
                   placeholder="Minimum 4 characters"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-400 mb-1 block">Role</label>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Role</label>
                 <select
                   value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value as AppUser['role'] })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>{r} — {ROLE_DESC[r]}</option>
@@ -919,7 +920,7 @@ export default function SettingsPage() {
             <div className="flex gap-3 mt-5">
               <button
                 onClick={() => setShowCreate(false)}
-                className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 text-sm hover:bg-gray-700 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-gray-50 text-gray-600 text-sm hover:bg-gray-100 transition-colors"
               >
                 Cancel
               </button>
@@ -938,29 +939,29 @@ export default function SettingsPage() {
       {/* ── Change Password Modal ──────────────────────────────────────────── */}
       {editUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setEditUser(null)}>
-          <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-sm border border-gray-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white mb-1">Change Password</h2>
-            <p className="text-sm text-gray-400 mb-5">For <span className="text-white font-medium">{editUser.name}</span></p>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm border border-gray-200 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Change Password</h2>
+            <p className="text-sm text-gray-500 mb-5">For <span className="text-gray-900 font-medium">{editUser.name}</span></p>
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-gray-400 mb-1 block">New Password</label>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">New Password</label>
                 <input
                   type="password"
                   value={pwForm.password}
                   onChange={(e) => setPwForm({ ...pwForm, password: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
                   placeholder="Minimum 4 characters"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-400 mb-1 block">Confirm Password</label>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">Confirm Password</label>
                 <input
                   type="password"
                   value={pwForm.confirm}
                   onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
                   placeholder="Repeat password"
                 />
               </div>
@@ -971,7 +972,7 @@ export default function SettingsPage() {
             <div className="flex gap-3 mt-5">
               <button
                 onClick={() => setEditUser(null)}
-                className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 text-sm hover:bg-gray-700 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-gray-50 text-gray-600 text-sm hover:bg-gray-100 transition-colors"
               >
                 Cancel
               </button>
@@ -985,6 +986,11 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 🧰 TOOLS TAB — account, QR codes, backup/restore */}
+      {tab === 'tools' && (
+        <AdminToolsSection shopName={shopName} logoUrl={logoUrl} />
       )}
     </div>
   );

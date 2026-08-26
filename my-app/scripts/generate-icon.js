@@ -37,17 +37,17 @@ function chunk(type, data) {
 
 // ── pixel data ───────────────────────────────────────────────────────────────
 // Amber gradient: centre coffee-brown cup on amber background
-function colorAt(x, y) {
-  const cx = SIZE / 2, cy = SIZE / 2;
+function colorAt(x, y, size) {
+  const cx = size / 2, cy = size / 2;
   const dx = x - cx, dy = y - cy;
   const dist = Math.sqrt(dx * dx + dy * dy);
 
   // Outer circle (slightly inset)
-  if (dist > SIZE * 0.46) return [245, 158, 11];  // amber-400 background
+  if (dist > size * 0.46) return [245, 158, 11];  // amber-400 background
 
   // Coffee cup silhouette (simple mug shape)
-  const relX = dx / (SIZE * 0.46);
-  const relY = dy / (SIZE * 0.46);
+  const relX = dx / (size * 0.46);
+  const relY = dy / (size * 0.46);
 
   // Handle (right side bump)
   if (relX > 0.35 && relX < 0.58 && relY > -0.1 && relY < 0.35) {
@@ -83,7 +83,7 @@ let offset = 0;
 for (let y = 0; y < SIZE; y++) {
   rawRows[offset++] = 0; // filter type None
   for (let x = 0; x < SIZE; x++) {
-    const [r, g, b] = colorAt(x, y);
+    const [r, g, b] = colorAt(x, y, SIZE);
     rawRows[offset++] = r;
     rawRows[offset++] = g;
     rawRows[offset++] = b;
@@ -126,7 +126,7 @@ for (let y = 0; y < SIZE2; y++) {
   rawRows2[off2++] = 0;
   for (let x = 0; x < SIZE2; x++) {
     // sample from the full-size image
-    const [r, g, b] = colorAt(Math.floor(x * SIZE / SIZE2), Math.floor(y * SIZE / SIZE2));
+    const [r, g, b] = colorAt(Math.floor(x * SIZE / SIZE2), Math.floor(y * SIZE / SIZE2), SIZE);
     rawRows2[off2++] = r;
     rawRows2[off2++] = g;
     rawRows2[off2++] = b;
@@ -144,3 +144,30 @@ const png32 = Buffer.concat([
 ]);
 fs.writeFileSync(path.join(outDir, 'icon-32.png'), png32);
 console.log('✅ Generated public/icons/icon-32.png  (32×32 for tray)');
+
+// Also write a 512×512 version for the PWA manifest (public/manifest.json
+// declares /icons/icon-512.png — Android install prompts want it)
+const SIZE3 = 512;
+const rawRows3 = Buffer.alloc(SIZE3 * (1 + SIZE3 * 3));
+let off3 = 0;
+for (let y = 0; y < SIZE3; y++) {
+  rawRows3[off3++] = 0;
+  for (let x = 0; x < SIZE3; x++) {
+    const [r, g, b] = colorAt(x, y, SIZE3);
+    rawRows3[off3++] = r;
+    rawRows3[off3++] = g;
+    rawRows3[off3++] = b;
+  }
+}
+const ihdr3 = Buffer.alloc(13);
+ihdr3.writeUInt32BE(SIZE3, 0);
+ihdr3.writeUInt32BE(SIZE3, 4);
+ihdr3[8] = 8; ihdr3[9] = 2;
+const png512 = Buffer.concat([
+  signature,
+  chunk('IHDR', ihdr3),
+  chunk('IDAT', zlib.deflateSync(rawRows3, { level: 6 })),
+  chunk('IEND', Buffer.alloc(0)),
+]);
+fs.writeFileSync(path.join(outDir, 'icon-512.png'), png512);
+console.log('✅ Generated public/icons/icon-512.png (512×512 for PWA)');

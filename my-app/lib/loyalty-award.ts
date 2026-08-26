@@ -163,14 +163,26 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
 
   const voucherCodes: string[] = [];
 
-  // For each category, apply loyalty if a setting exists
+  // For each category, apply loyalty if a setting exists. A category without
+  // its own rule follows the store-wide (no-category) program — same lookup
+  // rule as manual point-adds; an explicit opt-out stays opted out.
   for (const [catIdStr, qty] of Object.entries(itemsByCategory)) {
     const catId = parseInt(catIdStr);
-    const settings = await prisma.loyaltySetting.findUnique({
+    const perCategorySettings = await prisma.loyaltySetting.findUnique({
       where: { categoryId: catId },
     });
+    const settings = perCategorySettings
+      ? perCategorySettings
+      : await prisma.loyaltySetting.findFirst({ where: { categoryId: null } });
 
     if (!settings || !settings.enabled) continue;
+
+    // Category programs earn on the member's category card and make
+    // category-scoped vouchers; the store-wide program earns on their
+    // store-wide card and makes vouchers valid on any item.
+    const cardCategoryId = perCategorySettings ? catId : null;
+    const voucherScope: number | null = perCategorySettings ? catId : null;
+    const scopeLabel = perCategorySettings ? String(catId) : 'G';
 
     const isMilestoneMode = settings.isMilestoneMode;
     const milestones = JSON.parse(settings.milestones || '[]') as Milestone[];
@@ -179,17 +191,17 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
       threshold = Math.max(...milestones.map((m) => m.target));
     }
 
-    // Find or create card for this category
+    // Find or create the member's card for this scope
     let card = await prisma.loyaltyCard.findFirst({
       where: {
         customerName: normalizedTargetName,
-        categoryId: catId,
+        categoryId: cardCategoryId,
       },
     });
 
     if (!card) {
       card = await prisma.loyaltyCard.create({
-        data: { customerName: normalizedTargetName, categoryId: catId },
+        data: { customerName: normalizedTargetName, categoryId: cardCategoryId },
       });
     }
 
@@ -224,7 +236,7 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
             : settings.rewardType === 'PERCENTAGE'
               ? `${settings.rewardValue}% Off`
               : `₱${settings.rewardValue} Off`;
-        const code = `REWARD-${catId}-${Date.now().toString(36)}-${Math.random()
+        const code = `REWARD-${scopeLabel}-${Date.now().toString(36)}-${Math.random()
           .toString(36)
           .substring(7)
           .toUpperCase()}`;
@@ -238,7 +250,7 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
             discountValue: settings.rewardValue,
             rewardName: rewardName,
             targetType: 'CATEGORY',
-            targetCategoryId: catId,
+            targetCategoryId: voucherScope,
             status: 'ACTIVE',
           },
         });
@@ -255,7 +267,7 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
               : milestone.rewardType === 'PERCENTAGE'
                 ? `${milestone.rewardValue}% Off`
                 : `₱${milestone.rewardValue} Off`;
-          const code = `MIL-T${milestone.target}-${catId}-${Date.now().toString(36)}-${Math.random()
+          const code = `MIL-T${milestone.target}-${scopeLabel}-${Date.now().toString(36)}-${Math.random()
             .toString(36)
             .substring(7)
             .toUpperCase()}`;
@@ -269,7 +281,7 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
               discountValue: milestone.rewardValue,
               rewardName: rewardName,
               targetType: 'CATEGORY',
-              targetCategoryId: catId,
+              targetCategoryId: voucherScope,
               status: 'ACTIVE',
             },
           });

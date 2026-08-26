@@ -23,6 +23,7 @@ export default function AdminReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [filterProduct, setFilterProduct] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [view, setView] = useState<'reviews' | 'suggestions'>('reviews');
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
@@ -63,10 +64,12 @@ export default function AdminReviewsPage() {
   const uniqueProducts = Array.from(new Set(reviews.map((r) => r.product.name)));
 
   const filtered = reviews.filter((r) => {
+    if (view === 'suggestions' && !r.tasteSuggestion) return false;
     const matchesProduct = filterProduct === 'all' || r.product.name === filterProduct;
     const matchesSearch =
       r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.comment?.toLowerCase().includes(searchTerm.toLowerCase());
+      r.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.tasteSuggestion?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesProduct && matchesSearch;
   });
 
@@ -93,7 +96,31 @@ export default function AdminReviewsPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-6 space-y-6">
+      <main className="max-w-6xl mx-auto p-6 space-y-4">
+        {/* View toggle */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setView('reviews')}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              view === 'reviews'
+                ? 'bg-black text-white'
+                : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
+            }`}
+          >
+            ⭐ Reviews
+          </button>
+          <button
+            onClick={() => setView('suggestions')}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              view === 'suggestions'
+                ? 'bg-black text-white'
+                : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
+            }`}
+          >
+            💡 Taste Suggestions
+          </button>
+        </div>
+
         <div className="flex gap-4">
           <select
             value={filterProduct}
@@ -119,9 +146,11 @@ export default function AdminReviewsPage() {
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-3xl border border-gray-200/50 p-12 text-center">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">⭐</span>
+              <span className="text-3xl">{view === 'suggestions' ? '💡' : '⭐'}</span>
             </div>
-            <p className="text-gray-500 font-medium">No reviews found</p>
+            <p className="text-gray-500 font-medium">
+              {view === 'suggestions' ? 'No taste suggestions yet' : 'No reviews found'}
+            </p>
           </div>
         ) : (
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl overflow-hidden border border-gray-200/50 shadow-sm">

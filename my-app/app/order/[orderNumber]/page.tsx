@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, use } from 'react';
 import Link from 'next/link';
 import { useSocket } from '@/hooks/useSocket';
 import { playPreparingSound, playCompletedSound, fetchVoiceSettings } from '@/lib/sounds';
+import { ticketCode } from '@/lib/ticket';
+import { selectionsLabelFromJson } from '@/lib/product-options';
 
 interface BrandingState {
   shopName: string;
@@ -15,6 +17,7 @@ interface OrderItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  selections?: string | null;
   product: { name: string };
 }
 
@@ -125,7 +128,7 @@ function BarcodeDisplay({ value }: { value: string }) {
         </head>
         <body>
           <div class="barcode-container">
-            <div class="order-number">Order: ${value}</div>
+            <div class="order-number">Order: ${ticketCode(value)}</div>
             ${svgData}
           </div>
         </body>
@@ -734,7 +737,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
         <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-gray-800">Order Details</h3>
-            <span className="text-amber-700 font-mono font-bold text-sm">{order.orderNumber}</span>
+            <span className="text-amber-700 font-mono font-bold text-sm">{ticketCode(order.orderNumber)}</span>
           </div>
           <div className="text-sm text-gray-600 space-y-1">
             <div className="flex justify-between"><span>Customer</span><span className="font-medium text-gray-800">{order.customerName}</span></div>
@@ -769,9 +772,14 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
 
           <div className="border-t border-gray-100 pt-3 space-y-1">
             {order.items.map((item) => (
-              <div key={item.id} className="flex justify-between text-sm text-gray-600">
-                <span>{item.product.name} × {item.quantity}</span>
-                <span>₱{item.subtotal.toFixed(2)}</span>
+              <div key={item.id} className="text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>{item.product.name} × {item.quantity}</span>
+                  <span>₱{item.subtotal.toFixed(2)}</span>
+                </div>
+                {item.selections && (
+                  <p className="text-xs text-amber-700 pl-3">{selectionsLabelFromJson(item.selections)}</p>
+                )}
               </div>
             ))}
             <div className="flex justify-between font-bold text-base text-gray-800 pt-2 border-t border-gray-100 mt-2">

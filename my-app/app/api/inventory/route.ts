@@ -19,7 +19,14 @@ export async function GET(req: NextRequest) {
   try {
     const inventory = await prisma.inventory.findMany({
       include: {
-        product: { include: { category: true } },
+        product: {
+          include: {
+            category: true,
+            // Required-recipe count lets the UI mark products whose stock is
+            // derived from ingredients rather than directly adjustable.
+            _count: { select: { ingredients: { where: { required: true } } } },
+          },
+        },
       },
       orderBy: { product: { name: 'asc' } },
     });

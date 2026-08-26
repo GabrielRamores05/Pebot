@@ -1,1 +1,0 @@
-docker compose exec db psql -U postgres -d postgres -c "\dt"

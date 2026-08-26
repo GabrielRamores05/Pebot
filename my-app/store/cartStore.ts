@@ -1,13 +1,31 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export interface CartItemSelection {
+  optionId: number;
+  groupName: string;
+  name: string;
+  priceDelta: number;
+}
+
 export interface CartItem {
   productId: number;
   name: string;
-  price: number;
+  price: number; // unit price including selection adders
+  basePrice?: number; // product price before option adders (for re-configuring)
   quantity: number;
   categoryId?: number; // Added for category-based loyalty filtering
   notes?: string;
+  selections?: CartItemSelection[];
+}
+
+/** Unique identity of a cart line: product + its exact configuration. */
+export function lineKey(productId: number, selections?: CartItemSelection[]): string {
+  const ids = (selections ?? [])
+    .map((s) => s.optionId)
+    .sort((a, b) => a - b)
+    .join(',');
+  return `${productId}::${ids}`;
 }
 
 
@@ -16,8 +34,11 @@ export interface CartState {
   customerName: string;
   tableNumber: string;
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
-  removeItem: (productId: number) => void;
-  updateQuantity: (productId: number, qty: number) => void;
+  removeItem: (key: string) => void;
+  updateQuantity: (key: string, qty: number) => void;
+  /** Re-configure an existing line (new options/price). Merges if it collides
+   *  with another line that ends up identical. */
+  updateLine: (oldKey: string, item: Omit<CartItem, 'quantity'>, quantity?: number) => void;
   setCustomerName: (name: string) => void;
   setTableNumber: (table: string) => void;
   clearCart: () => void;
@@ -34,27 +55,49 @@ export const useCartStore = create<CartState>()(
 
       addItem: (item) =>
         set((state) => {
-          const existing = state.items.find((i) => i.productId === item.productId);
+          const key = lineKey(item.productId, item.selections);
+          const existing = state.items.find((i) => lineKey(i.productId, i.selections) === key);
           if (existing) {
             return {
               items: state.items.map((i) =>
-                i.productId === item.productId ? { ...i, quantity: i.quantity + 1 } : i
+                lineKey(i.productId, i.selections) === key ? { ...i, quantity: i.quantity + 1 } : i
               ),
             };
           }
           return { items: [...state.items, { ...item, quantity: 1 }] };
         }),
 
-      removeItem: (productId) =>
-        set((state) => ({ items: state.items.filter((i) => i.productId !== productId) })),
+      removeItem: (key) =>
+        set((state) => ({ items: state.items.filter((i) => lineKey(i.productId, i.selections) !== key) })),
 
-      updateQuantity: (productId, qty) =>
+      updateQuantity: (key, qty) =>
         set((state) => ({
           items:
             qty <= 0
-              ? state.items.filter((i) => i.productId !== productId)
-              : state.items.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i)),
+              ? state.items.filter((i) => lineKey(i.productId, i.selections) !== key)
+              : state.items.map((i) =>
+                  lineKey(i.productId, i.selections) === key ? { ...i, quantity: qty } : i
+                ),
         })),
+
+      updateLine: (oldKey, item, quantity) =>
+        set((state) => {
+          const oldLine = state.items.find((i) => lineKey(i.productId, i.selections) === oldKey);
+          const qty = quantity ?? oldLine?.quantity ?? 1;
+          // Remove the old configuration first…
+          let items = state.items.filter((i) => lineKey(i.productId, i.selections) !== oldKey);
+          const newKey = lineKey(item.productId, item.selections);
+          const existing = items.find((i) => lineKey(i.productId, i.selections) === newKey);
+          if (existing) {
+            // …then fold into an identical line if one exists
+            items = items.map((i) =>
+              lineKey(i.productId, i.selections) === newKey ? { ...i, quantity: i.quantity + qty } : i
+            );
+          } else {
+            items = [...items, { ...item, quantity: qty }];
+          }
+          return { items };
+        }),
 
       setCustomerName: (name) => set({ customerName: name }),
       setTableNumber: (table) => set({ tableNumber: table }),

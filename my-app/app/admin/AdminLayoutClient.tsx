@@ -3,11 +3,10 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import {
   IconMonitor, IconProducts,
-  IconAnalytics, IconInventory, IconQR,
-  IconLogout, IconCoffee, IconSettings, IconDownload, IconUpload,
+  IconAnalytics, IconInventory,
+  IconCoffee, IconSettings,
    IconTerminal, IconHistory, IconConsultant, IconAudit, IconStar,
 
 } from '@/lib/assets';
@@ -40,6 +39,7 @@ const navItems = [
   { href: '/admin/analytics',  Icon: IconAnalytics, label: 'Analytics', roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
   { href: '/admin/products',   Icon: IconProducts,  label: 'Products', roles: ['ADMIN', 'STAFF'], permission: 'products' },
   { href: '/admin/inventory',  Icon: IconInventory, label: 'Inventory', roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
+  { href: '/admin/stock-history', Icon: IconHistory, label: 'Stock History', roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
   { href: '/admin/expenses',   Icon: IconHistory,   label: 'Expenses', roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
   { href: '/admin/loyalty',    Icon: IconCoffee,    label: 'Loyalty', roles: ['ADMIN', 'STAFF'], permission: 'loyalty' },
   { href: '/admin/order-history', Icon: IconHistory, label: 'Order History', roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
@@ -55,20 +55,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [branding, setBranding] = useState<BrandingState>({ shopName: 'CaféOS', logoUrl: null });
-  const [showQR, setShowQR] = useState(false);
-  const [showExitQR, setShowExitQR] = useState(false);
-  const qrRef = useRef<HTMLDivElement>(null);
-  const exitQrRef = useRef<HTMLDivElement>(null);
   const [notifQueue, setNotifQueue] = useState<Array<{ orderNumber: string; customerName: string; tableName?: string; id: number }>>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [guestLeftNotif, setGuestLeftNotif] = useState<Array<{ guestNames: string; tableName: string; id: number }>>([]);
-  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
-  const [restoreCountdown, setRestoreCountdown] = useState(30);
-  const [restoreError, setRestoreError] = useState<string | null>(null);
-  const [restoring, setRestoring] = useState(false);
-  const restoreFileRef = useRef<HTMLInputElement>(null);
-  const restoreFile = useRef<File | null>(null);
 
   const handleNewOrder = useCallback((data: any) => {
     playNewOrderSound();
@@ -103,18 +93,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       'table-guest-left': handleGuestLeft,
     },
   });
-  const [localIp, setLocalIp] = useState(
-    typeof window !== 'undefined' ? window.location.origin : ''
-  );
-
-  useEffect(() => {
-    fetch('/api/system/ip')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.origin) setLocalIp(d.origin);
-      })
-      .catch(() => {});
-  }, []);
 
   // Fetch user and handle redirect on mount
   useEffect(() => {
@@ -150,205 +128,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       window.removeEventListener(BRANDING_UPDATED_EVENT, handleBrandingUpdated as EventListener);
     };
   }, []);
-
-  async function logout() {
-    await fetch('/api/auth/me', { method: 'DELETE' });
-    router.push('/login');
-  }
-
-  function printQR() {
-    if (!qrRef.current) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const qrElement = qrRef.current.querySelector('svg');
-    if (!qrElement) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Customer QR Code - CaféOS</title>
-          <style>
-            body {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              min-height: 100vh;
-              margin: 0;
-              font-family: Arial, sans-serif;
-              background: white;
-            }
-            .qr-container {
-              padding: 20px;
-              border: 2px solid #000;
-              border-radius: 10px;
-              background: white;
-              margin: 20px;
-            }
-            .title {
-              text-align: center;
-              margin-bottom: 20px;
-              font-size: 18px;
-              font-weight: bold;
-            }
-            .url {
-              text-align: center;
-              margin-top: 20px;
-              font-size: 12px;
-              color: #666;
-              word-break: break-all;
-            }
-            svg {
-              display: block;
-              margin: 0 auto;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="title">Scan to Order - CaféOS</div>
-          <div class="qr-container">
-            ${qrElement.outerHTML}
-          </div>
-          <div class="url">${localIp}/menu</div>
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
-  }
-
-  async function downloadQR() {
-    if (!qrRef.current) return;
-
-    const qrElement = qrRef.current.querySelector('svg');
-    if (!qrElement) return;
-
-    // Convert SVG to canvas
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const svgData = new XMLSerializer().serializeToString(qrElement);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const svgUrl = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = () => {
-      canvas.width = 400;
-      canvas.height = 400;
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 50, 50, 300, 300);
-
-      // Add text
-      ctx.fillStyle = '#333';
-      ctx.font = 'bold 16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('Scan to Order - CaféOS', canvas.width / 2, 30);
-
-      ctx.font = '12px Arial';
-      ctx.fillStyle = '#666';
-      ctx.fillText(localIp + '/menu', canvas.width / 2, 380);
-
-      // Download
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'cafe-qr-code.png';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
-      }, 'image/png');
-
-      URL.revokeObjectURL(svgUrl);
-    };
-
-    img.src = svgUrl;
-  }
-
-  async function handleSaveData() {
-    try {
-      const res = await fetch('/api/backup');
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        alert(data.error || 'Backup failed');
-        return;
-      }
-      const blob = await res.blob();
-      const disposition = res.headers.get('Content-Disposition') || '';
-      const match = disposition.match(/filename="([^"]+)"/);
-      const filename = match ? match[1] : `cafeos-backup-${Date.now()}.zip`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      alert('Backup failed: ' + String(e));
-    }
-  }
-
-  function handleRestoreFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    restoreFile.current = file;
-    setRestoreError(null);
-    setRestoreCountdown(30);
-    setShowRestoreConfirm(true);
-  }
-
-  function cancelRestore() {
-    setShowRestoreConfirm(false);
-    restoreFile.current = null;
-    if (restoreFileRef.current) restoreFileRef.current.value = '';
-  }
-
-  useEffect(() => {
-    if (!showRestoreConfirm || restoreCountdown <= 0) return;
-    const timer = setTimeout(() => setRestoreCountdown(c => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [showRestoreConfirm, restoreCountdown]);
-
-  async function confirmRestore() {
-    const file = restoreFile.current;
-    if (!file) return;
-    setRestoring(true);
-    try {
-      const form = new FormData();
-      form.append('backup', file);
-      const res = await fetch('/api/restore', { method: 'POST', body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setRestoreError(data.error || 'Restore failed');
-        setShowRestoreConfirm(false);
-        setRestoring(false);
-        restoreFile.current = null;
-        if (restoreFileRef.current) restoreFileRef.current.value = '';
-        return;
-      }
-      // Success: redirect to login per spec
-      window.location.href = data.redirect || '/login';
-    } catch (e) {
-      setRestoreError('Restore failed: ' + String(e));
-      setShowRestoreConfirm(false);
-      setRestoring(false);
-      restoreFile.current = null;
-      if (restoreFileRef.current) restoreFileRef.current.value = '';
-    }
-  }
 
   const visibleNav = navItems.filter((n) => {
     // Admin has full access
@@ -484,77 +263,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </div>
 
-        {/* User / Logout */}
-        {user && (
-          <div className="p-4 border-t border-slate-200">
-            <button
-              onClick={() => setShowQR(true)}
-              className="flex items-center gap-3 text-amber-500 hover:text-amber-600 transition-colors w-full mb-3 bg-slate-100 p-2.5 rounded-lg"
-              title={sidebarCollapsed ? 'Customer QR' : undefined}
-            >
-              <IconQR size={20} strokeWidth={1.75} className="shrink-0" />
-              <span className={`hidden md:block font-medium text-sm transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Customer QR</span>
-            </button>
-
-            <button
-              onClick={() => setShowExitQR(true)}
-              className="flex items-center gap-3 text-green-500 hover:text-green-600 transition-colors w-full mb-5 bg-slate-100 p-2.5 rounded-lg"
-              title={sidebarCollapsed ? 'Exit QR' : undefined}
-            >
-              <span className="text-lg">🚪</span>
-              <span className={`hidden md:block font-medium text-sm transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Exit QR</span>
-            </button>
-
-            {user.role === 'ADMIN' && (
-              <>
-                <button
-                  onClick={handleSaveData}
-                  className="flex items-center gap-3 text-slate-600 hover:text-slate-800 transition-colors w-full mb-3 bg-slate-100 p-2.5 rounded-lg"
-                  title={sidebarCollapsed ? 'Save Data' : undefined}
-                >
-                  <IconDownload size={20} strokeWidth={1.75} className="shrink-0" />
-                  <span className={`hidden md:block font-medium text-sm transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Save Data</span>
-                </button>
-
-                <button
-                  onClick={() => restoreFileRef.current?.click()}
-                  className="flex items-center gap-3 text-slate-600 hover:text-slate-800 transition-colors w-full mb-5 bg-slate-100 p-2.5 rounded-lg"
-                  title={sidebarCollapsed ? 'Restore Data' : undefined}
-                >
-                  <IconUpload size={20} strokeWidth={1.75} className="shrink-0" />
-                  <span className={`hidden md:block font-medium text-sm transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Restore Data</span>
-                </button>
-
-                <input
-                  ref={restoreFileRef}
-                  type="file"
-                  accept=".zip,application/zip"
-                  className="hidden"
-                  onChange={handleRestoreFileChange}
-                />
-              </>
-            )}
-
-            <div className="flex items-center gap-2 mb-3">
-              {branding.logoUrl
-                ? <img src={branding.logoUrl} alt="Shop Logo" className="w-7 h-7 rounded-md object-cover shrink-0" />
-                : <IconCoffee size={16} strokeWidth={1.75} className="text-amber-400 shrink-0" />}
-              <div className={`hidden md:block min-w-0 transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
-                <div className="text-xs text-slate-500 truncate">{user.name}</div>
-                <div className="text-xs text-amber-500 font-medium">{user.role}</div>
-              </div>
-              <button
-                onClick={logout}
-                title="Logout"
-                aria-label="Logout"
-                className="ml-auto w-9 h-9 rounded-lg bg-slate-100 text-slate-500 hover:text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500/60 transition-colors flex items-center justify-center"
-              >
-                <IconLogout size={18} strokeWidth={1.9} className="shrink-0" />
-              </button>
-            </div>
-            
-          </div>
-        )}
       </nav>
 
       {/* New Order Notifications - adjust for mobile header */}
@@ -606,171 +314,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
 
-      {/* QR Code Modal for Customer Ordering */}
-      {showQR && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowQR(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button 
-              onClick={() => setShowQR(false)} 
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
-            >
-              ✕
-            </button>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Scan to Order</h2>
-            <p className="text-gray-500 text-sm mb-6">Customers can scan this QR code to view the menu and place orders from their phones.</p>
-            
-            <div className="bg-white p-4 rounded-2xl inline-block shadow-sm border border-gray-200" ref={qrRef}>
-              <QRCodeSVG 
-                value={`${localIp}/menu`}
-                size={220}
-                level="H"
-                includeMargin={false}
-              />
-            </div>
-            
-            <div className="mt-6 flex gap-3 justify-center">
-              <button
-                onClick={printQR}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Print
-              </button>
-              <button
-                onClick={downloadQR}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Download
-              </button>
-            </div>
-            
-            <div className="mt-6 bg-gray-50 rounded-xl p-3 border border-gray-100">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-1">Direct Link</p>
-              <p className="text-sm font-mono text-gray-700 break-all select-all">{localIp}/menu</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Exit QR Code Modal - Single QR for whole system */}
-      {showExitQR && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowExitQR(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button 
-              onClick={() => setShowExitQR(false)} 
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
-            >
-              ✕
-            </button>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">🚪 Exit QR</h2>
-            <p className="text-gray-500 text-sm mb-6">Customers scan this when leaving to free up their table.</p>
-            
-            <div className="bg-white p-4 rounded-2xl inline-block shadow-sm border border-gray-200" ref={exitQrRef}>
-              <QRCodeSVG 
-                value={`${localIp}/exit`}
-                size={220}
-                level="H"
-                includeMargin={false}
-              />
-            </div>
-            
-            <div className="mt-6 flex gap-3 justify-center">
-              <button
-                onClick={() => {
-                  if (!exitQrRef.current) return;
-                  const qrElement = exitQrRef.current.querySelector('svg');
-                  if (!qrElement) return;
-                  const win = window.open('', '_blank', 'width=500,height=600');
-                  if (!win) return;
-                  win.document.write(`
-                    <html><head><title>Exit QR Code - CaféOS</title>
-                    <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;margin:0}img{width:300px;height:300px}h2{margin-bottom:8px}p{color:#666;margin-top:4px;font-size:14px}</style>
-                    </head><body>
-                    <h2>🚪 Exit QR</h2>
-                    <p>Scan when leaving</p>
-                    ${qrElement.outerHTML}
-                    <script>window.onload=function(){window.print();window.close()}</script>
-                    </body></html>
-                  `);
-                  win.document.close();
-                }}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Print
-              </button>
-              <button
-                onClick={() => {
-                  if (!exitQrRef.current) return;
-                  const qrElement = exitQrRef.current.querySelector('svg');
-                  if (!qrElement) return;
-                  const svgData = new XMLSerializer().serializeToString(qrElement);
-                  const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-                  const url = URL.createObjectURL(svgBlob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = 'exit-qr-code.png';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                }}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Download
-              </button>
-            </div>
-            
-            <div className="mt-6 bg-gray-50 rounded-xl p-3 border border-gray-100">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-1">Direct Link</p>
-              <p className="text-sm font-mono text-gray-700 break-all select-all">{localIp}/exit</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Restore Confirm Modal - 30 second countdown */}
-      {showRestoreConfirm && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative">
-            <h2 className="text-2xl font-bold text-red-600 mb-3">⚠️ Restore Backup?</h2>
-            <p className="text-gray-600 mb-6">
-              Current database will be permanently lost. Are you sure?
-            </p>
-            <p className="text-5xl font-bold text-slate-800 mb-6">{restoreCountdown}s</p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={cancelRestore}
-                disabled={restoring}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRestore}
-                disabled={restoring || restoreCountdown > 0}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {restoring ? 'Restoring…' : 'Confirm Restore'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Restore Error Modal */}
-      {restoreError && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative">
-            <h2 className="text-2xl font-bold text-red-600 mb-3">❌ Restore Failed</h2>
-            <p className="text-gray-600 mb-6">{restoreError}</p>
-            <button
-              onClick={() => setRestoreError(null)}
-              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

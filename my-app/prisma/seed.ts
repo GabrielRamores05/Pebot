@@ -235,6 +235,58 @@ async function main() {
    });
    console.log('✓ Recipes assigned (Coffee Beans / Milk required, Sugar optional)');
 
+   // Option groups and presets (product customization)
+   const sizeGroup = await prisma.optionGroup.upsert({
+     where: { name: 'Size' },
+     update: {},
+     create: { name: 'Size', selectionType: 'single', scalesRecipe: true, sortOrder: 1 },
+   });
+   const tempGroup = await prisma.optionGroup.upsert({
+     where: { name: 'Temperature' },
+     update: {},
+     create: { name: 'Temperature', selectionType: 'single', scalesRecipe: false, sortOrder: 2 },
+   });
+   const addonGroup = await prisma.optionGroup.upsert({
+     where: { name: 'Add-ons' },
+     update: {},
+     create: { name: 'Add-ons', selectionType: 'multi', scalesRecipe: false, sortOrder: 3 },
+   });
+
+   const optionPresets: [number, string, number, number, number][] = [
+     [sizeGroup.id, 'Small', 0, 1, 1],
+     [sizeGroup.id, 'Medium', 15, 1.5, 2],
+     [sizeGroup.id, 'Large', 30, 2, 3],
+     [tempGroup.id, 'Hot', 0, 1, 1],
+     [tempGroup.id, 'Cold', 0, 1, 2],
+     [addonGroup.id, 'Extra Shot', 25, 1, 1],
+     [addonGroup.id, 'Whipped Cream', 10, 1, 2],
+     [addonGroup.id, 'Oat Milk', 20, 1, 3],
+   ];
+   for (const [groupId, name, priceDelta, sizeMultiplier, sortOrder] of optionPresets) {
+     await prisma.option.upsert({
+       where: { groupId_name: { groupId, name } },
+       update: { priceDelta, sizeMultiplier, sortOrder },
+       create: { groupId, name, priceDelta, sizeMultiplier, sortOrder },
+     });
+   }
+   console.log('OK Option groups seeded (Size / Temperature / Add-ons)');
+
+   // Attach Size + Temperature to Coffee-category drinks
+   const coffeeCategory = await prisma.category.findFirst({ where: { name: 'Coffee' } });
+   if (coffeeCategory) {
+     const coffeeProducts = await prisma.product.findMany({ where: { categoryId: coffeeCategory.id } });
+     for (const prod of coffeeProducts) {
+       for (const gid of [sizeGroup.id, tempGroup.id]) {
+         await prisma.productOptionGroup.upsert({
+           where: { productId_groupId: { productId: prod.id, groupId: gid } },
+           update: {},
+           create: { productId: prod.id, groupId: gid },
+         });
+       }
+     }
+     console.log(`OK Size + Temperature attached to ${coffeeProducts.length} Coffee product(s)`);
+   }
+
    console.log('✅ Seeding completed!');
   console.log('📝 You can now login with:');
   console.log('   Email: admin@cafeos.local, Password: admin123');

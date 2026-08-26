@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useCartStore } from '@/store/cartStore';
+import { useCartStore, lineKey, type CartItemSelection } from '@/store/cartStore';
 import { calculateLoyaltyDiscountForItems } from '@/lib/pos-utils';
 
 interface BrandingState {
@@ -70,6 +70,84 @@ export default function CartPage() {
   const [isNameFromLoyalty, setIsNameFromLoyalty] = useState(false);
   const [loyaltyCard, setLoyaltyCard] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'GCASH' | 'PAYMAYA'>('CASH');
+
+  // ── Per-line option editing (checkout) ──────────────────────────────────────
+  interface OptionGroupDTO {
+    id: number;
+    group: { id: number; name: string; selectionType: 'single' | 'multi' };
+    options: { id: number; name: string; priceDelta: number }[];
+  }
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [groupsCache, setGroupsCache] = useState<Record<number, OptionGroupDTO[]>>({});
+  const [draftSingle, setDraftSingle] = useState<Record<number, number>>({});
+  const [draftMulti, setDraftMulti] = useState<number[]>([]);
+
+  async function openEditor(item: typeof cartStore.items[number]) {
+    const key = lineKey(item.productId, item.selections);
+    if (editingKey === key) { setEditingKey(null); return; }
+    setEditingKey(key);
+    setDraftSingle({});
+    setDraftMulti([]);
+
+    // Always fetch fresh; cache only serves as a network-failure fallback.
+    let groups: OptionGroupDTO[] | null = null;
+    try {
+      const res = await fetch(`/api/products/${item.productId}/option-groups`, { cache: 'no-store' });
+      groups = res.ok ? await res.json() : [];
+    } catch { groups = null; }
+    if (!groups) groups = groupsCache[item.productId] ?? [];
+    setGroupsCache((prev) => ({ ...prev, [item.productId]: groups ?? [] }));
+    const list = groups ?? [];
+
+    const dS: Record<number, number> = {};
+    const dM: number[] = [];
+    for (const sel of item.selections ?? []) {
+      for (const att of list) {
+        if (!(att.options ?? []).some((o) => o.id === sel.optionId)) continue;
+        if (att.group.selectionType === 'single') dS[att.group.id] = sel.optionId;
+        else dM.push(sel.optionId);
+      }
+    }
+    for (const att of list) {
+      if (att.group.selectionType === 'single' && !dS[att.group.id] && att.options?.length) {
+        dS[att.group.id] = att.options[0].id;
+      }
+    }
+    setDraftSingle(dS);
+    setDraftMulti(dM);
+  }
+
+  function confirmEdit(item: typeof cartStore.items[number]) {
+    const list = groupsCache[item.productId] ?? [];
+    const newSel: CartItemSelection[] = [];
+    for (const att of list) {
+      if (att.group.selectionType === 'single') {
+        const opt = (att.options ?? []).find((o) => o.id === draftSingle[att.group.id]);
+        if (opt) newSel.push({ optionId: opt.id, groupName: att.group.name, name: opt.name, priceDelta: opt.priceDelta });
+      } else {
+        for (const o of (att.options ?? [])) {
+          if (draftMulti.includes(o.id)) {
+            newSel.push({ optionId: o.id, groupName: att.group.name, name: o.name, priceDelta: o.priceDelta });
+          }
+        }
+      }
+    }
+    const oldAdder = (item.selections ?? []).reduce((s, x) => s + x.priceDelta, 0);
+    const basePrice = item.basePrice ?? Math.max(0, item.price - oldAdder);
+    const newAdder = newSel.reduce((s, x) => s + x.priceDelta, 0);
+
+    cartStore.updateLine(lineKey(item.productId, item.selections), {
+      productId: item.productId,
+      name: item.name,
+      price: basePrice + newAdder,
+      basePrice,
+      categoryId: item.categoryId,
+      notes: item.notes,
+      selections: newSel.length > 0 ? newSel : undefined,
+    });
+    setEditingKey(null);
+  }
+
   const [paymentScreenshot, setPaymentScreenshot] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
@@ -395,6 +473,7 @@ export default function CartPage() {
           items: cartStore.items.map((i) => ({
             productId: i.productId,
             quantity: i.quantity,
+            ...((i.selections?.length ?? 0) > 0 && { optionIds: i.selections!.map((s) => s.optionId) }),
           })),          paymentMethod,
           paymentScreenshot: paymentScreenshot || undefined,          ...(loyaltyDiscount > 0 && { loyaltyDiscount }),
           ...(loyaltyVoucherCodes.length > 0 && { loyaltyVoucherCodes }),
@@ -603,39 +682,133 @@ export default function CartPage() {
         <div className="lg:grid lg:grid-cols-[1.45fr_0.9fr] lg:gap-6">
           <div className="space-y-4">
             <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              {cartStore.items.map((item, idx) => (
-                <div key={item.productId} className={`flex items-center gap-3 p-4 ${idx > 0 ? 'border-t border-slate-100' : ''}`}>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-semibold text-slate-900">{item.name}</p>
-                    <p className="text-sm text-slate-500">₱{item.price.toFixed(2)} each</p>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-full bg-slate-100 p-1">
+              {cartStore.items.map((item, idx) => {
+                const key = lineKey(item.productId, item.selections);
+                const isEditing = editingKey === key;
+                return (
+                <div key={key} className={`${isEditing ? 'bg-amber-50/50 ' : ''}border-t border-slate-100 first:border-t-0`}>
+                  <div className="flex items-center gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-base font-semibold text-slate-900">{item.name}</p>
+                      <p className="text-xs font-medium text-slate-500">
+                        {(item.selections?.length ?? 0) > 0
+                          ? item.selections!.map((s) => s.name).join(' · ')
+                          : 'Regular'}
+                      </p>
+                      <p className="text-sm text-slate-500">₱{item.price.toFixed(2)} each</p>
+                      <button
+                        onClick={() => openEditor(item)}
+                        className="mt-1 text-xs font-medium text-amber-600 hover:text-amber-700 underline"
+                      >
+                        ⭐ Change size / options
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-full bg-slate-100 p-1">
+                      <button
+                        onClick={() => cartStore.updateQuantity(key, item.quantity - 1)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-semibold text-slate-700 shadow-sm"
+                      >
+                        −
+                      </button>
+                      <span className="w-7 text-center text-sm font-semibold text-slate-900">{item.quantity}</span>
+                      <button
+                        onClick={() => cartStore.updateQuantity(key, item.quantity + 1)}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="w-20 text-right">
+                      <p className="text-base font-semibold text-slate-900">₱{(item.price * item.quantity).toFixed(2)}</p>
+                    </div>
                     <button
-                      onClick={() => cartStore.updateQuantity(item.productId, item.quantity - 1)}
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-semibold text-slate-700 shadow-sm"
+                      onClick={() => cartStore.removeItem(key)}
+                      className="ml-1 text-xl text-slate-300 transition hover:text-red-500"
+                      aria-label={`Remove ${item.name}`}
                     >
-                      −
-                    </button>
-                    <span className="w-7 text-center text-sm font-semibold text-slate-900">{item.quantity}</span>
-                    <button
-                      onClick={() => cartStore.updateQuantity(item.productId, item.quantity + 1)}
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white"
-                    >
-                      +
+                      ✕
                     </button>
                   </div>
-                  <div className="w-20 text-right">
-                    <p className="text-base font-semibold text-slate-900">₱{(item.price * item.quantity).toFixed(2)}</p>
-                  </div>
-                  <button
-                    onClick={() => cartStore.removeItem(item.productId)}
-                    className="ml-1 text-xl text-slate-300 transition hover:text-red-500"
-                    aria-label={`Remove ${item.name}`}
-                  >
-                    ✕
-                  </button>
+
+                  {isEditing && (() => {
+                    const list = groupsCache[item.productId] ?? [];
+                    return (
+                    <div className="border-t border-slate-100 px-4 py-3 space-y-3">
+                      {list.length === 0 ? (
+                        <>
+                          <p className="text-xs text-gray-400">
+                            No customization groups loaded for this product yet.
+                          </p>
+                          <button
+                            onClick={() => setEditingKey(null)}
+                            className="w-full py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium"
+                          >
+                            Close
+                          </button>
+                        </>
+                      ) : (
+                      <>
+                        {(groupsCache[item.productId] ?? []).map((att) => (
+                          <div key={att.id}>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+                              {att.group.name}
+                              {att.group.selectionType === 'single' && <span className="font-normal normal-case text-gray-400"> · pick one</span>}
+                            </p>
+                            {att.group.selectionType === 'single' ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {(att.options ?? []).map((opt) => {
+                                  const active = draftSingle[att.group.id] === opt.id;
+                                  return (
+                                    <button
+                                      key={opt.id}
+                                      onClick={() => setDraftSingle((prev) => ({ ...prev, [att.group.id]: opt.id }))}
+                                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                        active ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                      }`}
+                                    >
+                                      {opt.name}{opt.priceDelta > 0 && <span className="ml-1 opacity-70">+₱{opt.priceDelta}</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {(att.options ?? []).map((opt) => {
+                                  const checked = draftMulti.includes(opt.id);
+                                  return (
+                                    <button
+                                      key={opt.id}
+                                      onClick={() =>
+                                        setDraftMulti((prev) => (checked ? prev.filter((id) => id !== opt.id) : [...prev, opt.id]))
+                                      }
+                                      className={`flex w-full items-center justify-between px-3 py-2 rounded-xl border text-sm transition-colors ${
+                                        checked ? 'border-black bg-white font-medium' : 'border-gray-200 bg-white hover:border-gray-300'
+                                      }`}
+                                    >
+                                      <span>{opt.name}</span>
+                                      {opt.priceDelta > 0 && <span className="text-gray-500">+₱{opt.priceDelta}</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                      )}
+                      <button
+                        onClick={() => confirmEdit(item)}
+                        disabled={false}
+                        className="w-full py-2.5 rounded-xl bg-stone-900 hover:bg-stone-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                      >
+                        Update this item
+                      </button>
+                    </div>
+                    );
+                  })()}
                 </div>
-              ))}
+                );
+              })}
             </section>
 
             {voucherDetails.length > 0 && (

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
+import { useState, useEffect, useRef, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 // Prevent static generation since we use useSearchParams
 export const dynamic = 'force-dynamic';
 import Link from 'next/link';
-import { useCartStore } from '@/store/cartStore';
+import { useCartStore, lineKey, type CartItemSelection } from '@/store/cartStore';
+import ProductReviews from './ProductReviews';
 import { useSocket } from '@/hooks/useSocket';
 import { BrowserMultiFormatReader } from '@zxing/library';
 
@@ -485,7 +487,7 @@ function XIcon() {
 }
 
 // ── Product Card ───────────────────────────────────────────────────────────
-function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen, onOpenDetail, onCloseDetail, bestSeller }: {
+function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen, onOpenDetail, onCloseDetail, bestSeller, reviewSummary, onReviewSubmitted, onOpenReviews }: {
   product: Product;
   catIcon?: string;
   cartItem?: { quantity: number };
@@ -495,6 +497,9 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
   onOpenDetail?: () => void;
   onCloseDetail?: () => void;
   bestSeller?: boolean;
+  reviewSummary?: { avg: number; total: number };
+  onReviewSubmitted?: (productId: number, rating: number) => void;
+  onOpenReviews?: () => void;
 }) {
   const outOfStock = product.inventory && product.inventory.quantity === 0;
   const lowStock = product.inventory &&
@@ -504,25 +509,6 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
   const atMax = cartItem ? cartItem.quantity >= maxQty : false;
 
   const [showModal, setShowModal] = useState(false);
-  const [showReviews, setShowReviews] = useState(false);
-  const [reviews, setReviews] = useState<{ id: number; customerName: string; rating: number; comment: string | null; imageUrl: string | null; createdAt: string }[]>([]);
-  const [avgRating, setAvgRating] = useState(0);
-  const [totalReviews, setTotalReviews] = useState(0);
-  const [loadingReviews, setLoadingReviews] = useState(false);
-  const [submittingReview, setSubmittingReview] = useState(false);
-  const [reviewerName, setReviewerName] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('loyaltyCustomerName') || '';
-    }
-    return '';
-  });
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewComment, setReviewComment] = useState('')
-  const [reviewSuggestion, setReviewSuggestion] = useState('');
-  const [reviewError, setReviewError] = useState('');
-  const [showWriteReview, setShowWriteReview] = useState(false);
-  const [reviewImage, setReviewImage] = useState<string | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const modalRef = useRef<HTMLDivElement | null>(null);
 
   const detailOpen = isDetailOpen ?? showModal;
@@ -542,12 +528,10 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
       return;
     }
     setShowModal(false);
-    setShowReviews(false);
   };
 
   useEffect(() => {
     if (!detailOpen) {
-      setShowReviews(false);
       document.body.style.overflow = '';
       return;
     }
@@ -563,70 +547,20 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
     };
   }, [detailOpen]);
 
-  const fetchReviews = async () => {
-    setLoadingReviews(true);
-    try {
-      const res = await fetch(`/api/reviews?productId=${product.id}`);
-      const data = await res.json();
-      if (res.ok) {
-        setReviews(data.reviews || []);
-        setAvgRating(data.averageRating || 0);
-        setTotalReviews(data.totalReviews || 0);
-      }
-    } catch (e) {
-      console.error('Error fetching reviews:', e);
-    } finally {
-      setLoadingReviews(false);
-    }
-  };
-
+  // Opens the review experience: the parent popup (with the review panel
+  // pre-opened) when hosted in the grid, otherwise our own detail modal.
   const handleOpenReviews = () => {
-    setShowReviews(true);
-    fetchReviews();
-  };
-
-  const handleSubmitReview = async () => {
-    if (reviewRating === 0) {
-      setReviewError('Please select a rating');
+    if (onOpenReviews) {
+      onOpenReviews();
       return;
     }
-
-    setSubmittingReview(true);
-    setReviewError('');
-
-    const nameToUse = reviewerName.trim() || 'Guest';
-
-    try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: product.id,
-          customerName: nameToUse,
-          rating: reviewRating,
-          comment: reviewComment.trim() ? reviewComment.trim() : null,
-          tasteSuggestion: reviewSuggestion ? reviewSuggestion.trim() : null,
-          imageUrl: reviewImage,
-        }),
-      });
-
-      if (res.ok) {
-        setReviewerName('');
-        setReviewRating(0);
-        setReviewComment('')
-        setReviewSuggestion('');
-        setReviewImage(null);
-        fetchReviews();
-      } else {
-        const data = await res.json();
-        setReviewError(data.error || 'Failed to submit review');
-      }
-    } catch (e) {
-      setReviewError('Failed to submit review');
-    } finally {
-      setSubmittingReview(false);
+    if (onOpenDetail) {
+      onOpenDetail();
+    } else {
+      setShowModal(true);
     }
   };
+
 
   return (
     <>
@@ -693,31 +627,67 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
               <span className="text-[9px] text-stone-500">{product.inventory.quantity} in stock</span>
             )}
 
+            {/* Rating strip — jumps straight to the review panel */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); handleOpenReviews(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handleOpenReviews(); } }}
+              className="flex items-center justify-between rounded-lg bg-[#faf4ee] px-2 py-1.5 transition-colors hover:bg-[#f3e8da]"
+            >
+              <span className={`text-[10px] font-medium ${reviewSummary && reviewSummary.total > 0 ? 'text-amber-600' : 'text-stone-400'}`}>
+                {reviewSummary && reviewSummary.total > 0
+                  ? `⭐ ${reviewSummary.avg.toFixed(1)} · ${reviewSummary.total} review${reviewSummary.total > 1 ? 's' : ''}`
+                  : '☆☆☆☆☆ Be first to review'}
+              </span>
+              <span className="text-[9px] text-stone-400 underline decoration-dotted">Rate it ›</span>
+            </div>
+
             {!outOfStock && (
               cartItem ? (
-                <div className="flex items-center justify-end gap-1 rounded-2xl bg-[#f4efe8] px-1 py-1 shadow-inner">
+                <div className="flex items-center justify-between gap-1">
                   <button
-                    onClick={(e) => { e.stopPropagation(); onUpdate(cartItem.quantity - 1); }}
-                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#e6dccb] bg-white text-base font-semibold text-stone-700 transition hover:bg-stone-50"
-                    aria-label="Remove one"
-                  >−</button>
-                  <span className="w-5 text-center text-[11px] font-bold text-stone-800">{cartItem.quantity}</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onUpdate(cartItem.quantity + 1); }}
-                    disabled={atMax}
-                    className="flex h-8 w-8 items-center justify-center rounded-xl bg-stone-900 text-base font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="Add one more"
-                  >+</button>
+                    onClick={(e) => { e.stopPropagation(); handleOpenReviews(); }}
+                    className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#f0e0ca] bg-[#fdf6ec] text-base text-amber-500 shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
+                    aria-label={`Review ${product.name}`}
+                    title="Review this product"
+                  >
+                    ⭐
+                  </button>
+                  <div className="flex items-center justify-end gap-1 rounded-2xl bg-[#f4efe8] px-1 py-1 shadow-inner">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onUpdate(cartItem.quantity - 1); }}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#e6dccb] bg-white text-base font-semibold text-stone-700 transition hover:bg-stone-50"
+                      aria-label="Remove one"
+                    >−</button>
+                    <span className="w-5 text-center text-[11px] font-bold text-stone-800">{cartItem.quantity}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onUpdate(cartItem.quantity + 1); }}
+                      disabled={atMax}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl bg-stone-900 text-base font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Add one more"
+                    >+</button>
+                  </div>
                 </div>
               ) : (
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between">
                   <button
-                    onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                    className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#1b1a18] text-lg font-semibold text-white shadow-md transition hover:bg-[#312d29] active:scale-95"
-                    aria-label={`Add ${product.name} to cart`}
+                    onClick={(e) => { e.stopPropagation(); handleOpenReviews(); }}
+                    className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#f0e0ca] bg-[#fdf6ec] text-base text-amber-500 shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
+                    aria-label={`Review ${product.name}`}
+                    title="Review this product"
                   >
-                    +
+                    ⭐
                   </button>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onAdd(); }}
+                      className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#1b1a18] text-lg font-semibold text-white shadow-md transition hover:bg-[#312d29] active:scale-95"
+                      aria-label={`Add ${product.name} to cart`}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               )
             )}
@@ -784,108 +754,14 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
                 className="flex w-full items-center justify-center gap-2 rounded-full bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-200"
               >
                 <span>⭐</span>
-                <span>{totalReviews > 0 ? `${avgRating.toFixed(1)} average · ${totalReviews} review${totalReviews > 1 ? 's' : ''}` : 'Customer Reviews'}</span>
+                <span>See reviews &amp; rate this</span>
               </button>
             </div>
 
-            {showReviews && (
-              <div className="mt-4 border-t border-gray-100 pt-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-900">Customer Reviews</h4>
-                  <button
-                    onClick={() => setShowReviews(false)}
-                    className="text-xs font-medium text-gray-500 hover:text-gray-700"
-                  >
-                    Hide
-                  </button>
-                </div>
-
-                {loadingReviews ? (
-                  <div className="py-4 text-center text-sm text-gray-500">Loading reviews...</div>
-                ) : reviews.length === 0 ? (
-                  <div className="py-4 text-center text-sm text-gray-500">No reviews yet. Be the first to review!</div>
-                ) : (
-                  <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-gray-800">{review.customerName}</p>
-                          <p className="text-[10px] text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</p>
-                        </div>
-                        <div className="mb-1 text-xs text-amber-500">
-                          {'⭐'.repeat(review.rating)}{'☆'.repeat(10 - review.rating)}
-                        </div>
-                        {review.comment && (
-                          <p className="text-xs leading-5 text-gray-600">{review.comment}</p>
-                        )}
-                        {review.imageUrl && (
-                          <img src={review.imageUrl} alt="Review attachment" className="mt-2 h-20 w-full rounded-lg object-cover" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-3 rounded-2xl bg-gray-50 p-3">
-                  {!showWriteReview ? (
-                    <button
-                      onClick={() => setShowWriteReview(true)}
-                      className="w-full rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
-                    >
-                      Write a Review
-                    </button>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="rounded-xl bg-white px-3 py-2 text-sm text-gray-700">
-                        {reviewerName || 'Guest'}
-                      </div>
-
-                      <div className="flex items-center gap-0.5">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            onClick={() => setReviewRating(star)}
-                            className="text-2xl transition-transform hover:scale-110"
-                          >
-                            {star <= reviewRating ? '⭐' : '☆'}
-                          </button>
-                        ))}
-                      </div>
-
-                      <textarea
-                        value={reviewComment}
-                        onChange={(e) => setReviewComment(e.target.value.slice(0, 200))}
-                        rows={2}
-                        maxLength={200}
-                        placeholder="Tell us what you liked"
-                        className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                      />
-                      <p className="text-right text-[10px] text-gray-400">{reviewComment.length}/200</p>
-
-                      <textarea
-  value={reviewSuggestion}
-  onChange={function(e) { setReviewSuggestion(e.target.value.slice(0, 300)) }}
-  rows={2}
-  maxLength={300}
-  placeholder="Suggestions for taste improvement (optional)"
-  className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black mt-2"
-/>
-<p className="text-right text-[10px] text-gray-400">{reviewSuggestion.length}/300</p>
-
-{reviewError && <p className="text-xs text-red-500">{reviewError}</p>}
-
-                      <button
-                        onClick={handleSubmitReview}
-                        disabled={submittingReview || uploadingImage}
-                        className="w-full rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:opacity-50"
-                      >
-                        {submittingReview ? 'Submitting...' : 'Submit Review'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            <ProductReviews
+              productId={product.id}
+              onSubmitted={(rating) => onReviewSubmitted?.(product.id, rating)}
+            />
           </div>
         </div>
       )}
@@ -894,8 +770,20 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────
+interface ProductOptionGroupDTO {
+  id: number;
+  group: {
+    id: number;
+    name: string;
+    selectionType: 'single' | 'multi';
+    scalesRecipe: boolean;
+  };
+  options: { id: number; name: string; priceDelta: number }[];
+}
+
 function MenuPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [branding, setBranding] = useState({ shopName: 'CaféOS', logoUrl: null as string | null });
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<number | 'all' | null>('all');
@@ -910,6 +798,13 @@ function MenuPageInner() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [tableSessionId, setTableSessionId] = useState<number | null>(null);
+  const [ratingsMap, setRatingsMap] = useState<Record<number, { avg: number; total: number }>>({});
+  const [pWriteOpen, setPWriteOpen] = useState(false);
+  const [productOptions, setProductOptions] = useState<ProductOptionGroupDTO[]>([]);
+  const [singlePicks, setSinglePicks] = useState<Record<number, number>>({});
+  const [multiPicks, setMultiPicks] = useState<number[]>([]);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [defaultOptionsMap, setDefaultOptionsMap] = useState<Record<number, CartItemSelection[]>>({});
   const cartStore = useCartStore();
   const sectionRefs = useRef<Record<number, HTMLElement | null>>({});
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -937,6 +832,119 @@ function MenuPageInner() {
       .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
       .catch(() => {});
   }, []);
+
+  // Fetch review ratings once for every product card
+  useEffect(() => {
+    fetch('/api/reviews')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const map: Record<number, { sum: number; total: number }> = {};
+        for (const rev of d?.reviews ?? []) {
+          const cur = map[rev.productId] ?? { sum: 0, total: 0 };
+          cur.sum += rev.rating;
+          cur.total += 1;
+          map[rev.productId] = cur;
+        }
+        const out: Record<number, { avg: number; total: number }> = {};
+        for (const [pid, v] of Object.entries(map)) {
+          out[Number(pid)] = { avg: v.sum / v.total, total: v.total };
+        }
+        setRatingsMap(out);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load this product's customization groups (Size / Temp / add-ons)
+  useEffect(() => {
+    if (selectedProductId === null) {
+      setPWriteOpen(false);
+      setProductOptions([]);
+      setSinglePicks({});
+      setMultiPicks([]);
+      setOptionsError(null);
+      return;
+    }
+    setPWriteOpen(false);
+    let cancelled = false;
+    setOptionsError(null);
+    fetch(`/api/products/${selectedProductId}/option-groups`)
+      .then((r) => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const list: ProductOptionGroupDTO[] = Array.isArray(data) ? data : [];
+        setProductOptions(list);
+        const defaults: Record<number, number> = {};
+        for (const att of list) {
+          if (att.group.selectionType === 'single' && att.options?.length) {
+            defaults[att.group.id] = att.options[0].id;
+          }
+        }
+        setSinglePicks(defaults);
+        setMultiPicks([]);
+      })
+      .catch((e: any) => {
+        if (!cancelled) setOptionsError(e?.message ? String(e.message) : 'load failed');
+      });
+    return () => { cancelled = true; };
+  }, [selectedProductId]);
+
+  useEffect(() => {
+    if (selectedProductId === null) setPWriteOpen(false);
+  }, [selectedProductId]);
+
+  // Default configuration for every product: first option of each attached
+  // group (Small · Hot …). Quick-add uses this so no line is ever blank.
+  useEffect(() => {
+    if (categories.length === 0) return;
+    Promise.all([
+      fetch('/api/option-groups').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/product-option-groups').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([groups, attachments]) => {
+        const groupsById: Record<number, { name: string; selectionType: string; options: { id: number; name: string; priceDelta: number }[] }> = {};
+        for (const g of Array.isArray(groups) ? groups : []) {
+          groupsById[g.id] = { name: g.name, selectionType: g.selectionType, options: g.options ?? [] };
+        }
+        const map: Record<number, CartItemSelection[]> = {};
+        for (const att of Array.isArray(attachments) ? attachments : []) {
+          const g = groupsById[att.groupId];
+          if (!g || g.selectionType !== 'single') continue; // multi groups start empty by design
+          const first = g.options[0];
+          if (!first) continue;
+          (map[att.productId] ??= []).push({
+            optionId: first.id,
+            groupName: g.name,
+            name: first.name,
+            priceDelta: first.priceDelta ?? 0,
+          });
+        }
+        setDefaultOptionsMap(map);
+      })
+      .catch(() => {});
+  }, [categories]);
+
+  const getDefaultSelections = useCallback(
+    (productId: number): CartItemSelection[] => defaultOptionsMap[productId] ?? [],
+    [defaultOptionsMap]
+  );
+
+  const handleReviewSubmitted = useCallback((productId: number, rating: number) => {
+    setRatingsMap((prev) => {
+      const cur = prev[productId] ?? { avg: 0, total: 0 };
+      const total = cur.total + 1;
+      const avg = (cur.avg * cur.total + rating) / total;
+      return { ...prev, [productId]: { avg, total } };
+    });
+  }, []);
+
+  const openDetailWithReview = useCallback((pid: number) => {
+    setSelectedProductId(pid);
+    setPWriteOpen(true);
+  }, []);
+
 
   // Cleanup: ensure body overflow is never left locked
   useEffect(() => {
@@ -1358,12 +1366,15 @@ function MenuPageInner() {
     return () => observer.disconnect();
   }, [categories, search]);
 
-  function handleAdd(product: Product, categoryId: number) {
-    cartStore.addItem({ 
-      productId: product.id, 
-      name: product.name, 
-      price: product.price,
-      categoryId: categoryId
+  function handleAdd(product: Product, categoryId: number, selections?: CartItemSelection[]) {
+    const adder = (selections ?? []).reduce((s, x) => s + x.priceDelta, 0);
+    cartStore.addItem({
+      productId: product.id,
+      name: product.name,
+      price: product.price + adder,
+      basePrice: product.price,
+      categoryId: categoryId,
+      selections,
     });
   }
 
@@ -1399,6 +1410,28 @@ function MenuPageInner() {
     }
     return null;
   }, [selectedProductId, categories]);
+
+  const chosenSelections: CartItemSelection[] = useMemo(() => {
+    const out: CartItemSelection[] = [];
+    for (const att of productOptions) {
+      if (!att?.group || !Array.isArray(att.options)) continue;
+      if (att.group.selectionType === 'single') {
+        const opt = att.options.find((o) => o.id === singlePicks[att.group.id]);
+        if (opt) out.push({ optionId: opt.id, groupName: att.group.name, name: opt.name, priceDelta: opt.priceDelta });
+      } else {
+        for (const opt of att.options) {
+          if (multiPicks.includes(opt.id)) {
+            out.push({ optionId: opt.id, groupName: att.group.name, name: opt.name, priceDelta: opt.priceDelta });
+          }
+        }
+      }
+    }
+    return out;
+  }, [productOptions, singlePicks, multiPicks]);
+
+  const popupUnitTotal = selectedProduct
+    ? selectedProduct.product.price + chosenSelections.reduce((s, x) => s + x.priceDelta, 0)
+    : 0;
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
@@ -1783,6 +1816,13 @@ function MenuPageInner() {
             </div>
           </div>
 
+          {/* Reviews entrance */}
+          <div className="flex w-full items-center gap-2 px-4 pb-3 sm:px-6 lg:px-8">
+            <Link href="/menu/reviews" className="inline-flex items-center gap-1.5 rounded-full border border-[#f0e0ca] bg-white/90 px-4 py-2 text-[13px] font-medium text-stone-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
+              ⭐ Reviews
+            </Link>
+          </div>
+
           <div className="px-4 pb-3">
             <div className={`flex items-center gap-2 rounded-full border border-[#e9dcc8] bg-[#faf4ee] px-4 py-2.5 shadow-sm transition-all duration-200 ${searchFocused ? 'border-[#d8b98f] bg-white ring-2 ring-[#eacfa7]/40' : ''}`}>
               <span className="shrink-0 text-stone-500"><SearchIcon /></span>
@@ -1920,8 +1960,11 @@ function MenuPageInner() {
                                     isDetailOpen={selectedProductId === product.id}
                                     onOpenDetail={() => setSelectedProductId(product.id)}
                                     onCloseDetail={() => setSelectedProductId(null)}
-                                    onAdd={() => handleAdd(product, catInfo?.id ?? 0)}
-                                    onUpdate={(qty) => cartStore.updateQuantity(product.id, qty)}
+                                    onAdd={() => handleAdd(product, catInfo?.id ?? 0, getDefaultSelections(product.id))}
+                                    reviewSummary={ratingsMap[product.id]}
+                                    onReviewSubmitted={handleReviewSubmitted}
+                                    onOpenReviews={() => router.push(`/menu/reviews?productId=${product.id}&write=1`)}
+                                    onUpdate={(qty) => cartStore.updateQuantity(lineKey(product.id, cartItem?.selections), qty)}
                                     bestSeller={bestSellerIds.has(product.id)}
                                   />
                                 );
@@ -1954,8 +1997,11 @@ function MenuPageInner() {
                                   isDetailOpen={selectedProductId === product.id}
                                   onOpenDetail={() => setSelectedProductId(product.id)}
                                   onCloseDetail={() => setSelectedProductId(null)}
-                                  onAdd={() => handleAdd(product, cat.id)}
-                                  onUpdate={(qty) => cartStore.updateQuantity(product.id, qty)}
+                                  onAdd={() => handleAdd(product, cat.id, getDefaultSelections(product.id))}
+                                  reviewSummary={ratingsMap[product.id]}
+                                  onReviewSubmitted={handleReviewSubmitted}
+                                  onOpenReviews={() => router.push(`/menu/reviews?productId=${product.id}&write=1`)}
+                                  onUpdate={(qty) => cartStore.updateQuantity(lineKey(product.id, cartItem?.selections), qty)}
                                   bestSeller={bestSellerIds.has(product.id)}
                                 />
                               );
@@ -1981,8 +2027,11 @@ function MenuPageInner() {
                           isDetailOpen={selectedProductId === product.id}
                           onOpenDetail={() => setSelectedProductId(product.id)}
                           onCloseDetail={() => setSelectedProductId(null)}
-                          onAdd={() => handleAdd(product, foundCategory?.id ?? 0)}
-                          onUpdate={(qty) => cartStore.updateQuantity(product.id, qty)}
+                          onAdd={() => handleAdd(product, foundCategory?.id ?? 0, getDefaultSelections(product.id))}
+                          reviewSummary={ratingsMap[product.id]}
+                          onReviewSubmitted={handleReviewSubmitted}
+                          onOpenReviews={() => router.push(`/menu/reviews?productId=${product.id}&write=1`)}
+                          onUpdate={(qty) => cartStore.updateQuantity(lineKey(product.id, cartItem?.selections), qty)}
                           bestSeller={bestSellerIds.has(product.id)}
                         />
                       );
@@ -2061,16 +2110,76 @@ function MenuPageInner() {
                     </span>
                   )}
 
+                  {productOptions.map((att) => {
+                    if (!att?.group || !Array.isArray(att.options)) return null;
+                    return (
+                    <div key={att.id} className="rounded-2xl bg-white border-2 border-[#f0e5d8] p-3 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wide text-stone-800 mb-2">
+                        {att.group.name}
+                        {att.group.selectionType === 'single' && <span className="text-gray-400 font-normal"> · choose one</span>}
+                      </p>
+                      {att.group.selectionType === 'single' ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {(att.options ?? []).map((opt) => {
+                            const active = singlePicks[att.group.id] === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                onClick={() => setSinglePicks((prev) => ({ ...prev, [att.group.id]: opt.id }))}
+                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                  active
+                                    ? 'bg-amber-500 text-white border-amber-500'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                }`}
+                              >
+                                {opt.name}{opt.priceDelta > 0 && <span className="ml-1 opacity-70">+₱{opt.priceDelta}</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {(att.options ?? []).map((opt) => {
+                            const checked = multiPicks.includes(opt.id);
+                            return (
+                              <button
+                                key={opt.id}
+                                onClick={() =>
+                                  setMultiPicks((prev) =>
+                                    checked ? prev.filter((id) => id !== opt.id) : [...prev, opt.id]
+                                  )
+                                }
+                                className={`flex w-full items-center justify-between px-3 py-2 rounded-xl border text-sm transition-colors ${
+                                  checked
+                                    ? 'border-black bg-white font-medium'
+                                    : 'border-gray-200 bg-white hover:border-gray-300'
+                                }`}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${checked ? 'bg-black border-black text-white' : 'border-gray-300 text-transparent'}`}>✓</span>
+                                  {opt.name}
+                                </span>
+                                {opt.priceDelta > 0 && <span className="text-gray-500">+₱{opt.priceDelta}</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    );
+                  })}
+
                   <button
                     onClick={() => {
-                      handleAdd(selectedProduct.product, selectedProduct.categoryIcon as any || 0);
+                      handleAdd(selectedProduct.product, selectedProduct.categoryIcon as any || 0, chosenSelections);
                       setSelectedProductId(null);
                     }}
                     disabled={!!selectedProduct.product.inventory && selectedProduct.product.inventory.quantity === 0}
                     className="flex h-12 w-full items-center justify-center rounded-full bg-[#1b1a18] px-4 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(31,26,23,0.2)] transition hover:bg-[#312d29] disabled:cursor-not-allowed disabled:bg-stone-300"
                   >
-                    {!!selectedProduct.product.inventory && selectedProduct.product.inventory.quantity === 0 ? 'Out of Stock' : 'Add to Order'}
+                    {!!selectedProduct.product.inventory && selectedProduct.product.inventory.quantity === 0 ? 'Out of Stock' : `Add to Order · ₱${popupUnitTotal.toFixed(2)}`}
                   </button>
+
                 </div>
               </div>
             </div>
@@ -2101,14 +2210,14 @@ function MenuPageInner() {
                           <p className="text-sm font-semibold text-stone-900">{item.name}</p>
                           <p className="mt-1 text-[12px] text-stone-500">₱{item.price.toFixed(2)} each</p>
                         </div>
-                        <button onClick={() => cartStore.removeItem(item.productId)} className="text-sm text-stone-400 transition hover:text-red-500">Remove</button>
+                        <button onClick={() => cartStore.removeItem(lineKey(item.productId, item.selections))} className="text-sm text-stone-400 transition hover:text-red-500">Remove</button>
                       </div>
 
                       <div className="mt-3 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 rounded-full border border-[#e9dcc8] bg-white px-2 py-1.5 shadow-sm">
-                          <button onClick={() => cartStore.updateQuantity(item.productId, item.quantity - 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f3e7d7] text-lg font-semibold text-stone-700">−</button>
+                          <button onClick={() => cartStore.updateQuantity(lineKey(item.productId, item.selections), item.quantity - 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f3e7d7] text-lg font-semibold text-stone-700">−</button>
                           <span className="min-w-5 text-center text-sm font-bold text-stone-800">{item.quantity}</span>
-                          <button onClick={() => cartStore.updateQuantity(item.productId, item.quantity + 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1f1a17] text-lg font-semibold text-white">+</button>
+                          <button onClick={() => cartStore.updateQuantity(lineKey(item.productId, item.selections), item.quantity + 1)} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1f1a17] text-lg font-semibold text-white">+</button>
                         </div>
                         <span className="text-[15px] font-bold text-stone-900">₱{(item.price * item.quantity).toFixed(2)}</span>
                       </div>

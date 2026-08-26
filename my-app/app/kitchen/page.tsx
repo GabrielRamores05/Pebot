@@ -3,10 +3,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { playNewOrderSound, playMessageSound } from '@/lib/sounds';
+import { ticketCode } from '@/lib/ticket';
+import { selectionsLabelFromJson } from '@/lib/product-options';
 
 interface OrderItem {
   id: number;
   quantity: number;
+  selections?: string | null;
   product: { name: string; stationType?: string };
 }
 
@@ -242,20 +245,13 @@ export default function KitchenPage() {
       <div key={`${order.id}-${items[0]?.id}`} className={`bg-gray-900 border-2 ${borderColor} ${hasUnanswered ? 'ring-2 ring-amber-400' : ''} rounded-xl p-4 flex flex-col`}>
         <div className="flex items-start justify-between mb-2">
           <div>
-            <p className="font-mono font-bold text-lg">{order.orderNumber}</p>
+            <p className="font-mono font-bold text-lg">{ticketCode(order.orderNumber)}</p>
             <p className="text-gray-400 text-sm">{order.customerName}</p>
           </div>
           <div className="text-right">
             <span className={`text-xs px-2 py-1 rounded-full font-semibold ${statusBadge}`}>
               {order.status}
             </span>
-            {order.queueNumber && (order.status === 'PENDING' || order.status === 'PREPARING') && (
-              <div className="mt-1 flex items-center justify-end gap-1">
-                <span className="text-xs bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded">
-                  Queue #{order.queueNumber}
-                </span>
-              </div>
-            )}
             {order.orderType && order.orderType !== 'DINE_IN' && (
               <p className="text-xs mt-1 font-semibold">
                 {order.orderType === 'DELIVERY' ? '🛵 Delivery' : '🥡 Takeout'}
@@ -287,7 +283,7 @@ export default function KitchenPage() {
         <div className="flex-1 space-y-1.5 mb-4">
           {items.map((item) => (
             <div key={item.id} className="flex justify-between text-sm">
-              <span className="text-gray-200">{item.quantity}× {item.product.name}</span>
+              <span className="text-gray-200">{item.quantity}× {item.product.name}{selectionsLabelFromJson(item.selections)}</span>
             </div>
           ))}
         </div>
@@ -476,7 +472,7 @@ export default function KitchenPage() {
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-lg w-full mx-4 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-xl font-bold">💬 {threadOrder.orderNumber}</h3>
+                <h3 className="text-xl font-bold">💬 {ticketCode(threadOrder.orderNumber)}</h3>
                 <p className="text-gray-400 text-sm">{threadOrder.customerName}{threadOrder.table ? ` · 📍 ${threadOrder.table.name}` : ''}</p>
               </div>
               <button onClick={() => setThreadOrder(null)} className="text-gray-400 hover:text-gray-200 text-xl px-2">✕</button>
@@ -536,7 +532,7 @@ export default function KitchenPage() {
         <div className="fixed top-4 right-4 z-50 space-y-2">
           {followUps.map((fu, i) => (
             <div key={i} className="bg-orange-500 text-white px-4 py-3 rounded-xl shadow-2xl text-sm animate-bounce max-w-xs">
-              📣 <strong>{fu.tableName}</strong> ({fu.customerName}) followed up <strong>{fu.orderNumber}</strong>
+              📣 <strong>{fu.tableName}</strong> ({fu.customerName}) followed up <strong>{ticketCode(fu.orderNumber)}</strong>
             </div>
           ))}
         </div>

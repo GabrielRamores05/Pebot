@@ -8,7 +8,7 @@ interface InventoryData { quantity: number; lowStockThreshold: number; }
 interface Product { id: number; name: string; description?: string; price: number; imageUrl?: string; available: boolean; inventory?: InventoryData; vatExempt?: boolean; marginType?: string; marginValue?: number; capitalCost?: number; }
 interface Category { id: number; name: string; icon?: string; products: Product[]; }
 interface CartLoyaltyAssignment { customerName: string; quantity: number; }
-interface CartItem { productId: number; name: string; price: number; quantity: number; vatExempt?: boolean; loyaltyAssignments?: CartLoyaltyAssignment[]; }
+interface CartItem { key?: string; productId: number; name: string; price: number; quantity: number; vatExempt?: boolean; loyaltyAssignments?: CartLoyaltyAssignment[]; optionIds?: number[]; selectionsLabel?: string; }
 interface Table { id: number; name: string; status: string; }
 interface LoyaltyCard { id: number; customerName: string; membershipCode?: string | null; memberSince?: string | null; coffeesCompleted: number; rewardsAvailable: number; lastRewardRedeemDate: string | null; }
 
@@ -155,6 +155,11 @@ export default function PosTerminalPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | number>('all');
   const [cart, setCart] = useState<CartItem[]>([]);
+  // Option picker state: which product is being configured
+  interface PickerGroup { id: number; group: { id: number; name: string; selectionType: 'single' | 'multi' }; options: { id: number; name: string; priceDelta: number }[] }
+  const [picker, setPicker] = useState<{ product: Product; groups: PickerGroup[] } | null>(null);
+  const [pickerSingle, setPickerSingle] = useState<Record<number, number>>({});
+  const [pickerMulti, setPickerMulti] = useState<number[]>([]);
   const [customerName, setCustomerName] = useState('Walk-In');
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
@@ -385,17 +390,44 @@ export default function PosTerminalPage() {
     },
   });
 
-  function addToCart(product: Product) {
+  function addToCart(product: Product, opts?: { optionIds?: number[]; selectionsLabel?: string; unitPrice?: number }) {
+    const key = opts?.optionIds?.length ? `${product.id}:${[...opts.optionIds].sort((a, b) => a - b).join(',')}` : String(product.id);
+    const unitPrice = opts?.unitPrice ?? product.price;
     setCart(prev => {
-      const existing = prev.find(i => i.productId === product.id);
-      if (existing) return prev.map(i => i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1, vatExempt: product.vatExempt ?? false }];
+      const existing = prev.find(i => (i.key ?? String(i.productId)) === key);
+      if (existing) return prev.map(i => (i.key ?? String(i.productId)) === key ? { ...i, quantity: i.quantity + 1 } : i);
+      return [...prev, { key, productId: product.id, name: product.name, price: unitPrice, quantity: 1, vatExempt: product.vatExempt ?? false, optionIds: opts?.optionIds, selectionsLabel: opts?.selectionsLabel }];
     });
   }
 
-  function updateQty(productId: number, qty: number) {
-    if (qty <= 0) setCart(prev => prev.filter(i => i.productId !== productId));
-    else setCart(prev => prev.map(i => i.productId === productId ? { ...i, quantity: qty } : i));
+  async function handleProductClick(product: Product) {
+    // Fast path: no customization groups attached → straight into the cart
+    try {
+      const res = await fetch(`/api/products/${product.id}/option-groups`);
+      const data = res.ok ? await res.json() : [];
+      const groups: PickerGroup[] = Array.isArray(data)
+        ? data.filter((g: PickerGroup) => (g.options?.length ?? 0) > 0)
+        : [];
+      if (groups.length === 0) {
+        addToCart(product);
+        return;
+      }
+      const defaults: Record<number, number> = {};
+      for (const g of groups) {
+        if (g.group.selectionType === 'single' && g.options?.length) defaults[g.group.id] = g.options[0].id;
+      }
+      setPickerSingle(defaults);
+      setPickerMulti([]);
+      setPicker({ product, groups });
+    } catch {
+      addToCart(product);
+    }
+  }
+
+  function updateQty(keyOrId: number | string, qty: number) {
+    const key = String(keyOrId);
+    if (qty <= 0) setCart(prev => prev.filter(i => (i.key ?? String(i.productId)) !== key));
+    else setCart(prev => prev.map(i => (i.key ?? String(i.productId)) === key ? { ...i, quantity: qty } : i));
   }
 
   function clearCart() {
@@ -409,17 +441,19 @@ export default function PosTerminalPage() {
     resetCalculator();
   }
 
-  function removeFromCart(productId: number) {
-    setCart(prev => prev.filter(i => i.productId !== productId));
+  function removeFromCart(keyOrId: number | string) {
+    const key = String(keyOrId);
+    setCart(prev => prev.filter(i => (i.key ?? String(i.productId)) !== key));
   }
 
-  function updateCartItemQuantity(productId: number, delta: number) {
-    const item = cart.find(i => i.productId === productId);
+  function updateCartItemQuantity(keyOrId: number | string, delta: number) {
+    const key = String(keyOrId);
+    const item = cart.find(i => (i.key ?? String(i.productId)) === key);
     if (!item) return;
     const qty = item.quantity + delta;
     if (qty <= 0) {
-      removeFromCart(productId);
-    } else setCart(prev => prev.map(i => i.productId === productId ? { ...i, quantity: qty } : i));
+      removeFromCart(key);
+    } else setCart(prev => prev.map(i => (i.key ?? String(i.productId)) === key ? { ...i, quantity: qty } : i));
   }
 
   async function loadLoyaltyMembers() {
@@ -584,6 +618,7 @@ export default function PosTerminalPage() {
         body: JSON.stringify({
           customerName: customerName.trim(),
           loyaltyCustomerName: loyaltyTargetName,
+          paymentMethod,
           tableId: selectedTable ?? undefined,
           orderType,
           deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress.trim() : undefined,
@@ -592,6 +627,7 @@ export default function PosTerminalPage() {
           items: cart.map(i => ({
             productId: i.productId,
             quantity: i.quantity,
+            ...(i.optionIds?.length ? { optionIds: i.optionIds } : {}),
             notes: (i.loyaltyAssignments ?? []).length > 0 ? JSON.stringify(i.loyaltyAssignments) : undefined,
           })),
         }),
@@ -864,17 +900,17 @@ export default function PosTerminalPage() {
           ) : (
             <div className="space-y-1">
               {cart.map(item => (
-                <div key={item.productId} className="rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-paper)] p-1.5">
+                <div key={item.key ?? item.productId} className="rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-paper)] p-1.5">
                   <div className="flex items-center gap-1">
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => updateCartItemQuantity(item.productId, -1)}
+                        onClick={() => updateCartItemQuantity(item.key ?? item.productId, -1)}
                         className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-[10px] font-bold text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]"
                       >
                         -
                       </button>
                       <button
-                        onClick={() => updateCartItemQuantity(item.productId, 1)}
+                        onClick={() => updateCartItemQuantity(item.key ?? item.productId, 1)}
                         className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-[10px] font-bold text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]"
                       >
                         +
@@ -882,13 +918,16 @@ export default function PosTerminalPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="break-words text-[10px] font-medium text-[var(--pos-ink)]">{item.name}</p>
+                      {item.selectionsLabel && (
+                        <p className="break-words text-[9px] text-[var(--pos-accent)]">{item.selectionsLabel}</p>
+                      )}
                       <div className="mt-0.5 flex items-center justify-between text-[9px] text-[var(--pos-ink-soft)]">
                         <span>Qty {item.quantity}</span>
                         <span className="font-semibold text-[var(--pos-ink)]">{formatCurrency(item.price * item.quantity)}</span>
                       </div>
                     </div>
                     <button
-                      onClick={() => removeFromCart(item.productId)}
+                      onClick={() => removeFromCart(item.key ?? item.productId)}
                       className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-sm)] text-[10px] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-danger-soft)] hover:text-[var(--pos-danger)]"
                     >
                       ✕
@@ -1086,7 +1125,7 @@ export default function PosTerminalPage() {
               return (
                 <button
                   key={product.id}
-                  onClick={() => !blocked && addToCart(product)}
+                  onClick={() => !blocked && handleProductClick(product)}
                   disabled={blocked}
                   className={`relative flex w-full min-w-0 min-h-[320px] flex-col items-center justify-between rounded-[var(--radius-lg)] border bg-white p-4 text-center shadow-sm transition-all overflow-hidden ${
                     blocked
@@ -1474,6 +1513,115 @@ export default function PosTerminalPage() {
           </div>
         </div>
       )}
+
+      {/* ── Option Picker Modal (size / temp / add-ons) ── */}
+      {picker && (() => {
+        const chosen: { optionId: number; groupName: string; name: string; priceDelta: number }[] = [];
+        for (const g of picker.groups) {
+          if (g.group.selectionType === 'single') {
+            const opt = (g.options ?? []).find((o) => o.id === pickerSingle[g.group.id]);
+            if (opt) chosen.push({ optionId: opt.id, groupName: g.group.name, name: opt.name, priceDelta: opt.priceDelta });
+          } else {
+            for (const opt of (g.options ?? [])) {
+              if (pickerMulti.includes(opt.id)) chosen.push({ optionId: opt.id, groupName: g.group.name, name: opt.name, priceDelta: opt.priceDelta });
+            }
+          }
+        }
+        const unitTotal = picker.product.price + chosen.reduce((s, x) => s + x.priceDelta, 0);
+        return (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setPicker(null)}
+          >
+            <div
+              className="bg-white rounded-3xl w-full max-w-md max-h-[86vh] flex flex-col overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900">{picker.product.name}</h3>
+                <p className="text-xs text-gray-400">Choose options, then confirm</p>
+              </div>
+
+              <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+                {picker.groups.map((g) => (
+                  <div key={g.id} className="rounded-2xl bg-gray-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                      {g.group.name}
+                      {g.group.selectionType === 'single' && <span className="text-gray-400 font-normal"> · choose one</span>}
+                    </p>
+                    {g.group.selectionType === 'single' ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {g.options.map((opt) => {
+                          const active = pickerSingle[g.group.id] === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => setPickerSingle((prev) => ({ ...prev, [g.group.id]: opt.id }))}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                active ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                              }`}
+                            >
+                              {opt.name}{opt.priceDelta > 0 && <span className="ml-1 opacity-70">+₱{opt.priceDelta}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {g.options.map((opt) => {
+                          const checked = pickerMulti.includes(opt.id);
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() =>
+                                setPickerMulti((prev) => (checked ? prev.filter((id) => id !== opt.id) : [...prev, opt.id]))
+                              }
+                              className={`flex w-full items-center justify-between px-3 py-2 rounded-xl border text-sm transition-colors ${
+                                checked ? 'border-black bg-white font-medium' : 'border-gray-200 bg-white hover:border-gray-300'
+                              }`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${checked ? 'bg-black border-black text-white' : 'border-gray-300 text-transparent'}`}>✓</span>
+                                {opt.name}
+                              </span>
+                              {opt.priceDelta > 0 && <span className="text-gray-500">+₱{opt.priceDelta}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-5 border-t border-gray-100 grid grid-cols-2 gap-3 bg-gray-50">
+                <button
+                  onClick={() => setPicker(null)}
+                  className="py-2.5 rounded-xl bg-white border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const label = chosen.length
+                      ? ` (${chosen.map((x) => (x.priceDelta > 0 ? `+${x.name}` : x.name)).join(' · ')})`
+                      : undefined;
+                    addToCart(picker.product, {
+                      optionIds: chosen.map((x) => x.optionId),
+                      selectionsLabel: label,
+                      unitPrice: unitTotal,
+                    });
+                    setPicker(null);
+                  }}
+                  className="py-2.5 rounded-xl bg-stone-900 hover:bg-stone-700 text-white text-sm font-semibold transition-colors"
+                >
+                  Add to Order · ₱{unitTotal.toFixed(2)}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
 
         </>

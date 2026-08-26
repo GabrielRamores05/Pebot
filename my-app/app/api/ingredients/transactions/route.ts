@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 interface TransactionWithIngredient {
   id: number;
   ingredientId: number;
-  ingredient: { id: number; name: string; baseUnit: string; category: string };
+  ingredient: { id: number; name: string; baseUnit: string; category: string; costPerUnit: number };
   type: string;
   quantity: number;
   purchaseCost: number | null;
@@ -42,13 +42,24 @@ export async function GET(req: NextRequest) {
     const transactions: TransactionWithIngredient[] = await prisma.ingredientTransaction.findMany({
       where,
       include: {
-        ingredient: { select: { id: true, name: true, baseUnit: true, category: true } },
+        ingredient: { select: { id: true, name: true, baseUnit: true, category: true, costPerUnit: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
 
-    return NextResponse.json(transactions);
+    // Non-purchase rows carry no stored cost — estimate them from the
+    // ingredient's current average unit cost so the ledger shows a peso
+    // value on every line.
+    const enriched = transactions.map((t) => {
+      let usageCost: number | null = null;
+      if (t.type !== 'PURCHASE' && t.purchaseCost == null && t.ingredient?.costPerUnit != null) {
+        usageCost = Math.round(Math.abs(t.quantity) * t.ingredient.costPerUnit * 100) / 100;
+      }
+      return { ...t, usageCost };
+    });
+
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error('[INGREDIENT TRANSACTIONS] Error:', error);
     return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });

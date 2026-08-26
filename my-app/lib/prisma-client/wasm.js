@@ -297,7 +297,36 @@ exports.Prisma.OrderItemScalarFieldEnum = {
   quantity: 'quantity',
   unitPrice: 'unitPrice',
   subtotal: 'subtotal',
-  notes: 'notes'
+  notes: 'notes',
+  selections: 'selections'
+};
+
+exports.Prisma.OptionGroupScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  selectionType: 'selectionType',
+  scalesRecipe: 'scalesRecipe',
+  sortOrder: 'sortOrder',
+  available: 'available',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.OptionScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  name: 'name',
+  priceDelta: 'priceDelta',
+  sizeMultiplier: 'sizeMultiplier',
+  sortOrder: 'sortOrder',
+  available: 'available',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.ProductOptionGroupScalarFieldEnum = {
+  productId: 'productId',
+  groupId: 'groupId',
+  sortOrder: 'sortOrder'
 };
 
 exports.Prisma.OrderMessageScalarFieldEnum = {
@@ -528,6 +557,9 @@ exports.Prisma.ModelName = {
   TableSession: 'TableSession',
   Order: 'Order',
   OrderItem: 'OrderItem',
+  OptionGroup: 'OptionGroup',
+  Option: 'Option',
+  ProductOptionGroup: 'ProductOptionGroup',
   OrderMessage: 'OrderMessage',
   Inventory: 'Inventory',
   Setting: 'Setting',

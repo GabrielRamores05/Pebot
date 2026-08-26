@@ -3,10 +3,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { playNewOrderSound, playMessageSound } from '@/lib/sounds';
+import { selectionsLabelFromJson } from '@/lib/product-options';
+import { ticketCode } from '@/lib/ticket';
 
 interface OrderItem {
   id: number;
   quantity: number;
+  selections?: string | null;
   product: { name: string; stationType?: string };
 }
 
@@ -234,7 +237,7 @@ export default function AdminKitchenPage() {
         {/* Header Row */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
-            <p className="text-2xl font-bold text-gray-900">{order.orderNumber}</p>
+            <p className="text-2xl font-bold text-gray-900">{ticketCode(order.orderNumber)}</p>
             <p className="text-lg font-semibold text-gray-700 mt-1">{order.customerName}</p>
           </div>
           <div className={`${config.badge} ${config.text} px-3 py-1.5 rounded-full text-xs font-bold`}>
@@ -289,9 +292,14 @@ export default function AdminKitchenPage() {
         {/* Items List - Large & Readable */}
         <div className="flex-1 space-y-2 mb-4">
           {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-              <span className="text-base font-bold text-gray-900 min-w-[24px]">{item.quantity}×</span>
-              <span className="text-base text-gray-700 font-medium">{item.product.name}</span>
+            <div key={item.id} className="bg-gray-50 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold text-gray-900 min-w-[24px]">{item.quantity}×</span>
+                <span className="text-base text-gray-700 font-medium">
+                  {item.product.name}
+                  {item.selections && <span className="text-sm text-amber-700 font-semibold">{selectionsLabelFromJson(item.selections)}</span>}
+                </span>
+              </div>
             </div>
           ))}
         </div>
@@ -498,7 +506,7 @@ export default function AdminKitchenPage() {
             <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[85vh] flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-bold text-xl text-gray-900">💬 {threadOrder.orderNumber}</h3>
+                  <h3 className="font-bold text-xl text-gray-900">💬 {ticketCode(threadOrder.orderNumber)}</h3>
                   <p className="text-sm text-gray-500">{threadOrder.customerName}{threadOrder.table ? ` · 📍 ${threadOrder.table.name}` : ''}</p>
                 </div>
                 <button onClick={() => setThreadOrder(null)} className="text-gray-400 hover:text-gray-600 text-xl px-2">✕</button>
@@ -558,7 +566,7 @@ export default function AdminKitchenPage() {
           <div className="fixed top-4 right-4 z-50 space-y-2">
             {followUps.map((fu, i) => (
               <div key={i} className="bg-amber-500 text-white px-5 py-4 rounded-xl shadow-xl text-sm font-semibold">
-                📣 <strong>{fu.tableName}</strong> ({fu.customerName}) followed up - <strong>{fu.orderNumber}</strong>
+                📣 <strong>{fu.tableName}</strong> ({fu.customerName}) followed up - <strong>{ticketCode(fu.orderNumber)}</strong>
               </div>
             ))}
           </div>

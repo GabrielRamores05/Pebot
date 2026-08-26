@@ -78,27 +78,28 @@ model Category {
 
 // ─── Product ─────────────────────────────────────────────────────────────────
 model Product {
-  id              Int                 @id @default(autoincrement())
+  id              Int                  @id @default(autoincrement())
   name            String
   description     String?
   price           Float
   imageUrl        String?
-  available       Boolean             @default(true)
-  prepTimeMinutes Int                 @default(5)
-  stationType     String              @default("general")
+  available       Boolean              @default(true)
+  prepTimeMinutes Int                  @default(5)
+  stationType     String               @default("general")
   categoryId      Int
-  category        Category            @relation(fields: [categoryId], references: [id])
+  category        Category             @relation(fields: [categoryId], references: [id])
   orderItems      OrderItem[]
   inventory       Inventory?
   reviews         Review[]
   ingredients     ProductIngredient[]
+  optionGroups    ProductOptionGroup[]
   // BIR-compliant pricing fields
-  capitalCost     Float               @default(0) // Raw material cost per item
-  marginType      String              @default("PERCENTAGE") // "PERCENTAGE" or "PESOS"
-  marginValue     Float               @default(30) // 30% or ₱30 default margin
-  vatExempt       Boolean             @default(false) // true if VAT-exempt
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  capitalCost     Float                @default(0) // Raw material cost per item
+  marginType      String               @default("PERCENTAGE") // "PERCENTAGE" or "PESOS"
+  marginValue     Float                @default(30) // 30% or ₱30 default margin
+  vatExempt       Boolean              @default(false) // true if VAT-exempt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 }
 
 // ─── Product Review ───────────────────────────────────────────────────────────
@@ -259,15 +260,61 @@ model Order {
 
 // ─── OrderItem ───────────────────────────────────────────────────────────────
 model OrderItem {
-  id        Int     @id @default(autoincrement())
-  orderId   Int
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id         Int     @id @default(autoincrement())
+  orderId    Int
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  Int
+  product    Product @relation(fields: [productId], references: [id])
+  quantity   Int
+  unitPrice  Float
+  subtotal   Float
+  notes      String?
+  selections String? // JSON: resolved options [{optionId, groupName, name, priceDelta, sizeMultiplier}]
+}
+
+// ── Product options system ──────────────────────────────────────────────────
+// Groups ("Size", "Temperature", "Add-ons"…) hold priced options and are
+// attached to products. Products with no attached groups sell exactly as
+// before — a single base price, no prompts.
+
+model OptionGroup {
+  id            Int                  @id @default(autoincrement())
+  name          String // "Size", "Temperature", "Add-ons"
+  selectionType String               @default("single") // single = pick one; multi = pick many (add-ons)
+  scalesRecipe  Boolean              @default(false) // true → option multipliers scale recipe quantities
+  sortOrder     Int                  @default(0)
+  available     Boolean              @default(true)
+  options       Option[]
+  products      ProductOptionGroup[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([name])
+}
+
+model Option {
+  id             Int         @id @default(autoincrement())
+  groupId        Int
+  group          OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name           String // "Small", "Hot", "Extra Shot"
+  priceDelta     Float       @default(0) // pesos added to the product's base price
+  sizeMultiplier Float       @default(1) // recipe scaling factor (used when group.scalesRecipe)
+  sortOrder      Int         @default(0)
+  available      Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+
+  @@unique([groupId, name])
+  @@index([groupId])
+}
+
+model ProductOptionGroup {
   productId Int
-  product   Product @relation(fields: [productId], references: [id])
-  quantity  Int
-  unitPrice Float
-  subtotal  Float
-  notes     String?
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  groupId   Int
+  group     OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sortOrder Int         @default(0)
+
+  @@unique([productId, groupId])
 }
 
 // ─── OrderMessage ────────────────────────────────────────────────────────────

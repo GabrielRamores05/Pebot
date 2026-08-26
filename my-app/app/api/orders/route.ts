@@ -9,12 +9,19 @@ import {
   awardLoyaltyForPaidOrder,
   awardLoyaltyToSpecificCards,
 } from '@/lib/loyalty-award';
-function generateOrderNumber(): string {
-  const now = new Date();
-  const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const timePart = now.getTime().toString().slice(-6);
-  return `ORD-${datePart}-${timePart}`;
-}
+import {
+  resolveSelections,
+  selectionsPriceAdder,
+  selectionsRecipeMultiplier,
+  selectionsLabel,
+  type ResolvedSelection,
+} from '@/lib/product-options';
+import {
+  fullOrderNumber,
+  nextSequenceForDay,
+  sequenceValue,
+  ticketDatePart,
+} from '@/lib/ticket';
 
 class InsufficientStockError extends Error {
   items: { productId: number; name: string; requested: number; available: number }[];
@@ -120,19 +127,46 @@ export async function POST(req: NextRequest) {
     const productMap = new Map(products.map((p) => [p.id, p]));
 
     let totalAmount = 0;
-    const orderItemsData = items.map((item) => {
+    const resolvedByItem: ResolvedSelection[][] = [];
+    const orderItemsData: {
+      productId: number;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      notes?: string;
+      selections?: string;
+    }[] = [];
+    for (const item of items) {
       const product = productMap.get(item.productId);
       if (!product) throw new Error(`Product ${item.productId} not found`);
-      const subtotal = product.price * item.quantity;
+
+      // Server-side resolution of size/temp/add-on selections: official names,
+      // prices and recipe multipliers come from the database, never the client.
+      const resolved = await resolveSelections(item.productId, (item as any).optionIds);
+      resolvedByItem.push(resolved);
+
+      const unitPrice = product.price + selectionsPriceAdder(resolved);
+      const subtotal = unitPrice * item.quantity;
       totalAmount += subtotal;
-      return {
+      orderItemsData.push({
         productId: item.productId,
         quantity: item.quantity,
-        unitPrice: product.price,
+        unitPrice,
         subtotal,
         notes: item.notes,
-      };
-    });
+        ...(resolved.length > 0 && {
+          selections: JSON.stringify(
+            resolved.map((r) => ({
+              optionId: r.optionId,
+              groupName: r.groupName,
+              name: r.name,
+              priceDelta: r.priceDelta,
+              sizeMultiplier: r.sizeMultiplier,
+            }))
+          ),
+        }),
+      });
+    }
 
     // Apply loyalty discount if provided
     const isLoyaltyOrder = !!(loyaltyDiscount && loyaltyDiscount > 0);
@@ -140,16 +174,22 @@ export async function POST(req: NextRequest) {
       totalAmount = Math.max(0, totalAmount - loyaltyDiscount);
     }
 
-    const orderNumber = generateOrderNumber();
-    const barcodeValue = `CAFE-${orderNumber}`;
-
     // Create order & deduct inventory in a transaction
     const order = await prisma.$transaction(async (tx) => {
-      // Assign queue number based on pending/preparing orders
-      const pendingCount = await tx.order.count({
-        where: { status: { in: ['PENDING', 'PREPARING'] } },
+      // Daily sequential ticket: ORD-MMDDYY-A001 → A999 → B001…, restarting
+      // at A001 each calendar day. Computed inside the transaction so two
+      // terminals placing orders at the same moment can't draw one code.
+      const datePart = ticketDatePart(new Date());
+      const todaysOrders = await tx.order.findMany({
+        where: { orderNumber: { startsWith: `ORD-${datePart}-` } },
+        select: { orderNumber: true },
       });
-      const queueNumber = pendingCount + 1;
+      const seq = nextSequenceForDay(todaysOrders.map((o) => o.orderNumber));
+      const orderNumber = fullOrderNumber(datePart, seq.letter, seq.num);
+      const barcodeValue = `CAFE-${orderNumber}`;
+      // Position within today's sequence; keeps any legacy internal sorting
+      // by queueNumber aligned with the ticket codes staff actually see.
+      const queueNumber = sequenceValue(seq);
 
       const newOrder = await tx.order.create({
         data: {
@@ -203,13 +243,16 @@ export async function POST(req: NextRequest) {
       // sufficiency in normal mode). Optional ingredients are only consumed
       // when enough stock exists — they never block a sale and never go
       // negative (spec §3).
-      for (const item of items) {
+      for (const [itemIdx, item] of items.entries()) {
+        // Size multipliers scale this line's recipe consumption so inventory
+        // stays truthful (e.g. Large = ×2 the milk/beans of a Small).
+        const multiplier = selectionsRecipeMultiplier(resolvedByItem[itemIdx] ?? []);
         const productIngredients = await tx.productIngredient.findMany({
           where: { productId: item.productId },
           include: { ingredient: true },
         });
         for (const pi of productIngredients) {
-          const totalNeeded = item.quantity * pi.quantity;
+          const totalNeeded = item.quantity * pi.quantity * multiplier;
           if (totalNeeded <= 0) continue;
 
           if (pi.required ?? true) {
@@ -227,7 +270,7 @@ export async function POST(req: NextRequest) {
                 purchaseUnit: null,
                 referenceId: newOrder.id,
                 referenceType: 'order',
-                notes: `Order ${newOrder.orderNumber}`,
+                notes: `Order ${newOrder.orderNumber}${selectionsLabel(resolvedByItem[itemIdx] ?? [])}`,
               },
             });
           } else {
@@ -249,7 +292,7 @@ export async function POST(req: NextRequest) {
                   purchaseUnit: null,
                   referenceId: newOrder.id,
                   referenceType: 'order',
-                  notes: `Order ${newOrder.orderNumber} (optional, partial)`,
+                  notes: `Order ${newOrder.orderNumber}${selectionsLabel(resolvedByItem[itemIdx] ?? [])} (optional, partial)`,
                 },
               });
             }

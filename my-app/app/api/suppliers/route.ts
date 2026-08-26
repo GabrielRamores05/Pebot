@@ -12,7 +12,16 @@ export async function GET(req: NextRequest) {
 
     const suppliers = await prisma.supplier.findMany({
       include: {
-        ingredients: { select: { id: true, name: true, currentStock: true, baseUnit: true } },
+        ingredients: {
+          select: {
+            id: true,
+            name: true,
+            currentStock: true,
+            baseUnit: true,
+            // Which menu items depend on this supplier's ingredient
+            products: { select: { product: { select: { id: true, name: true } } } },
+          },
+        },
         expenses: { select: { id: true, amount: true, expenseDate: true, description: true } },
       },
       orderBy: { name: 'asc' },

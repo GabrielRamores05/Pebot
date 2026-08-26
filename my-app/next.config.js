@@ -18,6 +18,10 @@ const getAllowedOrigins = () => {
 
 const nextConfig = {
   reactStrictMode: false,
+  // The Dockerfile copies `.next/standalone` into the slim runtime image.
+  // GitHub Actions always sets CI=true, so cloud builds produce it while
+  // local/Electron builds keep the default layout that server.js expects.
+  output: process.env.CI === 'true' ? 'standalone' : undefined,
   // Avoid running ESLint during production builds on developer machines
   // which can trigger glob scans of user folders (e.g. Windows junctions).
   eslint: {

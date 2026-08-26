@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import ProductReviews from '../ProductReviews';
 
 interface Review {
   id: number;
@@ -17,13 +19,34 @@ interface Review {
 
 export const dynamic = 'force-dynamic';
 
-export default function MenuReviewsPage() {
+function MenuReviewsContent() {
+  const searchParams = useSearchParams();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<{ id: number; name: string }[]>([]);
+  const [writeProductId, setWriteProductId] = useState<number | null>(
+    searchParams.get('productId') ? Number(searchParams.get('productId')) : null
+  );
   const [branding, setBranding] = useState<{ shopName: string; logoUrl: string | null }>({
     shopName: 'CaféOS',
     logoUrl: null,
   });
+
+  // Product list for the "Rate a product" selector
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((cats) => {
+        const out: { id: number; name: string }[] = [];
+        for (const c of Array.isArray(cats) ? cats : []) {
+          for (const p of c.products ?? []) {
+            if (!out.some((x) => x.id === p.id)) out.push({ id: p.id, name: p.name });
+          }
+        }
+        setProducts(out);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch('/api/settings/branding')
@@ -90,6 +113,40 @@ export default function MenuReviewsPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6">
+        {/* Write / rate a product */}
+        <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50/60 p-4">
+          <p className="text-sm font-semibold text-slate-800 mb-2">⭐ Rate one of our products</p>
+          {products.length === 0 ? (
+            <p className="text-xs text-slate-400">Loading products…</p>
+          ) : (
+            <>
+              <select
+                value={writeProductId ?? ''}
+                onChange={(e) => setWriteProductId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm mb-3"
+              >
+                <option value="">Choose a product…</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              {writeProductId && (
+                <ProductReviews
+                  key={`wall-${writeProductId}`}
+                  productId={writeProductId}
+                  defaultWriteOpen
+                  onSubmitted={() => {
+                    fetch('/api/reviews')
+                      .then((r) => r.json())
+                      .then((data) => setReviews(data.reviews || []))
+                      .catch(() => {});
+                  }}
+                />
+              )}
+            </>
+          )}
+        </div>
+
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-slate-900">Customer Reviews</h2>
           {reviews.length > 0 && (
@@ -101,12 +158,6 @@ export default function MenuReviewsPage() {
               <span className="text-slate-400">({reviews.length} reviews)</span>
             </div>
           )}
-          <Link
-            href="/menu/suggestions"
-            className="inline-block mt-2 text-sm text-amber-700 hover:text-amber-500 font-medium"
-          >
-            💡 View taste suggestions
-          </Link>
         </div>
 
         {reviews.length === 0 ? (
@@ -162,5 +213,13 @@ export default function MenuReviewsPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function MenuReviewsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading reviews...</div>}>
+      <MenuReviewsContent />
+    </Suspense>
   );
 }

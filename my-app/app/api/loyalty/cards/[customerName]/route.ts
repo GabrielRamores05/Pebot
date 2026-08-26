@@ -97,9 +97,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
 
     const targetCategoryId = categoryId ? parseInt(categoryId) : null;
 
-    const settings = await prisma.loyaltySetting.findUnique({
-      where: { categoryId: targetCategoryId ?? undefined },
-    });
+    // A global card has no category. categoryId is a nullable unique field,
+    // so findUnique can only use it when it holds a value — the no-category
+    // case must look the row up by its null state instead.
+    const settings = targetCategoryId !== null
+      ? await prisma.loyaltySetting.findUnique({ where: { categoryId: targetCategoryId } })
+      : await prisma.loyaltySetting.findFirst({ where: { categoryId: null } });
 
     if (!settings || !settings.enabled) {
       return NextResponse.json({ error: 'Loyalty not enabled for this category' }, { status: 400 });
