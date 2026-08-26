@@ -53,6 +53,7 @@ export default function SettingsPage() {
   const [receiptPrefix, setReceiptPrefix] = useState('INV');
   const [footerMessage, setFooterMessage] = useState('Thank you for your visit!');
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(true);
+  const [studentPwdDiscountRate, setStudentPwdDiscountRate] = useState(20);
   // Payment method settings
   const [gcashAccountName, setGcashAccountName] = useState('');
   const [gcashQrImage, setGcashQrImage] = useState<string | null>(null);
@@ -131,6 +132,7 @@ export default function SettingsPage() {
           setReceiptPrefix(d.receiptSerialPrefix || 'INV');
           setFooterMessage(d.footerMessage || 'Thank you for your visit!');
           setLoyaltyEnabled(d.loyaltyEnabled ?? true);
+          setStudentPwdDiscountRate(d.studentPwdDiscountRate != null ? Number(d.studentPwdDiscountRate) : 20);
           setGcashAccountName(d.gcashAccountName || '');
           setGcashQrImage(d.gcashQrImage || null);
           setPaymayaAccountName(d.paymayaAccountName || '');
@@ -162,6 +164,7 @@ export default function SettingsPage() {
           receiptSerialPrefix: receiptPrefix || 'INV',
           footerMessage: footerMessage || 'Thank you for your visit!',
           loyaltyEnabled,
+          studentPwdDiscountRate: studentPwdDiscountRate != null ? Number(studentPwdDiscountRate) : 20,
           gcashAccountName: gcashAccountName || null,
           gcashQrImage: gcashQrImage || null,
           paymayaAccountName: paymayaAccountName || null,
@@ -506,6 +509,22 @@ export default function SettingsPage() {
                 <option value={0}>0% (VAT Exempt)</option>
                 <option value={12}>12% (Standard)</option>
               </select>
+            </div>
+
+            {/* Student / PWD Discount Rate */}
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Student / PWD Discount Rate (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={studentPwdDiscountRate}
+                onChange={(e) => setStudentPwdDiscountRate(parseFloat(e.target.value) || 0)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
+                placeholder="20"
+              />
+              <p className="text-gray-500 text-xs mt-1">Statutory discount applied via the terminal's Student/PWD button (e.g., 20 for 20%).</p>
             </div>
 
             {/* Receipt Prefix */}

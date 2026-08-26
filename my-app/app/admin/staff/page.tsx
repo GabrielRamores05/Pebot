@@ -1,492 +1,981 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 
-interface StaffMember {
-  id: number;
-  name: string;
-  email: string;
-  permissions: Record<string, boolean>;
-  active: boolean;
-  createdAt: string;
-}
+// CafeOS — Staff & HR (Philippine-friendly)
+// Tabs: Team · Schedule · Time Clock · Time Off · Payroll · Reviews · Documents · Training
+// Plus a plain-language Overview so the numbers make sense at a glance.
 
-interface StaffFormData {
-  name: string;
-  email: string;
-  password: string;
-  permissions: Record<string, boolean>;
-}
+type Permission = {
+  liveOrders: boolean; terminal: boolean; tables: boolean; analytics: boolean;
+  products: boolean; inventory: boolean; kitchen: boolean; loyalty: boolean;
+  staff: boolean; settings: boolean;
+};
 
-const PERMISSIONS = [
-  { key: 'liveOrders', label: '📺 Live Orders', desc: 'View order dashboard' },
-  { key: 'terminal', label: '💻 POS Terminal', desc: 'Create & manage orders' },
-  { key: 'tables', label: '🪑 Tables', desc: 'Manage restaurant tables' },
-  { key: 'analytics', label: '📊 Analytics', desc: 'View reports & metrics' },
-  { key: 'products', label: '🛍️ Products', desc: 'Manage product catalog' },
-  { key: 'inventory', label: '📦 Inventory', desc: 'Manage stock levels' },
-  { key: 'kitchen', label: '🍳 Kitchen', desc: 'View & prepare orders' },
-  { key: 'loyalty', label: '🏆 Loyalty', desc: 'Manage loyalty program' },
-  { key: 'staff', label: '👥 Staff', desc: 'Manage staff & users' },
-  { key: 'settings', label: '⚙️ Settings', desc: 'System configuration' },
+type StaffMember = {
+  id: number; name: string; email: string; role: 'ADMIN' | 'STAFF' | 'KITCHEN';
+  permissions: Permission; active: boolean; createdAt: string; hireDate?: string | null;
+  position?: string | null; department?: string | null; phone?: string | null;
+  address?: string | null; dateOfBirth?: string | null; hourlyRate?: number | null;
+  monthlySalary?: number | null; paymentType?: string | null;
+  emergencyContactName?: string | null; emergencyContactPhone?: string | null;
+};
+
+type Tab = 'Team' | 'Schedule' | 'Time Clock' | 'Time Off' | 'Payroll' | 'Reviews' | 'Documents' | 'Training';
+const TABS: { key: Tab; label: string; hint: string }[] = [
+  { key: 'Team', label: 'Team', hint: 'Who works here and what they do' },
+  { key: 'Schedule', label: 'Schedule', hint: 'Weekly rota and shift templates' },
+  { key: 'Time Clock', label: 'Time Clock', hint: 'Who is in, clock in / out' },
+  { key: 'Time Off', label: 'Time Off', hint: 'Leave requests and approvals' },
+  { key: 'Payroll', label: 'Payroll', hint: 'Pay runs with SSS / PhilHealth / Pag-IBIG' },
+  { key: 'Reviews', label: 'Reviews', hint: 'Performance notes' },
+  { key: 'Documents', label: 'Documents', hint: 'Contracts and certificates' },
+  { key: 'Training', label: 'Training', hint: 'Courses and certifications' },
 ];
 
-const DEFAULT_PERMISSIONS = PERMISSIONS.reduce((acc, p) => ({ ...acc, [p.key]: false }), {});
+const PERMS: { key: keyof Permission; label: string; desc: string }[] = [
+  { key: 'liveOrders', label: 'Live Orders', desc: 'View the live order board' },
+  { key: 'terminal', label: 'POS Terminal', desc: 'Create and manage orders' },
+  { key: 'tables', label: 'Tables', desc: 'Manage restaurant tables' },
+  { key: 'analytics', label: 'Analytics', desc: 'View reports & metrics' },
+  { key: 'products', label: 'Products', desc: 'Manage product catalog' },
+  { key: 'inventory', label: 'Inventory', desc: 'Manage stock levels' },
+  { key: 'kitchen', label: 'Kitchen', desc: 'View & prepare orders' },
+  { key: 'loyalty', label: 'Loyalty', desc: 'Manage loyalty program' },
+  { key: 'staff', label: 'Staff', desc: 'Manage staff & users' },
+  { key: 'settings', label: 'Settings', desc: 'System configuration' },
+];
 
-function getPermissionCount(perms: Record<string, boolean>) {
-  return Object.values(perms).filter(Boolean).length;
+const POSITIONS = ['Barista', 'Cashier', 'Kitchen Staff', 'Shift Supervisor', 'Manager'];
+const DEPARTMENTS = ['Front of House', 'Back of House', 'Management'];
+
+export default function StaffPage() {
+  const [activeTab, setActiveTab] = useState<Tab>('Team');
+  const [overview, setOverview] = useState<{ team: number; inToday: number; pendingLeave: number; lastPayroll: string | null }>({ team: 0, inToday: 0, pendingLeave: 0, lastPayroll: null });
+
+  const loadOverview = useCallback(async () => {
+    const today = iso(new Date());
+    const [s, a, l, p] = await Promise.all([
+      fetch('/api/staff').then(r => r.json()).catch(() => []),
+      fetch(`/api/attendance?from=${today}&to=${today}`).then(r => r.json()).catch(() => []),
+      fetch('/api/leave-requests').then(r => r.json()).catch(() => []),
+      fetch('/api/payroll').then(r => r.json()).catch(() => []),
+    ]);
+    const staffArr = Array.isArray(s) ? s : [];
+    const attArr = Array.isArray(a) ? a : [];
+    const leaveArr = Array.isArray(l) ? l : [];
+    const payArr = Array.isArray(p) ? p : [];
+    setOverview({
+      team: staffArr.filter((x: any) => x.active).length,
+      inToday: attArr.filter((x: any) => !x.clockOut).length,
+      pendingLeave: leaveArr.filter((x: any) => x.status === 'PENDING').length,
+      lastPayroll: payArr.length ? iso(new Date(payArr[0].periodEnd)) : null,
+    });
+  }, []);
+
+  useEffect(() => { loadOverview(); }, [loadOverview]);
+
+  return (
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-slate-800">Staff &amp; HR</h1>
+        <p className="text-sm text-slate-500 mt-1">Your team, their schedule, attendance, leave and pay — in one place.</p>
+      </div>
+
+      {/* Overview strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <OverviewCard label="Active team" value={overview.team} icon="👥" />
+        <OverviewCard label="Clocked in today" value={overview.inToday} icon="🟢" />
+        <OverviewCard label="Pending time off" value={overview.pendingLeave} icon="📝" accent={overview.pendingLeave > 0} />
+        <OverviewCard label="Last pay period end" value={overview.lastPayroll ?? '—'} icon="💸" small />
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex flex-wrap gap-1 mb-1 border-b border-slate-200">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+              activeTab === t.key ? 'bg-amber-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-slate-400 mb-5">{TABS.find(t => t.key === activeTab)?.hint}</p>
+
+      {activeTab === 'Team' && <TeamTab onChanged={loadOverview} />}
+      {activeTab === 'Schedule' && <ScheduleTab />}
+      {activeTab === 'Time Clock' && <TimeClockTab onChanged={loadOverview} />}
+      {activeTab === 'Time Off' && <TimeOffTab onChanged={loadOverview} />}
+      {activeTab === 'Payroll' && <PayrollTab />}
+      {activeTab === 'Reviews' && <ReviewsTab />}
+      {activeTab === 'Documents' && <DocumentsTab />}
+      {activeTab === 'Training' && <TrainingTab />}
+    </div>
+  );
 }
 
+function OverviewCard({ label, value, icon, accent, small }: { label: string; value: string | number; icon: string; accent?: boolean; small?: boolean }) {
+  return (
+    <div className={`rounded-2xl border p-4 bg-white shadow-sm ${accent ? 'border-amber-300' : 'border-slate-200'}`}>
+      <div className="text-2xl">{icon}</div>
+      <p className={`mt-1 font-bold text-slate-800 ${small ? 'text-lg' : 'text-2xl'}`}>{value}</p>
+      <p className="text-xs text-slate-500">{label}</p>
+    </div>
+  );
+}
 
-export default function StaffManagement() {
+// ─── TEAM ─────────────────────────────────────────────────────────────────────
+function TeamTab({ onChanged }: { onChanged: () => void }) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState<StaffFormData>({
-    name: '',
-    email: '',
-    password: '',
-    permissions: { ...DEFAULT_PERMISSIONS },
-  });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [search, setSearch] = useState('');
+  const [permDraft, setPermDraft] = useState<Permission>(blankPerms());
+  const [form, setForm] = useState<StaffForm>(blankForm());
 
-  const fetchStaff = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/staff');
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(`Failed to fetch staff: ${errorData.details || 'HTTP ' + res.status}`);
-      }
       const data = await res.json();
-      setStaff(data);
-    } catch (e) {
-      console.error('Failed to load staff:', e);
-      setError(e instanceof Error ? e.message : 'Failed to load staff members');
-    } finally {
-      setLoading(false);
-    }
+      setStaff(Array.isArray(data) ? data : []);
+    } catch { setStaff([]); }
+    finally { setLoading(false); }
   }, []);
+  useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    fetchStaff();
-  }, [fetchStaff]);
-
-  const handleSaveStaff = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-
-    if (!formData.name || !formData.email) {
-      setError('Please fill in name and email');
-      return;
-    }
-
-    if (!editingId && !formData.password) {
-      setError('Password is required for new staff');
-      return;
-    }
-
-    // Check if at least one permission is enabled
-    const hasPermission = Object.values(formData.permissions).some(p => p);
-    if (!hasPermission) {
-      setError('Please grant at least one permission');
-      return;
-    }
-
-    try {
-      const url = editingId ? `/api/staff/${editingId}` : '/api/staff';
-      const method = editingId ? 'PUT' : 'POST';
-
-      const payload: any = {
-        name: formData.name,
-        email: formData.email,
-        permissions: formData.permissions,
-      };
-
-      // Only include password if provided
-      if (formData.password) {
-        payload.password = formData.password;
-      }
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to save staff member');
-      }
-
-      setSuccess(editingId ? 'Staff member updated successfully' : 'Staff member added successfully');
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        permissions: { ...DEFAULT_PERMISSIONS },
-      });
-      setShowForm(false);
-      setEditingId(null);
-      fetchStaff();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error saving staff member');
-    }
-  };
-
-  const handleEditStaff = (member: StaffMember) => {
-    setEditingId(member.id);
-    setFormData({
-      name: member.name,
-      email: member.email,
-      password: '',
-      permissions: member.permissions,
+  function openCreate() {
+    setEditingId(null); setForm(blankForm()); setPermDraft(blankPerms()); setShowForm(true); setError(''); setSuccess('');
+  }
+  function openEdit(s: StaffMember) {
+    setEditingId(s.id);
+    setForm({
+      name: s.name, email: s.email, role: s.role, password: '',
+      phone: s.phone ?? '', address: s.address ?? '', dateOfBirth: s.dateOfBirth ? s.dateOfBirth.slice(0, 10) : '',
+      hireDate: s.hireDate ? s.hireDate.slice(0, 10) : '', position: s.position ?? '', department: s.department ?? '',
+      emergencyContactName: s.emergencyContactName ?? '', emergencyContactPhone: s.emergencyContactPhone ?? '',
+      hourlyRate: s.hourlyRate != null ? String(s.hourlyRate) : '', monthlySalary: s.monthlySalary != null ? String(s.monthlySalary) : '', paymentType: s.paymentType ?? '',
     });
-    setShowForm(true);
-  };
+    setPermDraft(s.permissions);
+    setShowForm(true); setError(''); setSuccess('');
+  }
 
-  const handleDeleteStaff = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this staff member?')) return;
-
-    try {
-      const res = await fetch(`/api/staff/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete staff member');
-      setSuccess('Staff member deleted');
-      fetchStaff();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error deleting staff member');
+  async function submit() {
+    setError(''); setSuccess('');
+    const payload: any = {
+      ...form,
+      permissions: permDraft,
+      hourlyRate: form.hourlyRate ? Number(form.hourlyRate) : null,
+      monthlySalary: form.monthlySalary ? Number(form.monthlySalary) : null,
+    };
+    if (editingId) {
+      if (!payload.password) delete payload.password;
+      const res = await fetch(`/api/staff/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); setError(e.error || 'Update failed'); return; }
+      setSuccess('Staff updated');
+    } else {
+      if (!payload.password) { setError('Password is required for new staff'); return; }
+      const res = await fetch('/api/staff', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); setError(e.error || 'Create failed'); return; }
+      setSuccess('Staff created');
     }
-  };
+    setShowForm(false); load(); onChanged();
+  }
 
-  const handleToggleActive = async (id: number, active: boolean) => {
-    try {
-      const res = await fetch(`/api/staff/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: !active }),
-      });
-      if (!res.ok) throw new Error('Failed to update staff member');
-      fetchStaff();
-    } catch (e) {
-      setError('Error updating staff member');
-    }
-  };
+  async function toggleActive(s: StaffMember) {
+    await fetch(`/api/staff/${s.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active: !s.active }) });
+    load(); onChanged();
+  }
+  async function remove(s: StaffMember) {
+    if (!confirm(`Delete ${s.name}? This cannot be undone.`)) return;
+    await fetch(`/api/staff/${s.id}`, { method: 'DELETE' });
+    load(); onChanged();
+  }
 
-  const handlePermissionChange = (permissionKey: string) => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        [permissionKey]: !prev.permissions[permissionKey],
-      },
-    }));
-  };
+  const filtered = staff.filter(s => s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase()));
+  const active = filtered.filter(s => s.active).length;
+  const full = filtered.filter(s => PERMS.every(p => s.permissions[p.key])).length;
 
-  const handleSelectAll = () => {
-    const allEnabled = Object.values(formData.permissions).every(p => p);
-    const newPermissions = PERMISSIONS.reduce((acc, p) => ({
-      ...acc,
-      [p.key]: !allEnabled,
-    }), {});
-    setFormData(prev => ({
-      ...prev,
-      permissions: newPermissions,
-    }));
-  };
-
-  const filteredStaff = staff.filter(
-    s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         s.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const enabledCount = getPermissionCount(formData.permissions);
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen">
-        <div className="text-gray-500 font-medium">Loading staff members...</div>
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">Team ({filtered.length})</h2>
+          {!showForm && <p className="text-xs text-slate-400 mt-1">{active} active · {full} full access</p>}
+        </div>
+        {!showForm && (
+          <button onClick={openCreate} className="rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 text-sm font-semibold">
+            + Add staff
+          </button>
+        )}
       </div>
-    );
+
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
+      {success && <div className="rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm p-3">{success}</div>}
+
+      {showForm && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
+          <h3 className="font-semibold text-slate-800">{editingId ? 'Edit staff member' : 'Add staff member'}</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Full name" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+            <Field label="Email" value={form.email} onChange={v => setForm({ ...form, email: v })} />
+            <Field label="Password (leave blank to keep)" type="password" value={form.password} onChange={v => setForm({ ...form, password: v })} />
+            <div>
+              <label className="text-xs font-medium text-slate-600">Role</label>
+              <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <option value="STAFF">Staff</option>
+                <option value="KITCHEN">Kitchen</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+            <Field label="Phone" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />
+            <Field label="Address" value={form.address} onChange={v => setForm({ ...form, address: v })} />
+            <Field label="Date of birth" type="date" value={form.dateOfBirth} onChange={v => setForm({ ...form, dateOfBirth: v })} />
+            <Field label="Hire date" type="date" value={form.hireDate} onChange={v => setForm({ ...form, hireDate: v })} />
+            <div>
+              <label className="text-xs font-medium text-slate-600">Position</label>
+              <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <option value="">—</option>
+                {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600">Department</label>
+              <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <option value="">—</option>
+                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <Field label="Emergency contact name" value={form.emergencyContactName} onChange={v => setForm({ ...form, emergencyContactName: v })} />
+            <Field label="Emergency contact phone" value={form.emergencyContactPhone} onChange={v => setForm({ ...form, emergencyContactPhone: v })} />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+            <div>
+              <label className="text-xs font-medium text-slate-600">How they are paid</label>
+              <select value={form.paymentType} onChange={e => setForm({ ...form, paymentType: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <option value="">—</option>
+                <option value="HOURLY">Hourly wage</option>
+                <option value="SALARIED">Monthly salary</option>
+              </select>
+            </div>
+            <Field label="Hourly rate (₱)" value={form.hourlyRate} onChange={v => setForm({ ...form, hourlyRate: v })} />
+            <Field label="Monthly salary (₱)" value={form.monthlySalary} onChange={v => setForm({ ...form, monthlySalary: v })} />
+          </div>
+
+          <div className="border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-slate-700">What they can open</p>
+              <div className="flex gap-2">
+                <button onClick={() => setPermDraft(blankPerms(true))} className="text-xs text-amber-600 hover:underline">Select all</button>
+                <button onClick={() => setPermDraft(blankPerms())} className="text-xs text-slate-500 hover:underline">Deselect all</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {PERMS.map(p => (
+                <label key={p.key} className="flex items-start gap-2 p-2 rounded-lg border border-slate-100 hover:bg-slate-50">
+                  <input type="checkbox" checked={permDraft[p.key]} onChange={e => setPermDraft({ ...permDraft, [p.key]: e.target.checked })} className="mt-0.5" />
+                  <span className="text-xs"><span className="font-medium text-slate-700">{p.label}</span><br /><span className="text-slate-400">{p.desc}</span></span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 text-sm">Cancel</button>
+            <button onClick={submit} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold">Save</button>
+          </div>
+        </div>
+      )}
+
+      {!showForm && (
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or email..."
+          className="w-full md:w-80 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+        />
+      )}
+
+      {loading ? (
+        <div className="py-12 text-center text-gray-400">Loading…</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map(s => (
+            <div key={s.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white font-bold">
+                  {s.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-800 truncate">{s.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{s.email}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1 text-[11px]">
+                <Badge color={s.active ? 'green' : 'gray'}>{s.active ? 'Active' : 'Inactive'}</Badge>
+                {s.position && <Badge color="blue">{s.position}</Badge>}
+                {s.department && <Badge color="purple">{s.department}</Badge>}
+                {s.paymentType && <Badge color="amber">{s.paymentType === 'HOURLY' ? `₱${s.hourlyRate}/hr` : `₱${s.monthlySalary}/mo`}</Badge>}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => toggleActive(s)} className={`flex-1 text-xs rounded-lg py-1.5 ${s.active ? 'bg-gray-100 text-gray-600' : 'bg-green-50 text-green-700'}`}>
+                  {s.active ? 'Deactivate' : 'Activate'}
+                </button>
+                <button onClick={() => openEdit(s)} className="flex-1 text-xs rounded-lg py-1.5 bg-blue-50 text-blue-700">Edit</button>
+                <button onClick={() => remove(s)} className="flex-1 text-xs rounded-lg py-1.5 bg-red-50 text-red-600">Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SCHEDULE ────────────────────────────────────────────────────────────────
+function ScheduleTab() {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [weekStart, setWeekStart] = useState(getMonday(new Date()));
+  const [editingShift, setEditingShift] = useState<any | null>(null);
+  const [shiftForm, setShiftForm] = useState({ name: '', startTime: '08:00', endTime: '17:00', breakMinutes: 60 });
+  const [showShiftForm, setShowShiftForm] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadShifts = async () => { const r = await fetch('/api/shifts'); const d = await r.json(); setShifts(Array.isArray(d) ? d : []); };
+  const loadStaff = async () => { const r = await fetch('/api/staff'); const d = await r.json(); setStaff(Array.isArray(d) ? d : []); };
+  const loadSchedules = async () => {
+    const from = iso(weekStart); const to = iso(addDays(weekStart, 6));
+    const r = await fetch(`/api/schedules?from=${from}&to=${to}`); const d = await r.json(); setSchedules(Array.isArray(d) ? d : []);
+  };
+  useEffect(() => { loadStaff(); loadShifts(); loadSchedules(); }, [weekStart]);
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  function daySchedules(day: Date, userId: number) {
+    return schedules.filter(s => s.userId === userId && s.date.slice(0, 10) === iso(day).slice(0, 10));
+  }
+
+  async function assign(userId: number, shiftId: number, day: Date) {
+    const r = await fetch('/api/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, shiftId, dates: [iso(day)] }) });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); setError(e.error || 'Failed'); return; }
+    setError(''); loadSchedules();
+  }
+  async function unassign(s: any) {
+    await fetch('/api/schedules', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) });
+    loadSchedules();
+  }
+
+  function openNewShift() { setEditingShift(null); setShiftForm({ name: '', startTime: '08:00', endTime: '17:00', breakMinutes: 60 }); setShowShiftForm(true); setError(''); }
+  function openEditShift(s: any) { setEditingShift(s); setShiftForm({ name: s.name, startTime: s.startTime, endTime: s.endTime, breakMinutes: s.breakMinutes ?? 0 }); setShowShiftForm(true); setError(''); }
+  async function saveShift() {
+    if (!shiftForm.name) { setError('Name required'); return; }
+    const body = { name: shiftForm.name, startTime: shiftForm.startTime, endTime: shiftForm.endTime, breakMinutes: Number(shiftForm.breakMinutes) };
+    const r = editingShift
+      ? await fetch('/api/shifts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingShift.id, ...body }) })
+      : await fetch('/api/shifts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) { setError('Save failed'); return; }
+    setShowShiftForm(false); loadShifts();
+  }
+  async function deleteShift(id: number) {
+    if (!confirm('Delete this shift template?')) return;
+    await fetch('/api/shifts', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    loadShifts();
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#F5F5F7] text-gray-900">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200/60 px-8 py-5">
-        <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Staff Management</h1>
-            <p className="text-gray-500 text-sm mt-1">Manage staff and assign granular permissions</p>
+            <p className="text-sm font-semibold text-slate-700">Shift templates</p>
+            <p className="text-xs text-slate-400">Create your own shifts (e.g. Opening, Closing). Times are shown as 12-hour.</p>
           </div>
-          <button
-            onClick={() => {
-              setEditingId(null);
-              setFormData({
-                name: '',
-                email: '',
-                password: '',
-                permissions: { ...DEFAULT_PERMISSIONS },
-              });
-              setShowForm(!showForm);
-              setError('');
-            }}
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
-          >
-            {showForm ? '✕ Cancel' : '+ Add Staff Member'}
-          </button>
+          <button onClick={openNewShift} className="text-sm rounded-lg bg-amber-600 text-white px-3 py-1.5">+ New shift</button>
+        </div>
+        {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+        <div className="flex flex-wrap gap-2">
+          {shifts.length === 0 && <span className="text-xs text-slate-400">None yet.</span>}
+          {shifts.map(s => (
+            <div key={s.id} className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1 text-xs">
+              <span className="font-medium text-slate-700">{s.name}</span>
+              <span className="text-slate-400">{fmtTime(s.startTime)}–{fmtTime(s.endTime)}</span>
+              <button onClick={() => openEditShift(s)} className="text-blue-600 hover:underline">edit</button>
+              <button onClick={() => deleteShift(s.id)} className="text-red-500 hover:text-red-700">×</button>
+            </div>
+          ))}
+        </div>
+
+        {showShiftForm && (
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2 items-end border-t border-slate-100 pt-3">
+            <Field label="Name" value={shiftForm.name} onChange={v => setShiftForm({ ...shiftForm, name: v })} />
+            <Field label="Start" type="time" value={shiftForm.startTime} onChange={v => setShiftForm({ ...shiftForm, startTime: v })} />
+            <Field label="End" type="time" value={shiftForm.endTime} onChange={v => setShiftForm({ ...shiftForm, endTime: v })} />
+            <Field label="Break (min)" value={String(shiftForm.breakMinutes)} onChange={v => setShiftForm({ ...shiftForm, breakMinutes: Number(v) || 0 })} />
+            <button onClick={saveShift} className="rounded-lg bg-amber-600 text-white px-3 py-2 text-sm font-semibold">{editingShift ? 'Update' : 'Add'}</button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-lg font-semibold text-slate-800">Weekly schedule</h2>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="px-3 py-1.5 rounded-lg bg-slate-100 text-sm">‹ Prev</button>
+          <span className="text-sm text-slate-600">{iso(weekStart)} — {iso(addDays(weekStart, 6))}</span>
+          <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="px-3 py-1.5 rounded-lg bg-slate-100 text-sm">Next ›</button>
         </div>
       </div>
 
-      <div className="p-8 space-y-8">
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600 text-sm font-medium">
-            {error}
-          </div>
-        )}
-
-        {/* Success Message */}
-        {success && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-600 text-sm font-medium">
-            {success}
-          </div>
-        )}
-
-        {/* Add/Edit Form */}
-        {showForm && (
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-8 border border-gray-100/50 shadow-xl shadow-gray-200/50 space-y-8">
-            <h3 className="text-2xl font-semibold text-gray-900">{editingId ? 'Edit Staff Member' : 'Add New Staff Member'}</h3>
-            <form onSubmit={handleSaveStaff} className="space-y-6">
-              {/* Basic Info Section */}
-              <div className="space-y-5">
-                <h4 className="text-lg font-medium text-gray-800">Basic Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-base font-medium text-gray-600 mb-3">Full Name *</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full bg-slate-50 border border-gray-200/60 rounded-2xl px-5 py-3.5 text-gray-900 text-lg focus:outline-none focus:ring-2 focus:ring-amber-100/80 focus:border-amber-300 transition-all"
-                      placeholder="John Doe"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-base font-medium text-gray-600 mb-3">Email *</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full bg-white border border-gray-200/60 rounded-2xl px-5 py-3.5 text-gray-900 text-lg focus:outline-none focus:ring-2 focus:ring-blue-100/80 focus:border-blue-300 transition-all"
-                      placeholder="john@example.com"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-base font-medium text-gray-600 mb-3">
-                    {editingId ? 'Password (leave blank to keep current)' : 'Password *'}
-                  </label>
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full bg-slate-50 border border-gray-200/60 rounded-2xl px-5 py-3.5 text-gray-900 text-lg focus:outline-none focus:ring-2 focus:ring-amber-100/80 focus:border-amber-300 transition-all"
-                    placeholder="••••••••"
-                    required={!editingId}
-                  />
-                </div>
-              </div>
-
-              {/* Permissions Section */}
-              <div className="space-y-5 border-t border-gray-100 pt-6">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-medium text-gray-800">Feature Permissions ({enabledCount}/10)</h4>
-                  <button
-                    type="button"
-                    onClick={handleSelectAll}
-                    className="text-sm px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-amber-600 font-medium transition-all"
-                  >
-                    {enabledCount === 10 ? 'Deselect All' : 'Select All'}
-                  </button>
-                </div>
-                <p className="text-base text-gray-500">Check the features this staff member can access:</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {PERMISSIONS.map(perm => (
-                    <label
-                      key={perm.key}
-                      className={`flex items-start gap-4 p-5 border-2 rounded-2xl cursor-pointer transition-all ${
-                        formData.permissions[perm.key]
-                          ? 'bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-300 shadow-md shadow-amber-100'
-                          : 'bg-white border-gray-100 hover:border-gray-200 hover:shadow-lg hover:shadow-gray-100'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.permissions[perm.key] || false}
-                        onChange={() => handlePermissionChange(perm.key)}
-                        className="w-6 h-6 rounded-lg accent-amber-500 mt-0.5 cursor-pointer shadow-sm"
-                      />
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900 text-lg">{perm.label}</div>
-                        <div className="text-sm text-gray-500 mt-1">{perm.desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-4 pt-6">
-                <button
-                  type="submit"
-                  className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-white font-semibold py-4 rounded-2xl transition-all shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 text-lg"
-                >
-                  {editingId ? 'Update Staff Member' : 'Add Staff Member'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Search Bar */}
-        {!showForm && (
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="text"
-              placeholder="Search by name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-2xl pl-12 pr-4 py-4 text-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-100/80 focus:border-amber-300 shadow-lg shadow-gray-100/50 transition-all"
-            />
-          </div>
-        )}
-
-        {/* Staff List */}
-        {filteredStaff.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredStaff.map(member => (
-              <div key={member.id} className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-gray-100/50 hover:border-gray-200 hover:shadow-2xl hover:shadow-gray-200/50 transition-all group">
-                <div className="space-y-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center text-2xl font-semibold text-amber-700 shadow-inner">
-                        {member.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-xl">{member.name}</h3>
-                        <p className="text-base text-gray-500">{member.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      <button
-                        onClick={() => handleToggleActive(member.id, member.active)}
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                          member.active
-                            ? 'bg-gradient-to-r from-green-100 to-green-50 text-green-700 shadow-md shadow-green-100 hover:shadow-lg hover:shadow-green-100'
-                            : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-500 shadow-md shadow-gray-100 hover:shadow-lg hover:shadow-gray-100'
-                        }`}
-                      >
-                        {member.active ? '✓ Active' : '○ Inactive'}
-                      </button>
-                      <button
-                        onClick={() => handleEditStaff(member)}
-                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-100 to-blue-50 text-blue-600 shadow-md shadow-blue-100 hover:shadow-lg hover:shadow-blue-100 transition-all"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteStaff(member.id)}
-                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-red-100 to-red-50 text-red-600 shadow-md shadow-red-100 hover:shadow-lg hover:shadow-red-100 transition-all"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Permissions Display */}
-                  <div className="pt-4 border-t border-gray-100">
-                    <p className="text-sm text-gray-500 mb-3 font-medium">Access: {getPermissionCount(member.permissions)}/10 features</p>
-                    <div className="flex flex-wrap gap-2">
-                      {PERMISSIONS
-                        .filter(p => member.permissions[p.key])
-                        .map(p => (
-                          <span
-                            key={p.key}
-                            className="px-3 py-1.5 text-sm bg-gradient-to-r from-amber-100 to-amber-50 text-amber-700 rounded-xl font-medium shadow-sm"
-                          >
-                            {p.label}
-                          </span>
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="text-left p-3">Staff</th>
+              {weekDays.map(d => <th key={d.toISOString()} className="text-center p-3 font-medium text-slate-600">{dayName(d)}<br /><span className="text-xs text-slate-400">{d.getMonth()+1}/{d.getDate()}</span></th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {staff.map(s => (
+              <tr key={s.id} className="border-b border-slate-50">
+                <td className="p-3 font-medium text-slate-700">{s.name}{s.position ? <span className="text-xs text-slate-400 block">{s.position}</span> : null}</td>
+                {weekDays.map(d => {
+                  const ds = daySchedules(d, s.id);
+                  return (
+                    <td key={d.toISOString()} className="p-2 text-center">
+                      <div className="space-y-1">
+                        {ds.map(sc => (
+                          <div key={sc.id} className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 rounded px-1.5 py-0.5 text-[11px]">
+                            {sc.shift.name}
+                            <button onClick={() => unassign(sc)} className="text-amber-600 hover:text-red-600">×</button>
+                          </div>
                         ))}
-                      {getPermissionCount(member.permissions) === 0 && (
-                        <span className="text-xs text-gray-400 italic">No permissions granted</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                        <select onChange={e => { if (e.target.value) { assign(s.id, Number(e.target.value), d); e.target.value = ''; } }} className="block w-full text-[11px] rounded border border-slate-200 px-1 py-0.5">
+                          <option value="">+ shift</option>
+                          {shifts.map(sh => <option key={sh.id} value={sh.id}>{sh.name}</option>)}
+                        </select>
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
             ))}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <p className="text-gray-500 mb-4">
-              {searchTerm ? 'No staff members found matching your search' : 'No staff members yet'}
-            </p>
-            <p className="text-gray-500 text-sm">
-              {!showForm && !searchTerm && 'Click "Add Staff Member" to get started'}
-            </p>
-          </div>
-        )}
-
-        {/* Statistics */}
-        {staff.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mt-10 pt-8 border-t border-gray-200/60">
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-gray-100/50 shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-gray-200/60 transition-all group">
-              <div className="text-gray-400 text-sm font-semibold uppercase tracking-wider">Total Staff</div>
-              <div className="text-5xl font-bold mt-3 text-gray-900">{staff.length}</div>
-              <div className="mt-3 h-1 w-16 bg-gradient-to-r from-gray-300 to-gray-400 rounded-full"></div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-gray-100/50 shadow-xl shadow-green-100/50 hover:shadow-2xl hover:shadow-green-200/60 transition-all group">
-              <div className="text-green-500 text-sm font-semibold uppercase tracking-wider">Active</div>
-              <div className="text-5xl font-bold mt-3 text-green-600">
-                {staff.filter(s => s.active).length}
-              </div>
-              <div className="mt-3 h-1 w-16 bg-gradient-to-r from-green-300 to-green-500 rounded-full"></div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-gray-100/50 shadow-xl shadow-purple-100/50 hover:shadow-2xl hover:shadow-purple-200/60 transition-all group">
-              <div className="text-purple-500 text-sm font-semibold uppercase tracking-wider">Full Access</div>
-              <div className="text-5xl font-bold mt-3 text-purple-600">
-                {staff.filter(s => getPermissionCount(s.permissions) === 10).length}
-              </div>
-              <div className="mt-3 h-1 w-16 bg-gradient-to-r from-purple-300 to-purple-500 rounded-full"></div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-gray-100/50 shadow-xl shadow-blue-100/50 hover:shadow-2xl hover:shadow-blue-200/60 transition-all group">
-              <div className="text-blue-500 text-sm font-semibold uppercase tracking-wider">Limited Access</div>
-              <div className="text-5xl font-bold mt-3 text-blue-600">
-                {staff.filter(s => {
-                  const count = getPermissionCount(s.permissions);
-                  return count > 0 && count < 10;
-                }).length}
-              </div>
-              <div className="mt-3 h-1 w-16 bg-gradient-to-r from-blue-300 to-blue-500 rounded-full"></div>
-            </div>
-          </div>
-        )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
+}
+
+// ─── TIME CLOCK ──────────────────────────────────────────────────────────────
+function TimeClockTab({ onChanged }: { onChanged: () => void }) {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [records, setRecords] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [msg, setMsg] = useState('');
+  const [from, setFrom] = useState(iso(addDays(new Date(), -30)));
+  const [to, setTo] = useState(iso(new Date()));
+
+  const loadSchedules = async () => {
+    const t = iso(new Date());
+    const r = await fetch(`/api/schedules?from=${t}&to=${t}`); const d = await r.json();
+    setSchedules(Array.isArray(d) ? d : []);
+  };
+
+  useEffect(() => {
+    (async () => {
+      const r = await fetch('/api/staff'); const d = await r.json(); setStaff(Array.isArray(d) ? d : []);
+      loadRecords();
+      loadSchedules();
+    })();
+  }, []);
+  const loadRecords = async () => {
+    const r = await fetch(`/api/attendance?from=${from}&to=${to}`); const d = await r.json(); setRecords(Array.isArray(d) ? d : []);
+  };
+
+  async function clockIn(staffId: number) {
+    const r = await fetch('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: staffId }) });
+    if (r.ok) { loadRecords(); onChanged(); }
+  }
+  async function clockOut(recId: number) {
+    const r = await fetch('/api/attendance', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attendanceId: recId }) });
+    if (r.ok) { loadRecords(); onChanged(); }
+  }
+
+  const toMin = (t?: string | null) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+
+  async function clockInScheduledNow() {
+    setMsg('');
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    let done = 0;
+    for (const s of schedules) {
+      const sm = toMin(s.shift?.startTime);
+      const em = toMin(s.shift?.endTime);
+      if (sm == null || em == null) continue;
+      const scheduled = sm <= em ? (nowMin >= sm && nowMin <= em) : (nowMin >= sm || nowMin <= em);
+      if (scheduled && !activeByUser.get(s.userId)) { await clockIn(s.userId); done++; }
+    }
+    setMsg(done ? `Clocked in ${done} scheduled staff.` : 'No staff currently scheduled to clock in.');
+    loadSchedules();
+  }
+
+  async function clockOutEnded() {
+    setMsg('');
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    let done = 0;
+    for (const rec of records) {
+      if (rec.clockOut) continue;
+      const ends = schedules.filter((s: any) => s.userId === rec.userId).map((s: any) => toMin(s.shift?.endTime)).filter((x): x is number => x != null);
+      if (!ends.length) continue;
+      const latestEnd = Math.max(...ends);
+      if (nowMin > latestEnd) { await clockOut(rec.id); done++; }
+    }
+    setMsg(done ? `Clocked out ${done} ended shift(s).` : 'No ended shifts to clock out.');
+  }
+
+  const activeByUser = new Map<number, any>();
+  records.filter(r => !r.clockOut).forEach(r => activeByUser.set(r.userId, r));
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        Tip: staff are clocked in automatically when they log in, and clocked out when they log out. Use the buttons below only to fix mistakes.
+      </div>
+      <h2 className="text-lg font-semibold text-slate-800">Time clock</h2>
+      <div className="flex gap-2 items-end flex-wrap">
+        <div><label className="text-xs text-slate-600">From</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="block rounded-lg border border-slate-200 px-2 py-1 text-sm" /></div>
+        <div><label className="text-xs text-slate-600">To</label><input type="date" value={to} onChange={e => setTo(e.target.value)} className="block rounded-lg border border-slate-200 px-2 py-1 text-sm" /></div>
+        <button onClick={loadRecords} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm">Filter</button>
+        <button onClick={clockInScheduledNow} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm">Clock in everyone scheduled now</button>
+        <button onClick={clockOutEnded} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-sm">Clock out ended shifts</button>
+        {msg && <span className="text-sm text-slate-600">{msg}</span>}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {staff.map(s => {
+          const active = activeByUser.get(s.id);
+          return (
+            <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-3 flex items-center justify-between">
+              <div>
+                <p className="font-medium text-slate-700">{s.name}</p>
+                <p className="text-xs text-slate-400">{active ? 'In since ' + new Date(active.clockIn).toLocaleTimeString() : 'Not clocked in'}</p>
+              </div>
+              {active
+                ? <button onClick={() => clockOut(active.id)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-sm">Clock out</button>
+                : <button onClick={() => clockIn(s.id)} className="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-sm">Clock in</button>}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-slate-100 text-slate-600"><th className="text-left p-3">Staff</th><th className="text-left p-3">In</th><th className="text-left p-3">Out</th><th className="text-left p-3">Hours</th></tr></thead>
+          <tbody>
+            {records.map(r => (
+              <tr key={r.id} className="border-b border-slate-50">
+                <td className="p-3">{r.user?.name}</td>
+                <td className="p-3">{new Date(r.clockIn).toLocaleString()}</td>
+                <td className="p-3">{r.clockOut ? new Date(r.clockOut).toLocaleString() : <span className="text-amber-600">Active</span>}</td>
+                <td className="p-3">{r.totalHours ?? '—'}</td>
+              </tr>
+            ))}
+            {records.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-slate-400">No records in range</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── TIME OFF ────────────────────────────────────────────────────────────────
+function TimeOffTab({ onChanged }: { onChanged: () => void }) {
+  const [types, setTypes] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [form, setForm] = useState({ userId: '', leaveTypeId: '', startDate: '', endDate: '', reason: '' });
+
+  const load = async () => {
+    const [t, r, s] = await Promise.all([fetch('/api/leave-types').then(x => x.json()), fetch('/api/leave-requests').then(x => x.json()), fetch('/api/staff').then(x => x.json())]);
+    setTypes(Array.isArray(t) ? t : []); setRequests(Array.isArray(r) ? r : []); setStaff(Array.isArray(s) ? s : []);
+  };
+  useEffect(() => { load(); }, []);
+
+  async function submit() {
+    const r = await fetch('/api/leave-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId) }) });
+    if (r.ok) { setForm({ userId: '', leaveTypeId: '', startDate: '', endDate: '', reason: '' }); load(); onChanged(); }
+  }
+  async function review(id: number, status: string) {
+    await fetch('/api/leave-requests', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) });
+    load(); onChanged();
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold text-slate-800">Time off</h2>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <p className="text-sm font-semibold text-slate-700">Request leave</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <select value={form.leaveTypeId} onChange={e => setForm({ ...form, leaveTypeId: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Type</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+          <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <input placeholder="Reason" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+        </div>
+        <button onClick={submit} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Submit request</button>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-slate-100 text-slate-600"><th className="text-left p-3">Staff</th><th className="text-left p-3">Type</th><th className="text-left p-3">Dates</th><th className="text-left p-3">Status</th><th className="text-left p-3">Actions</th></tr></thead>
+          <tbody>
+            {requests.map(r => (
+              <tr key={r.id} className="border-b border-slate-50">
+                <td className="p-3">{r.user?.name}</td>
+                <td className="p-3">{r.leaveType?.name}</td>
+                <td className="p-3">{r.startDate.slice(0,10)} → {r.endDate.slice(0,10)}</td>
+                <td className="p-3"><Badge color={r.status === 'APPROVED' ? 'green' : r.status === 'REJECTED' ? 'red' : 'amber'}>{r.status}</Badge></td>
+                <td className="p-3 space-x-1">
+                  {r.status === 'PENDING' && <>
+                    <button onClick={() => review(r.id, 'APPROVED')} className="text-xs px-2 py-1 rounded bg-green-50 text-green-700">Approve</button>
+                    <button onClick={() => review(r.id, 'REJECTED')} className="text-xs px-2 py-1 rounded bg-red-50 text-red-600">Reject</button>
+                  </>}
+                </td>
+              </tr>
+            ))}
+            {requests.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-400">No requests</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── PAYROLL ─────────────────────────────────────────────────────────────────
+function PayrollTab() {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [records, setRecords] = useState<any[]>([]);
+  const [form, setForm] = useState({ userId: '', periodStart: '', periodEnd: '', deductions: '0' });
+  const [openId, setOpenId] = useState<number | null>(null);
+
+  const load = async () => {
+    const [s, r] = await Promise.all([fetch('/api/staff').then(x => x.json()), fetch('/api/payroll').then(x => x.json())]);
+    setStaff(Array.isArray(s) ? s : []); setRecords(Array.isArray(r) ? r : []);
+  };
+  useEffect(() => { load(); }, []);
+
+  async function generate() {
+    const r = await fetch('/api/payroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId), deductions: Number(form.deductions) }) });
+    if (r.ok) { setForm({ userId: '', periodStart: '', periodEnd: '', deductions: '0' }); load(); }
+  }
+  async function markPaid(id: number) {
+    await fetch('/api/payroll', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'PAID' }) });
+    load();
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        Payslips follow Philippine rules: SSS, PhilHealth and Pag-IBIG employee shares are deducted first, then BIR withholding tax is computed on what remains. This is a calculation guide — you still file and pay the agencies.
+      </div>
+      <h2 className="text-lg font-semibold text-slate-800">Payroll</h2>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <p className="text-sm font-semibold text-slate-700">Run payroll for a period</p>
+        <div className="flex flex-wrap gap-2 items-end">
+          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <input type="date" value={form.periodStart} onChange={e => setForm({ ...form, periodStart: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <input type="date" value={form.periodEnd} onChange={e => setForm({ ...form, periodEnd: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <input placeholder="Other deductions ₱" value={form.deductions} onChange={e => setForm({ ...form, deductions: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm w-32" />
+          <button onClick={generate} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Generate</button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-slate-100 text-slate-600"><th className="text-left p-3">Staff</th><th className="text-left p-3">Period</th><th className="text-right p-3">Hours</th><th className="text-right p-3">Gross</th><th className="text-right p-3">Net</th><th className="text-left p-3">Status</th></tr></thead>
+          <tbody>
+            {records.map(r => {
+              const b = safeParse(r.breakdown);
+              return (
+                <Fragment key={r.id}>
+                  <tr className="border-b border-slate-50 cursor-pointer hover:bg-slate-50" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                    <td className="p-3">{r.user?.name}</td>
+                    <td className="p-3">{r.periodStart.slice(0,10)} → {r.periodEnd.slice(0,10)}</td>
+                    <td className="p-3 text-right">{r.regularHours + r.overtimeHours}h</td>
+                    <td className="p-3 text-right">₱{r.grossPay.toFixed(2)}</td>
+                    <td className="p-3 text-right font-semibold">₱{r.netPay.toFixed(2)}</td>
+                    <td className="p-3"><Badge color={r.status === 'PAID' ? 'green' : r.status === 'PROCESSED' ? 'blue' : 'amber'}>{r.status}</Badge>{r.status !== 'PAID' && <button onClick={(e) => { e.stopPropagation(); markPaid(r.id); }} className="ml-2 text-xs text-green-600 hover:underline">Mark paid</button>}</td>
+                  </tr>
+                  {openId === r.id && b && (
+                    <tr className="bg-slate-50">
+                      <td colSpan={6} className="p-4 text-xs">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-w-2xl">
+                          <Line label="Gross pay" value={b.grossPay} />
+                          <Line label="SSS (EE)" value={b.sss?.employee} sub={`MSC ₱${b.sss?.msc}`} />
+                          <Line label="PhilHealth (EE)" value={b.philHealth?.employee} />
+                          <Line label="Pag-IBIG (EE)" value={b.pagIbig?.employee} />
+                          <Line label="Withholding tax" value={b.withholdingTax} />
+                          <Line label="Taxable income" value={b.taxableIncome} />
+                          <Line label="Employer cost" value={b.employerCost} sub="SSS/Phil/Pag shares" />
+                          <Line label="Net pay" value={b.netPay} bold />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+            {records.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-slate-400">No payroll runs</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Line({ label, value, sub, bold }: { label: string; value?: number; sub?: string; bold?: boolean }) {
+  return (
+    <div className="rounded-lg bg-white border border-slate-100 p-2">
+      <p className="text-slate-400">{label}</p>
+      <p className={`${bold ? 'font-bold text-slate-800' : 'text-slate-700'}`}>₱{(value ?? 0).toFixed(2)}</p>
+      {sub && <p className="text-[10px] text-slate-400">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── REVIEWS ─────────────────────────────────────────────────────────────────
+function ReviewsTab() {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [form, setForm] = useState({ userId: '', period: '', rating: '3', strengths: '', improvements: '', goals: '' });
+
+  const load = async () => {
+    const [s, r] = await Promise.all([fetch('/api/staff').then(x => x.json()), fetch('/api/performance-reviews').then(x => x.json())]);
+    setStaff(Array.isArray(s) ? s : []); setReviews(Array.isArray(r) ? r : []);
+  };
+  useEffect(() => { load(); }, []);
+
+  async function submit() {
+    const r = await fetch('/api/performance-reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId), rating: Number(form.rating) }) });
+    if (r.ok) { setForm({ userId: '', period: '', rating: '3', strengths: '', improvements: '', goals: '' }); load(); }
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold text-slate-800">Reviews</h2>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <p className="text-sm font-semibold text-slate-700">New review</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <input placeholder="Period (e.g. Q3 2026)" value={form.period} onChange={e => setForm({ ...form, period: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <select value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n} ★</option>)}</select>
+          <input placeholder="Strengths" value={form.strengths} onChange={e => setForm({ ...form, strengths: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <input placeholder="Improvements" value={form.improvements} onChange={e => setForm({ ...form, improvements: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <input placeholder="Goals" value={form.goals} onChange={e => setForm({ ...form, goals: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+        </div>
+        <button onClick={submit} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Submit review</button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {reviews.map(r => (
+          <div key={r.id} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-slate-700">{r.user?.name}</p>
+              <span className="text-amber-500 font-bold">{r.rating} ★</span>
+            </div>
+            <p className="text-xs text-slate-400">{r.period} · by {r.reviewer?.name}</p>
+            {r.strengths && <p className="text-xs mt-1"><span className="font-medium">Strengths:</span> {r.strengths}</p>}
+            {r.improvements && <p className="text-xs"><span className="font-medium">Improve:</span> {r.improvements}</p>}
+            {r.goals && <p className="text-xs"><span className="font-medium">Goals:</span> {r.goals}</p>}
+          </div>
+        ))}
+        {reviews.length === 0 && <p className="text-slate-400 text-sm">No reviews yet.</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── DOCUMENTS ───────────────────────────────────────────────────────────────
+function DocumentsTab() {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [selectedId, setSelectedId] = useState<number | ''>('');
+  const [docs, setDocs] = useState<any[]>([]);
+  const [form, setForm] = useState({ name: '', type: 'CONTRACT', fileUrl: '', expiryDate: '', notes: '' });
+
+  const load = async () => {
+    const r = await fetch('/api/staff'); const d = await r.json(); setStaff(Array.isArray(d) ? d : []);
+  };
+  useEffect(() => { load(); }, []);
+  useEffect(() => { if (selectedId) loadDocs(Number(selectedId)); }, [selectedId]);
+  const loadDocs = async (id: number) => {
+    const r = await fetch(`/api/staff/${id}/documents`); const d = await r.json(); setDocs(Array.isArray(d) ? d : []);
+  };
+
+  async function submit() {
+    if (!selectedId) return;
+    const r = await fetch(`/api/staff/${selectedId}/documents`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+    if (r.ok) { setForm({ name: '', type: 'CONTRACT', fileUrl: '', expiryDate: '', notes: '' }); loadDocs(Number(selectedId)); }
+  }
+  async function remove(id: number) {
+    await fetch(`/api/staff/documents/${id}`, { method: 'DELETE' });
+    if (selectedId) loadDocs(Number(selectedId));
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold text-slate-800">Documents</h2>
+      <select value={selectedId} onChange={e => setSelectedId(e.target.value ? Number(e.target.value) : '')} className="rounded-lg border border-slate-200 px-3 py-2 text-sm max-w-xs">
+        <option value="">Select staff member…</option>
+        {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+
+      {selectedId && (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-2">
+            <p className="text-sm font-semibold text-slate-700">Add document</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <input placeholder="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
+                <option value="CONTRACT">Contract</option><option value="NDA">NDA</option><option value="CERTIFICATION">Certification</option><option value="OTHER">Other</option>
+              </select>
+              <input placeholder="File URL" value={form.fileUrl} onChange={e => setForm({ ...form, fileUrl: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+              <input type="date" value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+            </div>
+            <button onClick={submit} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Add</button>
+          </div>
+
+          <div className="space-y-2">
+            {docs.map(d => (
+              <div key={d.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
+                <div>
+                  <p className="font-medium text-slate-700 text-sm">{d.name} <Badge color="purple">{d.type}</Badge></p>
+                  {d.expiryDate && <p className="text-xs text-slate-400">Expires {d.expiryDate.slice(0,10)}</p>}
+                </div>
+                <button onClick={() => remove(d.id)} className="text-xs text-red-600 hover:underline">Delete</button>
+              </div>
+            ))}
+            {docs.length === 0 && <p className="text-slate-400 text-sm">No documents.</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TRAINING ────────────────────────────────────────────────────────────────
+function TrainingTab() {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [newName, setNewName] = useState('');
+
+  const load = async () => {
+    const [s, c] = await Promise.all([fetch('/api/staff').then(x => x.json()), fetch('/api/training').then(x => x.json())]);
+    setStaff(Array.isArray(s) ? s : []); setCourses(Array.isArray(c) ? c : []);
+  };
+  useEffect(() => { load(); }, []);
+
+  async function addCourse() {
+    if (!newName.trim()) return;
+    await fetch('/api/training', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) });
+    setNewName(''); load();
+  }
+  async function enroll(courseId: number, userId: number) {
+    await fetch(`/api/training/${courseId}/enroll`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+    load();
+  }
+  async function complete(courseId: number, userId: number) {
+    await fetch(`/api/training/${courseId}/enroll`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, status: 'COMPLETED', completedAt: new Date().toISOString() }) });
+    load();
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold text-slate-800">Training</h2>
+      <div className="flex gap-2">
+        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New course name…" className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm flex-1 max-w-xs" />
+        <button onClick={addCourse} className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold">Add course</button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {courses.map(c => (
+          <div key={c.id} className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="font-medium text-slate-700">{c.name}</p>
+            <p className="text-xs text-slate-400">{c.enrollments?.length ?? 0} enrolled</p>
+            <details className="mt-2">
+              <summary className="text-xs text-amber-600 cursor-pointer">Manage enrollments</summary>
+              <div className="mt-2 space-y-1">
+                {staff.map(s => {
+                  const en = c.enrollments?.find((e: any) => e.userId === s.id);
+                  return (
+                    <div key={s.id} className="flex items-center justify-between text-xs">
+                      <span>{s.name}</span>
+                      {!en
+                        ? <button onClick={() => enroll(c.id, s.id)} className="text-blue-600 hover:underline">Enroll</button>
+                        : en.status === 'COMPLETED'
+                          ? <Badge color="green">Completed</Badge>
+                          : <button onClick={() => complete(c.id, s.id)} className="text-green-600 hover:underline">Mark done</button>}
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          </div>
+        ))}
+        {courses.length === 0 && <p className="text-slate-400 text-sm">No courses yet.</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-slate-600">{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+    </div>
+  );
+}
+function Badge({ children, color }: { children: React.ReactNode; color: 'green' | 'red' | 'amber' | 'blue' | 'purple' | 'gray' }) {
+  const map: Record<string, string> = {
+    green: 'bg-green-50 text-green-700', red: 'bg-red-50 text-red-600', amber: 'bg-amber-50 text-amber-700',
+    blue: 'bg-blue-50 text-blue-700', purple: 'bg-purple-50 text-purple-700', gray: 'bg-gray-100 text-gray-500',
+  };
+  return <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${map[color]}`}>{children}</span>;
+}
+function blankPerms(all = false): Permission {
+  return { liveOrders: all, terminal: all, tables: all, analytics: all, products: all, inventory: all, kitchen: all, loyalty: all, staff: all, settings: all };
+}
+type StaffForm = {
+  name: string; email: string; role: 'ADMIN' | 'STAFF' | 'KITCHEN'; password: string;
+  phone: string; address: string; dateOfBirth: string; hireDate: string;
+  position: string; department: string; emergencyContactName: string; emergencyContactPhone: string;
+  hourlyRate: string; monthlySalary: string; paymentType: string;
+};
+function blankForm(): StaffForm {
+  return { name: '', email: '', role: 'STAFF', password: '', phone: '', address: '', dateOfBirth: '', hireDate: '', position: '', department: '', emergencyContactName: '', emergencyContactPhone: '', hourlyRate: '', monthlySalary: '', paymentType: '' };
+}
+function getMonday(d: Date) { const day = (d.getDay() + 6) % 7; return addDays(new Date(d.getFullYear(), d.getMonth(), d.getDate()), -day); }
+function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function iso(d: Date) { return d.toISOString().slice(0, 10); }
+function dayName(d: Date) { return ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]; }
+function fmtTime(t?: string | null) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hr = h % 12 === 0 ? 12 : h % 12;
+  return `${hr}:${String(m).padStart(2, '0')} ${period}`;
+}
+function safeParse(json?: string | null) {
+  if (!json) return null;
+  try { return JSON.parse(json); } catch { return null; }
 }

@@ -15,6 +15,7 @@ export interface RecipeItemInfo {
   quantity: number; // units consumed per 1 product (base units)
   required: boolean;
   currentStock: number;
+  costPerUnit?: number; // price per 1 base unit (for capital-cost derivation)
 }
 
 export interface AvailabilityBreakdown {
@@ -82,7 +83,17 @@ export async function fetchRecipe(tx: StockTx, productId: number): Promise<Recip
     quantity: pi.quantity,
     required: pi.required ?? true,
     currentStock: pi.ingredient.currentStock ?? 0,
+    costPerUnit: pi.ingredient.costPerUnit ?? 0,
   }));
+}
+
+/**
+ * Derived capital cost (cost to make one unit) = Σ (ingredient.costPerUnit × quantity)
+ * over the product's recipe. Every recipe ingredient is treated as required, so all
+ * lines count toward the cost.
+ */
+export function computeProductCapitalCost(recipe: RecipeItemInfo[]): number {
+  return recipe.reduce((sum, r) => sum + (r.quantity || 0) * (r.costPerUnit || 0), 0);
 }
 
 /** Sellable quantity for a single product (Infinity => Number.MAX_SAFE_INTEGER for DB use). */
@@ -108,6 +119,11 @@ export async function productsUsingIngredient(tx: StockTx, ingredientId: number)
 export async function recomputeProduct(tx: StockTx, productId: number): Promise<void> {
   const recipe = await fetchRecipe(tx, productId);
   const { sellable } = calcSellableQuantity(recipe);
+  // Persist the derived capital cost from the recipe (single source of truth).
+  await tx.product.update({
+    where: { id: productId },
+    data: { capitalCost: computeProductCapitalCost(recipe) },
+  });
   if (sellable === Infinity) return; // recipe-less product — leave legacy/manual quantity alone
   // Clamp to >= 0: an overridden sale can drive an ingredient negative, but the
   // derived "sellable" cache used by the menu/terminal must never be negative

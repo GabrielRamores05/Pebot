@@ -10,38 +10,42 @@ interface RouteParams {
 export const dynamic = 'force-dynamic';
 
 // GET /api/products/:id/option-groups — public: customers need this to see
-// size/temp/add-on choices. Only AVAILABLE groups & options are exposed.
+// size/temp/add-on choices. Returns per-product options (same JSON shape as
+// before so existing pickers need no changes).
 export async function GET(req: NextRequest, { params }: RouteParams) {
   const { id } = await params;
+  const productId = Number(id);
+
+  // Fetch the groups attached to this product (in attachment order)
   const attachments = await prisma.productOptionGroup.findMany({
-    where: { productId: Number(id), group: { available: true } },
+    where: { productId, group: { available: true } },
     include: {
       group: {
-        select: {
-          id: true,
-          name: true,
-          selectionType: true,
-          scalesRecipe: true,
-          sortOrder: true,
-          options: {
-            where: { available: true },
-            orderBy: { sortOrder: 'asc' },
-            select: { id: true, name: true, priceDelta: true },
-          },
-        },
+        select: { id: true, name: true, selectionType: true, sortOrder: true },
       },
     },
     orderBy: { sortOrder: 'asc' },
   });
+
+  // Fetch all per-product options for this product in one query
+  const allOptions = await prisma.productOption.findMany({
+    where: { productId, available: true },
+    orderBy: { sortOrder: 'asc' },
+    select: { id: true, name: true, priceDelta: true, groupId: true },
+  });
+
+  // Index options by groupId
+  const optionsByGroup = new Map<number, typeof allOptions>();
+  for (const opt of allOptions) {
+    const arr = optionsByGroup.get(opt.groupId) ?? [];
+    arr.push(opt);
+    optionsByGroup.set(opt.groupId, arr);
+  }
+
   return NextResponse.json(
     attachments.map((a) => ({
-      group: {
-        id: a.group.id,
-        name: a.group.name,
-        selectionType: a.group.selectionType,
-        scalesRecipe: a.group.scalesRecipe,
-      },
-      options: a.group.options,
+      group: a.group,
+      options: (optionsByGroup.get(a.groupId) ?? []).map(({ groupId: _, ...rest }) => rest),
     }))
   );
 }
@@ -61,7 +65,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     const attachment = await prisma.productOptionGroup.create({
       data: { productId: Number(id), groupId },
-      include: { group: { include: { options: true } } },
+      include: { group: true },
     });
     return NextResponse.json(attachment, { status: 201 });
   } catch (error: any) {

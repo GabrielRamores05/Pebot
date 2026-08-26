@@ -8,6 +8,7 @@ import {
   IconAnalytics, IconInventory,
   IconCoffee, IconSettings,
    IconTerminal, IconHistory, IconConsultant, IconAudit, IconStar,
+  IconLogout,
 
 } from '@/lib/assets';
 import { useSocket } from '@/hooks/useSocket';
@@ -263,6 +264,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </div>
 
+        {/* Logout — always visible, regardless of permissions */}
+        <div className="p-3 border-t border-slate-200">
+          <button
+            onClick={async () => {
+              await fetch('/api/auth/me', { method: 'DELETE' });
+              router.push('/login');
+            }}
+            className="flex items-center gap-3 w-full px-4 py-3 mx-2 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors"
+            title="Log out"
+          >
+            <IconLogout size={20} strokeWidth={1.75} className="shrink-0" />
+            <span className={`hidden md:block font-medium transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Log out</span>
+          </button>
+        </div>
+
       </nav>
 
       {/* New Order Notifications - adjust for mobile header */}
@@ -310,7 +326,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen pt-14 md:pt-0">
+      <main className="flex-1 flex flex-col min-h-0 h-screen overflow-y-auto pt-14 md:pt-0">
         {children}
       </main>
 

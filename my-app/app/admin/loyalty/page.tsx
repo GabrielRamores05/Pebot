@@ -40,6 +40,7 @@ interface LoyaltySetting {
   rewardValue: number;
   isMilestoneMode: boolean;
   milestones: { target: number; rewardType: string; rewardValue: number }[];
+  maxHeldRewards: number;
 }
 
 
@@ -56,6 +57,7 @@ const defaultSettings: LoyaltySetting = {
   rewardValue: 0,
   isMilestoneMode: false,
   milestones: [],
+  maxHeldRewards: 3,
 };
 
 
@@ -550,6 +552,21 @@ export default function AdminLoyaltyManagementPage() {
                       </button>
                     </div>
                   </div>
+
+                  {editingSettings && (
+                    <div>
+                      <label className="block text-gray-600 font-medium mb-2 text-sm">Max rewards held per card</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={editingSettings.maxHeldRewards ?? 3}
+                        onChange={(e) => setEditingSettings({ ...editingSettings, maxHeldRewards: parseInt(e.target.value) || 3 })}
+                        className="w-full bg-gray-50 text-gray-900 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-amber-400 outline-none transition-all"
+                      />
+                      <p className="text-gray-400 text-xs mt-1">Once a card holds this many unredeemed rewards, no new reward is earned until one is redeemed. Progress still builds.</p>
+                    </div>
+                  )}
 
                   {!editingSettings.isMilestoneMode ? (
                     <>

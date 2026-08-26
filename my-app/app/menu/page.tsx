@@ -776,7 +776,6 @@ interface ProductOptionGroupDTO {
     id: number;
     name: string;
     selectionType: 'single' | 'multi';
-    scalesRecipe: boolean;
   };
   options: { id: number; name: string; priceDelta: number }[];
 }
@@ -899,24 +898,17 @@ function MenuPageInner() {
   // group (Small · Hot …). Quick-add uses this so no line is ever blank.
   useEffect(() => {
     if (categories.length === 0) return;
-    Promise.all([
-      fetch('/api/option-groups').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/product-option-groups').then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([groups, attachments]) => {
-        const groupsById: Record<number, { name: string; selectionType: string; options: { id: number; name: string; priceDelta: number }[] }> = {};
-        for (const g of Array.isArray(groups) ? groups : []) {
-          groupsById[g.id] = { name: g.name, selectionType: g.selectionType, options: g.options ?? [] };
-        }
+    fetch('/api/product-option-groups')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((attachments) => {
         const map: Record<number, CartItemSelection[]> = {};
         for (const att of Array.isArray(attachments) ? attachments : []) {
-          const g = groupsById[att.groupId];
-          if (!g || g.selectionType !== 'single') continue; // multi groups start empty by design
-          const first = g.options[0];
+          if (att.group.selectionType !== 'single') continue; // multi groups start empty by design
+          const first = (att.productOptions ?? [])[0];
           if (!first) continue;
           (map[att.productId] ??= []).push({
             optionId: first.id,
-            groupName: g.name,
+            groupName: att.group.name,
             name: first.name,
             priceDelta: first.priceDelta ?? 0,
           });

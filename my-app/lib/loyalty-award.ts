@@ -177,6 +177,10 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
 
     if (!settings || !settings.enabled) continue;
 
+    // Cap on unredeemed rewards this card may hold (per loyalty module; the
+    // store-wide module acts as the fallback for categories without their own).
+    const maxHeldRewards = (typeof settings.maxHeldRewards === 'number') ? settings.maxHeldRewards : 3;
+
     // Category programs earn on the member's category card and make
     // category-scoped vouchers; the store-wide program earns on their
     // store-wide card and makes vouchers valid on any item.
@@ -205,6 +209,11 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
       });
     }
 
+    // How many unredeemed rewards this card currently holds
+    let heldRewards = await prisma.loyaltyVoucher.count({
+      where: { cardId: card.id, status: 'ACTIVE' },
+    });
+
     const currentCount = card.paidCoffeesCount;
     const currentPoints = card.loyaltyPoints ?? 0;
     let claimedMilestones = JSON.parse(card.claimedMilestones || '[]') as number[];
@@ -230,6 +239,7 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
 
     if (!isMilestoneMode) {
       while (tempCount >= threshold) {
+        if (heldRewards >= maxHeldRewards) break; // at cap: keep progress, stop issuing
         const rewardName =
           settings.rewardType === 'FREE'
             ? 'Free Item'
@@ -255,12 +265,14 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
           },
         });
         voucherCodes.push(code);
+        heldRewards++;
         tempCount -= threshold;
       }
     } else {
       // Milestone mode
       for (const milestone of milestones.sort((a, b) => a.target - b.target)) {
         if (tempCount >= milestone.target && !claimedMilestones.includes(milestone.target)) {
+          if (heldRewards >= maxHeldRewards) continue; // at cap: keep unclaimed, stop issuing
           const rewardName =
             milestone.rewardType === 'FREE'
               ? 'Free Item'
@@ -286,6 +298,7 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
             },
           });
           voucherCodes.push(code);
+          heldRewards++;
           claimedMilestones.push(milestone.target);
         }
       }

@@ -128,6 +128,18 @@ exports.Prisma.UserScalarFieldEnum = {
   active: 'active',
   permissions: 'permissions',
   subscriptionId: 'subscriptionId',
+  phone: 'phone',
+  address: 'address',
+  dateOfBirth: 'dateOfBirth',
+  hireDate: 'hireDate',
+  position: 'position',
+  department: 'department',
+  profilePhoto: 'profilePhoto',
+  emergencyContactName: 'emergencyContactName',
+  emergencyContactPhone: 'emergencyContactPhone',
+  hourlyRate: 'hourlyRate',
+  monthlySalary: 'monthlySalary',
+  paymentType: 'paymentType',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -277,6 +289,9 @@ exports.Prisma.OrderScalarFieldEnum = {
   tableId: 'tableId',
   status: 'status',
   totalAmount: 'totalAmount',
+  discountAmount: 'discountAmount',
+  discountReason: 'discountReason',
+  discountRate: 'discountRate',
   barcodeValue: 'barcodeValue',
   notes: 'notes',
   loyaltyPromo: 'loyaltyPromo',
@@ -305,21 +320,28 @@ exports.Prisma.OptionGroupScalarFieldEnum = {
   id: 'id',
   name: 'name',
   selectionType: 'selectionType',
-  scalesRecipe: 'scalesRecipe',
   sortOrder: 'sortOrder',
   available: 'available',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
 
-exports.Prisma.OptionScalarFieldEnum = {
+exports.Prisma.ProductOptionScalarFieldEnum = {
   id: 'id',
+  productId: 'productId',
   groupId: 'groupId',
   name: 'name',
   priceDelta: 'priceDelta',
-  sizeMultiplier: 'sizeMultiplier',
   sortOrder: 'sortOrder',
   available: 'available',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.ProductOptionIngredientScalarFieldEnum = {
+  id: 'id',
+  productOptionId: 'productOptionId',
+  ingredientId: 'ingredientId',
+  deltaQty: 'deltaQty',
   createdAt: 'createdAt'
 };
 
@@ -364,6 +386,7 @@ exports.Prisma.BusinessSettingsScalarFieldEnum = {
   lastReceiptNumber: 'lastReceiptNumber',
   footerMessage: 'footerMessage',
   loyaltyEnabled: 'loyaltyEnabled',
+  studentPwdDiscountRate: 'studentPwdDiscountRate',
   gcashAccountName: 'gcashAccountName',
   gcashQrImage: 'gcashQrImage',
   paymayaAccountName: 'paymayaAccountName',
@@ -389,6 +412,7 @@ exports.Prisma.LoyaltySettingScalarFieldEnum = {
   rewardValue: 'rewardValue',
   isMilestoneMode: 'isMilestoneMode',
   milestones: 'milestones',
+  maxHeldRewards: 'maxHeldRewards',
   updated: 'updated'
 };
 
@@ -531,6 +555,135 @@ exports.Prisma.ExpenseScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.ShiftScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  startTime: 'startTime',
+  endTime: 'endTime',
+  breakMinutes: 'breakMinutes',
+  isActive: 'isActive',
+  sortOrder: 'sortOrder',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ScheduleScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  shiftId: 'shiftId',
+  date: 'date',
+  status: 'status',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.AttendanceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  scheduleId: 'scheduleId',
+  clockIn: 'clockIn',
+  clockOut: 'clockOut',
+  breakStart: 'breakStart',
+  breakEnd: 'breakEnd',
+  totalHours: 'totalHours',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.LeaveTypeScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  daysPerYear: 'daysPerYear',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.LeaveRequestScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  leaveTypeId: 'leaveTypeId',
+  startDate: 'startDate',
+  endDate: 'endDate',
+  reason: 'reason',
+  status: 'status',
+  approvedById: 'approvedById',
+  approvedAt: 'approvedAt',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.PayrollScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  periodStart: 'periodStart',
+  periodEnd: 'periodEnd',
+  regularHours: 'regularHours',
+  overtimeHours: 'overtimeHours',
+  grossPay: 'grossPay',
+  deductions: 'deductions',
+  netPay: 'netPay',
+  status: 'status',
+  processedById: 'processedById',
+  processedAt: 'processedAt',
+  notes: 'notes',
+  breakdown: 'breakdown',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.PerformanceReviewScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  reviewerId: 'reviewerId',
+  period: 'period',
+  rating: 'rating',
+  strengths: 'strengths',
+  improvements: 'improvements',
+  goals: 'goals',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.StaffDocumentScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  type: 'type',
+  fileUrl: 'fileUrl',
+  expiryDate: 'expiryDate',
+  uploadedById: 'uploadedById',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TrainingScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  duration: 'duration',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.StaffTrainingScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  trainingId: 'trainingId',
+  status: 'status',
+  completedAt: 'completedAt',
+  expiryDate: 'expiryDate',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -558,7 +711,8 @@ exports.Prisma.ModelName = {
   Order: 'Order',
   OrderItem: 'OrderItem',
   OptionGroup: 'OptionGroup',
-  Option: 'Option',
+  ProductOption: 'ProductOption',
+  ProductOptionIngredient: 'ProductOptionIngredient',
   ProductOptionGroup: 'ProductOptionGroup',
   OrderMessage: 'OrderMessage',
   Inventory: 'Inventory',
@@ -576,7 +730,17 @@ exports.Prisma.ModelName = {
   AIConversation: 'AIConversation',
   AIMessage: 'AIMessage',
   ExpenseCategory: 'ExpenseCategory',
-  Expense: 'Expense'
+  Expense: 'Expense',
+  Shift: 'Shift',
+  Schedule: 'Schedule',
+  Attendance: 'Attendance',
+  LeaveType: 'LeaveType',
+  LeaveRequest: 'LeaveRequest',
+  Payroll: 'Payroll',
+  PerformanceReview: 'PerformanceReview',
+  StaffDocument: 'StaffDocument',
+  Training: 'Training',
+  StaffTraining: 'StaffTraining'
 };
 
 /**

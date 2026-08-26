@@ -9,13 +9,13 @@ async function hashPassword(password: string): Promise<string> {
 
 const DEFAULT_PERMISSIONS = {
   liveOrders: true,
-  terminal: false,
+  terminal: true,
   tables: false,
   analytics: false,
   products: false,
   inventory: false,
   kitchen: false,
-  loyalty: false,
+  loyalty: true,
   staff: false,
   settings: false,
 };
@@ -34,7 +34,7 @@ const ADMIN_PERMISSIONS = {
 };
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.log('Seeding database...');
 
   // Create subscription tiers
   const regularSubscription = await prisma.subscription.upsert({
@@ -94,7 +94,7 @@ async function main() {
     },
   });
 
-  console.log('✓ Subscription tiers created');
+  console.log('  Subscription tiers created');
 
   // Create admin user
   const adminPassword = await hashPassword('admin123');
@@ -116,41 +116,28 @@ async function main() {
     },
   });
 
-  console.log('✓ Admin user created/updated:', admin.email);
-  console.log('  ✓ All features enabled (PREMIUM tier)');
+  console.log('  Admin user:', admin.email);
 
   // Create staff user
   const staffPassword = await hashPassword('staff123');
   const staff = await prisma.user.upsert({
     where: { email: 'staff@cafeos.local' },
-    update: {},
+    update: { permissions: JSON.stringify(DEFAULT_PERMISSIONS) },
     create: {
       name: 'Staff Member',
       email: 'staff@cafeos.local',
       password: staffPassword,
       role: 'STAFF',
-      permissions: JSON.stringify({
-        liveOrders: true,
-        terminal: true,
-        tables: true,
-        analytics: false,
-        products: false,
-        inventory: false,
-        kitchen: false,
-        loyalty: false,
-        staff: false,
-        settings: false,
-      }),
+      permissions: JSON.stringify(DEFAULT_PERMISSIONS),
       subscriptionId: regularSubscription.id,
       active: true,
     },
   });
 
-  console.log('✓ Staff user created:', staff.email);
-  console.log('  ✓ Limited features enabled (Orders, Terminal, Tables) - REGULAR tier');
+  console.log('  Staff user:', staff.email);
 
-  // Create a POS license
-  const posLicense = await prisma.pOSLicense.upsert({
+  // POS license
+  await prisma.pOSLicense.upsert({
     where: { id: 1 },
     update: {},
     create: {
@@ -161,141 +148,229 @@ async function main() {
     },
   });
 
-   console.log('✓ POS License created/activated');
+  console.log('  POS License created');
 
-   // ── Demo ingredient inventory + recipes (Recipe/BOM model) ──────────────
-   // These exercise the shared-ingredient-pool availability engine. A café
-   // replaces them with its own menu; they're idempotent (matched by name).
-   const coffeeCat = await prisma.category.upsert({
-     where: { name: 'Coffee' },
-     update: { icon: '☕' },
-     create: { name: 'Coffee', icon: '☕', sortOrder: 0 },
-   });
-   console.log('✓ Category:', coffeeCat.name);
+  // ── HR: default shift templates ─────────────────────────────────────────────
+  const shifts = [
+    { name: 'Morning', startTime: '06:00', endTime: '14:00', breakMinutes: 30, sortOrder: 1 },
+    { name: 'Afternoon', startTime: '14:00', endTime: '22:00', breakMinutes: 30, sortOrder: 2 },
+    { name: 'Full Day', startTime: '08:00', endTime: '17:00', breakMinutes: 60, sortOrder: 3 },
+    { name: 'Night', startTime: '22:00', endTime: '06:00', breakMinutes: 30, sortOrder: 4 },
+  ];
+  for (const s of shifts) {
+    await prisma.shift.upsert({
+      where: { name: s.name },
+      update: {},
+      create: s,
+    });
+  }
+  console.log('  Shift templates seeded');
 
-   async function upsertIngredient(data: {
-     name: string; category: string; baseUnit: string; purchaseUnit: string;
-     currentStock: number; minStock: number; costPerUnit: number;
-   }) {
-     const existing = await prisma.ingredient.findFirst({ where: { name: data.name } });
-     if (existing) {
-       return prisma.ingredient.update({ where: { id: existing.id }, data });
-     }
-     return prisma.ingredient.create({ data });
-   }
+  // ── HR: default leave types ────────────────────────────────────────────────
+  const leaveTypes = [
+    { name: 'Sick Leave', daysPerYear: 15 },
+    { name: 'Vacation Leave', daysPerYear: 15 },
+    { name: 'Personal Leave', daysPerYear: 5 },
+    { name: 'Maternity Leave', daysPerYear: 60 },
+    { name: 'Paternity Leave', daysPerYear: 7 },
+  ];
+  for (const lt of leaveTypes) {
+    await prisma.leaveType.upsert({
+      where: { name: lt.name },
+      update: {},
+      create: lt,
+    });
+  }
+  console.log('  Leave types seeded');
 
-   const beans = await upsertIngredient({
-     name: 'Coffee Beans', category: 'Coffee', baseUnit: 'g', purchaseUnit: 'kg',
-     currentStock: 1000, minStock: 200, costPerUnit: 0.60,
-   });
-   const milk = await upsertIngredient({
-     name: 'Fresh Milk', category: 'Dairy', baseUnit: 'ml', purchaseUnit: 'L',
-     currentStock: 2000, minStock: 500, costPerUnit: 0.08,
-   });
-   const sugar = await upsertIngredient({
-     name: 'Sugar', category: 'Syrup', baseUnit: 'g', purchaseUnit: 'kg',
-     currentStock: 500, minStock: 100, costPerUnit: 0.04,
-   });
-   console.log('✓ Ingredients: Coffee Beans, Fresh Milk, Sugar');
+  // ── Ingredients ────────────────────────────────────────────────────────────
+  const coffeeCat = await prisma.category.upsert({
+    where: { name: 'Coffee' },
+    update: { icon: '☕' },
+    create: { name: 'Coffee', icon: '☕', sortOrder: 0 },
+  });
 
-   async function upsertProduct(data: {
-     name: string; price: number; capitalCost: number; categoryId: number;
-   }) {
-     const existing = await prisma.product.findFirst({ where: { name: data.name } });
-     if (existing) {
-       return prisma.product.update({ where: { id: existing.id }, data });
-     }
-     return prisma.product.create({ data });
-   }
+  async function upsertIngredient(data: {
+    name: string; category: string; baseUnit: string; purchaseUnit: string;
+    currentStock: number; minStock: number; costPerUnit: number;
+  }) {
+    const existing = await prisma.ingredient.findFirst({ where: { name: data.name } });
+    if (existing) {
+      return prisma.ingredient.update({ where: { id: existing.id }, data });
+    }
+    return prisma.ingredient.create({ data });
+  }
 
-   const americano = await upsertProduct({ name: 'Americano', price: 120, capitalCost: 30, categoryId: coffeeCat.id });
-   const latte = await upsertProduct({ name: 'Latte', price: 150, capitalCost: 45, categoryId: coffeeCat.id });
-   console.log('✓ Products: Americano, Latte');
+  const beans = await upsertIngredient({
+    name: 'Coffee Beans', category: 'Coffee', baseUnit: 'g', purchaseUnit: 'kg',
+    currentStock: 1000, minStock: 200, costPerUnit: 0.60,
+  });
+  const milk = await upsertIngredient({
+    name: 'Fresh Milk', category: 'Dairy', baseUnit: 'ml', purchaseUnit: 'L',
+    currentStock: 2000, minStock: 500, costPerUnit: 0.08,
+  });
+  const sugar = await upsertIngredient({
+    name: 'Sugar', category: 'Syrup', baseUnit: 'g', purchaseUnit: 'kg',
+    currentStock: 500, minStock: 100, costPerUnit: 0.04,
+  });
+  console.log('  Ingredients: Coffee Beans, Fresh Milk, Sugar');
 
-   // Per-product Inventory rows (quantity is a *derived cache* — the backfill
-   // script recomputes it from ingredient stock).
-   for (const p of [americano, latte]) {
-     await prisma.inventory.upsert({
-       where: { productId: p.id },
-       update: { lowStockThreshold: 10, unit: 'pcs' },
-       create: { productId: p.id, quantity: 0, lowStockThreshold: 10, unit: 'pcs' },
-     });
-   }
+  // ── Products ───────────────────────────────────────────────────────────────
+  async function upsertProduct(data: {
+    name: string; price: number; categoryId: number;
+  }) {
+    const existing = await prisma.product.findFirst({ where: { name: data.name } });
+    if (existing) {
+      return prisma.product.update({ where: { id: existing.id }, data });
+    }
+    return prisma.product.create({ data });
+  }
 
-   // Recipes (BOM): how much of each ingredient one product consumes.
-    await prisma.productIngredient.deleteMany({ where: { productId: { in: [americano.id, latte.id] } } });
-   await prisma.productIngredient.createMany({
-     data: [
-       { productId: americano.id, ingredientId: beans.id, quantity: 18, required: true },
-       { productId: americano.id, ingredientId: sugar.id, quantity: 10, required: false },
-       { productId: latte.id, ingredientId: beans.id, quantity: 18, required: true },
-       { productId: latte.id, ingredientId: milk.id, quantity: 150, required: true },
-       { productId: latte.id, ingredientId: sugar.id, quantity: 10, required: false },
-     ],
-   });
-   console.log('✓ Recipes assigned (Coffee Beans / Milk required, Sugar optional)');
+  const americano = await upsertProduct({ name: 'Americano', price: 120, categoryId: coffeeCat.id });
+  const latte = await upsertProduct({ name: 'Latte', price: 150, categoryId: coffeeCat.id });
+  console.log('  Products: Americano, Latte');
 
-   // Option groups and presets (product customization)
-   const sizeGroup = await prisma.optionGroup.upsert({
-     where: { name: 'Size' },
-     update: {},
-     create: { name: 'Size', selectionType: 'single', scalesRecipe: true, sortOrder: 1 },
-   });
-   const tempGroup = await prisma.optionGroup.upsert({
-     where: { name: 'Temperature' },
-     update: {},
-     create: { name: 'Temperature', selectionType: 'single', scalesRecipe: false, sortOrder: 2 },
-   });
-   const addonGroup = await prisma.optionGroup.upsert({
-     where: { name: 'Add-ons' },
-     update: {},
-     create: { name: 'Add-ons', selectionType: 'multi', scalesRecipe: false, sortOrder: 3 },
-   });
+  // Per-product Inventory rows
+  for (const p of [americano, latte]) {
+    await prisma.inventory.upsert({
+      where: { productId: p.id },
+      update: { lowStockThreshold: 10, unit: 'pcs' },
+      create: { productId: p.id, quantity: 0, lowStockThreshold: 10, unit: 'pcs' },
+    });
+  }
 
-   const optionPresets: [number, string, number, number, number][] = [
-     [sizeGroup.id, 'Small', 0, 1, 1],
-     [sizeGroup.id, 'Medium', 15, 1.5, 2],
-     [sizeGroup.id, 'Large', 30, 2, 3],
-     [tempGroup.id, 'Hot', 0, 1, 1],
-     [tempGroup.id, 'Cold', 0, 1, 2],
-     [addonGroup.id, 'Extra Shot', 25, 1, 1],
-     [addonGroup.id, 'Whipped Cream', 10, 1, 2],
-     [addonGroup.id, 'Oat Milk', 20, 1, 3],
-   ];
-   for (const [groupId, name, priceDelta, sizeMultiplier, sortOrder] of optionPresets) {
-     await prisma.option.upsert({
-       where: { groupId_name: { groupId, name } },
-       update: { priceDelta, sizeMultiplier, sortOrder },
-       create: { groupId, name, priceDelta, sizeMultiplier, sortOrder },
-     });
-   }
-   console.log('OK Option groups seeded (Size / Temperature / Add-ons)');
+  // Recipes (BOM) — every recipe ingredient is required (no optional concept).
+  await prisma.productIngredient.deleteMany({ where: { productId: { in: [americano.id, latte.id] } } });
+  await prisma.productIngredient.createMany({
+    data: [
+      { productId: americano.id, ingredientId: beans.id, quantity: 18, required: true },
+      { productId: americano.id, ingredientId: sugar.id, quantity: 10, required: true },
+      { productId: latte.id, ingredientId: beans.id, quantity: 18, required: true },
+      { productId: latte.id, ingredientId: milk.id, quantity: 150, required: true },
+      { productId: latte.id, ingredientId: sugar.id, quantity: 10, required: true },
+    ],
+  });
+  console.log('  Recipes assigned');
 
-   // Attach Size + Temperature to Coffee-category drinks
-   const coffeeCategory = await prisma.category.findFirst({ where: { name: 'Coffee' } });
-   if (coffeeCategory) {
-     const coffeeProducts = await prisma.product.findMany({ where: { categoryId: coffeeCategory.id } });
-     for (const prod of coffeeProducts) {
-       for (const gid of [sizeGroup.id, tempGroup.id]) {
-         await prisma.productOptionGroup.upsert({
-           where: { productId_groupId: { productId: prod.id, groupId: gid } },
-           update: {},
-           create: { productId: prod.id, groupId: gid },
-         });
-       }
-     }
-     console.log(`OK Size + Temperature attached to ${coffeeProducts.length} Coffee product(s)`);
-   }
+  // Derived capital cost = Σ (ingredient.costPerUnit × quantity) over the recipe.
+  // Recomputed here so a fresh seed has correct costs without manual entry.
+  for (const p of [americano, latte]) {
+    const recipe = await prisma.productIngredient.findMany({
+      where: { productId: p.id },
+      include: { ingredient: true },
+    });
+    const capital = recipe.reduce(
+      (sum, pi) => sum + (pi.quantity || 0) * (pi.ingredient.costPerUnit || 0),
+      0,
+    );
+    await prisma.product.update({ where: { id: p.id }, data: { capitalCost: capital } });
+  }
 
-   console.log('✅ Seeding completed!');
-  console.log('📝 You can now login with:');
-  console.log('   Email: admin@cafeos.local, Password: admin123');
-  console.log('   Email: staff@cafeos.local, Password: staff123');
+  // ── Per-product option groups & options ─────────────────────────────────────
+  // Clean slate for option data
+  await prisma.productOptionIngredient.deleteMany();
+  await prisma.productOption.deleteMany();
+  await prisma.productOptionGroup.deleteMany();
+  await prisma.optionGroup.deleteMany();
+
+  // Create groups
+  const sizeGroup = await prisma.optionGroup.create({
+    data: { name: 'Size', selectionType: 'single', sortOrder: 1 },
+  });
+  const tempGroup = await prisma.optionGroup.create({
+    data: { name: 'Temperature', selectionType: 'single', sortOrder: 2 },
+  });
+  const addonGroup = await prisma.optionGroup.create({
+    data: { name: 'Add-ons', selectionType: 'multi', sortOrder: 3 },
+  });
+  console.log('  Groups: Size, Temperature, Add-ons');
+
+  // Attach all three groups to both products
+  for (const prod of [americano, latte]) {
+    for (const gid of [sizeGroup.id, tempGroup.id, addonGroup.id]) {
+      await prisma.productOptionGroup.create({
+        data: { productId: prod.id, groupId: gid },
+      });
+    }
+  }
+
+  // Helper: create a product option with optional ingredient deltas
+  async function createOption(
+    productId: number,
+    groupId: number,
+    name: string,
+    priceDelta: number,
+    sortOrder: number,
+    deltas: { ingredientId: number; deltaQty: number }[] = [],
+  ) {
+    const option = await prisma.productOption.create({
+      data: { productId, groupId, name, priceDelta, sortOrder },
+    });
+    for (const d of deltas) {
+      await prisma.productOptionIngredient.create({
+        data: { productOptionId: option.id, ingredientId: d.ingredientId, deltaQty: d.deltaQty },
+      });
+    }
+    return option;
+  }
+
+  // ── Americano per-product options ───────────────────────────────────────────
+  // Base recipe: 18g beans, 10g sugar (optional)
+  // Small = base (no delta), Medium = +8g beans, Large = +18g beans (doubles)
+  await createOption(americano.id, sizeGroup.id, 'Small', 0, 1, [
+    { ingredientId: beans.id, deltaQty: 0 },
+  ]);
+  await createOption(americano.id, sizeGroup.id, 'Medium', 15, 2, [
+    { ingredientId: beans.id, deltaQty: 8 },
+  ]);
+  await createOption(americano.id, sizeGroup.id, 'Large', 30, 3, [
+    { ingredientId: beans.id, deltaQty: 18 },
+  ]);
+
+  await createOption(americano.id, tempGroup.id, 'Hot', 0, 1);
+  await createOption(americano.id, tempGroup.id, 'Cold', 0, 2);
+
+  await createOption(americano.id, addonGroup.id, 'Extra Shot', 25, 1, [
+    { ingredientId: beans.id, deltaQty: 18 },
+  ]);
+  await createOption(americano.id, addonGroup.id, 'Whipped Cream', 10, 2);
+  await createOption(americano.id, addonGroup.id, 'Oat Milk', 20, 3);
+
+  // ── Latte per-product options ───────────────────────────────────────────────
+  // Base recipe: 18g beans, 150ml milk, 10g sugar (optional)
+  // Small = base, Medium = +8g beans +75ml milk, Large = +18g beans +150ml milk
+  await createOption(latte.id, sizeGroup.id, 'Small', 0, 1, [
+    { ingredientId: beans.id, deltaQty: 0 },
+    { ingredientId: milk.id, deltaQty: 0 },
+  ]);
+  await createOption(latte.id, sizeGroup.id, 'Medium', 15, 2, [
+    { ingredientId: beans.id, deltaQty: 8 },
+    { ingredientId: milk.id, deltaQty: 75 },
+  ]);
+  await createOption(latte.id, sizeGroup.id, 'Large', 30, 3, [
+    { ingredientId: beans.id, deltaQty: 18 },
+    { ingredientId: milk.id, deltaQty: 150 },
+  ]);
+
+  await createOption(latte.id, tempGroup.id, 'Hot', 0, 1);
+  await createOption(latte.id, tempGroup.id, 'Cold', 0, 2);
+
+  await createOption(latte.id, addonGroup.id, 'Extra Shot', 25, 1, [
+    { ingredientId: beans.id, deltaQty: 18 },
+  ]);
+  await createOption(latte.id, addonGroup.id, 'Whipped Cream', 10, 2);
+  await createOption(latte.id, addonGroup.id, 'Oat Milk', 20, 3);
+
+  console.log('  Per-product options seeded with ingredient deltas');
+
+  console.log('Seeding completed!');
+  console.log('Login: admin@cafeos.local / admin123');
+  console.log('Login: staff@cafeos.local / staff123');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seeding failed:', e);
+    console.error('Seeding failed:', e);
     process.exit(1);
   })
   .finally(async () => {

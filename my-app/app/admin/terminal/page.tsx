@@ -31,6 +31,10 @@ interface OrderReceipt {
   // Cash payment details
   cashReceived?: number;
   change?: number;
+  // Discount (e.g., Student / PWD)
+  discountAmount?: number;
+  discountReason?: string;
+  discountRate?: number;
 }
 
 interface BusinessSettings {
@@ -42,6 +46,7 @@ interface BusinessSettings {
   footerMessage: string;
   serialNo?: string;
   loyaltyEnabled?: boolean;
+  studentPwdDiscountRate?: number;
 }
 
 // VAT Configuration - Adjustable for future rate changes
@@ -160,6 +165,49 @@ export default function PosTerminalPage() {
   const [picker, setPicker] = useState<{ product: Product; groups: PickerGroup[] } | null>(null);
   const [pickerSingle, setPickerSingle] = useState<Record<number, number>>({});
   const [pickerMulti, setPickerMulti] = useState<number[]>([]);
+
+  // ── Draggable column widths (persisted per device) ─────────────────────────
+  const [colW, setColW] = useState<{ calc: number; summary: number }>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem('terminal-col-widths') || '');
+        if (saved?.calc && saved?.summary) return saved;
+      } catch {}
+    }
+    return { calc: 220, summary: 260 };
+  });
+  const dragCol = useRef<{ target: 'calc' | 'summary'; startX: number; startW: number } | null>(null);
+
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      if (!dragCol.current) return;
+      const dx = e.clientX - dragCol.current.startX;
+      const { target, startW } = dragCol.current;
+      setColW((prev) => {
+        const w = target === 'calc'
+          ? Math.min(460, Math.max(170, startW + dx))
+          : Math.min(520, Math.max(210, startW - dx));
+        return { ...prev, [target]: w };
+      });
+    }
+    function onUp() {
+      if (!dragCol.current) return;
+      dragCol.current = null;
+      try { localStorage.setItem('terminal-col-widths', JSON.stringify(colW)); } catch {}
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [colW]);
+
+  function startColDrag(target: 'calc' | 'summary', e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCol.current = { target, startX: e.clientX, startW: colW[target] };
+  }
   const [customerName, setCustomerName] = useState('Walk-In');
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
@@ -185,6 +233,8 @@ export default function PosTerminalPage() {
   const [cashInput, setCashInput] = useState('');
   const [orderFeedback, setOrderFeedback] = useState<'idle' | 'success'>('idle');
   const [cashReceived, setCashReceived] = useState<number>(0);
+  // Student / PWD discount rate (%) applied at the calculator; 0 = no discount
+  const [discountRate, setDiscountRate] = useState<number>(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -299,7 +349,9 @@ export default function PosTerminalPage() {
     setCashReceived(cash);
   };
 
-  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const cartSubtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const discountAmount = discountRate > 0 ? Math.round(cartSubtotal * discountRate / 100 * 100) / 100 : 0;
+  const total = Math.max(0, cartSubtotal - discountAmount);
   const cashValue = cashReceived > 0 ? cashReceived : Number.parseFloat(cashInput || '0') || 0;
   const changeValue = cashValue > 0 ? cashValue - total : 0;
   const hasCashInput = cashInput.trim() !== '' || cashReceived > 0;
@@ -585,9 +637,9 @@ export default function PosTerminalPage() {
       }
     }
 
-    // Calculate totals for validation - product prices already include VAT (from BIR pricing)
-    const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-    const totalAmount = subtotal; // No extra VAT needed - price already includes VAT
+    // Calculate totals for validation - product prices already include VAT (from BIR pricing).
+    // `total` is the discounted (VAT-inclusive) total shown in the calculator.
+    const totalAmount = total;
 
     // Validate cash payment
     if (paymentMethod === 'CASH') {
@@ -617,13 +669,15 @@ export default function PosTerminalPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerName: customerName.trim(),
-          loyaltyCustomerName: loyaltyTargetName,
+          loyaltyCustomerName: loyaltyTargetName || customerName.trim(),
           paymentMethod,
           tableId: selectedTable ?? undefined,
           orderType,
           deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress.trim() : undefined,
           paymentConfirmed: true,
           overrideStock,
+          discountRate: discountRate > 0 ? discountRate : undefined,
+          discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
           items: cart.map(i => ({
             productId: i.productId,
             quantity: i.quantity,
@@ -659,7 +713,7 @@ export default function PosTerminalPage() {
         orderNumber: data.orderNumber,
         receiptSerial: data.receiptSerial || `INV-${Date.now()}`,
         customerName: customerName.trim() || 'Guest',
-        totalAmount: subtotal + vatAmount, // Full price including VAT for receipt
+        totalAmount: total, // Discounted (VAT-inclusive) amount paid
         items: cart.map(i => ({ name: i.name, quantity: i.quantity, price: i.price, vatExempt: i.vatExempt })),
         tableName: table?.name,
         deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress.trim() : undefined,
@@ -670,8 +724,11 @@ export default function PosTerminalPage() {
         vatTaxableTotal,
         vatExemptTotal,
         vatAmount,
+        discountAmount: discountRate > 0 ? discountAmount : 0,
+        discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
+        discountRate: discountRate > 0 ? discountRate : undefined,
         cashReceived: paymentMethod === 'CASH' ? cashReceived : undefined,
-        change: paymentMethod === 'CASH' ? cashReceived - (subtotal + vatAmount) : undefined,
+        change: paymentMethod === 'CASH' ? cashReceived - total : undefined,
       });
       clearCart();
       setCustomerName('Walk-In');
@@ -727,7 +784,16 @@ export default function PosTerminalPage() {
         <>
 
       {/* ── COLUMN 1: Calculator (220px) ──────────────────────────────── */}
-      <div className="flex h-full w-[220px] flex-shrink-0 flex-col overflow-hidden border-r border-[var(--pos-border)] bg-[var(--pos-paper)]">
+      <div
+        className="flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-[var(--pos-border)] bg-[var(--pos-paper)] relative"
+        style={{ width: colW.calc, minWidth: 170, maxWidth: 460 }}
+      >
+        {/* Drag handle (left edge) */}
+        <div
+          onPointerDown={(e) => startColDrag('calc', e)}
+          className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--pos-accent)]/40"
+          title="Drag to resize"
+        />
         {/* Cash Calculator */}
         <div className="border-b border-[var(--pos-border)] bg-[var(--pos-surface)] p-2.5">
           <div className="mb-2 rounded-[var(--radius-lg)] bg-[var(--pos-ink)] p-2.5 text-white shadow-[var(--shadow-modal)]">
@@ -735,6 +801,12 @@ export default function PosTerminalPage() {
               <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Total</span>
               <span className="text-sm font-semibold tracking-[-0.04em] text-white" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{formatCurrency(total)}</span>
             </div>
+            {discountRate > 0 && (
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Discount ({discountRate}%)</span>
+                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatCurrency(discountAmount)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center mb-1">
               <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Cash</span>
               <span className={`text-sm font-semibold tracking-[-0.04em] ${cashValue >= total && cashValue > 0 ? 'text-[var(--pos-accent-soft)]' : 'text-white'}`} style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -748,6 +820,22 @@ export default function PosTerminalPage() {
               </span>
             </div>
           </div>
+
+          {typeof businessSettings?.studentPwdDiscountRate === 'number' && (
+            <button
+              onClick={() => setDiscountRate(discountRate > 0 ? 0 : (businessSettings?.studentPwdDiscountRate ?? 20))}
+              className={`mb-1.5 w-full rounded-[var(--radius-md)] py-1.5 text-[10px] font-semibold tracking-[0.04em] transition ${
+                discountRate > 0
+                  ? 'bg-[var(--pos-accent)] text-white'
+                  : 'border border-[var(--pos-border)] bg-[var(--pos-surface)] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]'
+              }`}
+              style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
+            >
+              {discountRate > 0
+                ? `Student/PWD −${discountRate}%  (−${formatCurrency(discountAmount)})`
+                : `Apply Student / PWD −${businessSettings?.studentPwdDiscountRate ?? 20}%`}
+            </button>
+          )}
 
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Enter cash tendered</div>
           <div className="grid grid-cols-4 gap-1 mb-1.5">{[100,200,500,1000].map(a=>(<button key={a} onClick={()=>setCashInput(String(a))} className="rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] py-1.5 text-[10px] font-semibold tracking-[-0.04em] text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>₱{a}</button>))}</div>
@@ -892,7 +980,17 @@ export default function PosTerminalPage() {
       </div>
 
       {/* ── COLUMN 2: Order Summary (260px) ──────────────────────────────── */}
-      <div className="flex h-full w-[260px] flex-shrink-0 flex-col overflow-hidden border-r border-[var(--pos-border)] bg-[var(--pos-surface)]">
+      <div
+        className="flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-[var(--pos-border)] bg-[var(--pos-surface)] relative"
+        style={{ width: colW.summary, minWidth: 210, maxWidth: 520 }}
+      >
+        {/* Drag handle (left edge) — drag right edge effect: narrows when pulled left */}
+        <div
+          onPointerDown={(e) => startColDrag('summary', e)}
+          className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--pos-accent)]/40"
+          title="Drag to resize"
+        />
+        {/* ── COLUMN 2: Order Summary ── */}
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto p-2">
           {cart.length === 0 ? (
@@ -1267,6 +1365,12 @@ export default function PosTerminalPage() {
                     <span className="text-gray-800">₱{receipt.vatAmount.toFixed(2)}</span>
                   </div>
                 )}
+                {(receipt.discountAmount ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">{receipt.discountReason || 'Discount'}{receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span>
+                    <span className="text-gray-800">−₱{(receipt.discountAmount ?? 0).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Grand Total */}
@@ -1407,8 +1511,9 @@ export default function PosTerminalPage() {
                           </div>
                           <div class="totals">
                             <div class="row"><span>Subtotal:</span><span>₱${receipt.subtotal.toFixed(2)}</span></div>
-                            <div class="row"><span>VAT (${vatRate}%):</span><span>₱${receipt.vatAmount.toFixed(2)}</span></div>
-                            <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
+                             <div class="row"><span>VAT (${vatRate}%):</span><span>₱${receipt.vatAmount.toFixed(2)}</span></div>
+                             ${(receipt.discountAmount ?? 0) > 0 ? `<div class="row"><span>${escapeHtml(receipt.discountReason || 'Discount')}${receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span><span>−₱${(receipt.discountAmount ?? 0).toFixed(2)}</span></div>` : ''}
+                             <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
                             ${receipt.paymentMethod === 'CASH' && receipt.cashReceived !== undefined ? `
                               <div class="row"><span>Cash:</span><span>₱${receipt.cashReceived.toFixed(2)}</span></div>
                               ${receipt.change !== undefined && receipt.change > 0 ? `<div class="row"><span>Change:</span><span>₱${receipt.change.toFixed(2)}</span></div>` : ''}
@@ -1487,8 +1592,9 @@ export default function PosTerminalPage() {
                           </div>
                           <div class="totals">
                             <div class="row"><span>Subtotal:</span><span>₱${receipt.subtotal.toFixed(2)}</span></div>
-                            <div class="row"><span>VAT (${vatRate}%):</span><span>₱${receipt.vatAmount.toFixed(2)}</span></div>
-                            <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
+                             <div class="row"><span>VAT (${vatRate}%):</span><span>₱${receipt.vatAmount.toFixed(2)}</span></div>
+                             ${(receipt.discountAmount ?? 0) > 0 ? `<div class="row"><span>${escapeHtml(receipt.discountReason || 'Discount')}${receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span><span>−₱${(receipt.discountAmount ?? 0).toFixed(2)}</span></div>` : ''}
+                             <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
                             ${receipt.paymentMethod === 'CASH' && receipt.cashReceived !== undefined ? `
                               <div class="row"><span>Cash:</span><span>₱${receipt.cashReceived.toFixed(2)}</span></div>
                               ${receipt.change !== undefined && receipt.change > 0 ? `<div class="row"><span>Change:</span><span>₱${receipt.change.toFixed(2)}</span></div>` : ''}

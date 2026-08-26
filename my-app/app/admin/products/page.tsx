@@ -71,7 +71,7 @@ export default function Page() {
   const [ingredients, setIngredients] = useState<any[]>([]);
 
   // ── Option groups (customization) state ────────────────────────────────────
-  const [optionGroups, setOptionGroups] = useState<{ id: number; name: string; selectionType: 'single' | 'multi'; scalesRecipe: boolean }[]>([]);
+  const [optionGroups, setOptionGroups] = useState<{ id: number; name: string; selectionType: 'single' | 'multi' }[]>([]);
   const [attachedGroupIds, setAttachedGroupIds] = useState<number[]>([]);
 
   useEffect(() => {
@@ -148,8 +148,16 @@ export default function Page() {
   // Product Ingredients Assignment
   const [productIngredients, setProductIngredients] = useState<any[]>([]);
   const [ingredientQuantities, setIngredientQuantities] = useState<Record<number, number>>({});
-  const [ingredientRequired, setIngredientRequired] = useState<Record<number, boolean>>({});
   const [availability, setAvailability] = useState<any>(null);
+
+  // Derived capital cost = Σ (ingredient.costPerUnit × quantity) over the recipe.
+  const computedCapital = ingredients.reduce(
+    (sum: number, ing: any) => {
+      const qty = ingredientQuantities[ing.id];
+      return sum + (qty > 0 ? (ing.costPerUnit || 0) * qty : 0);
+    },
+    0,
+  );
 
   // Fetch ingredients when editing a product
   const fetchProductIngredients = async (productId: number) => {
@@ -158,10 +166,8 @@ export default function Page() {
       const data = await res.json();
       setProductIngredients(data);
       const qtyMap: Record<number, number> = {};
-      const reqMap: Record<number, boolean> = {};
-      data.forEach((pi: any) => { qtyMap[pi.ingredientId] = pi.quantity; reqMap[pi.ingredientId] = pi.required ?? true; });
+      data.forEach((pi: any) => { qtyMap[pi.ingredientId] = pi.quantity; });
       setIngredientQuantities(qtyMap);
-      setIngredientRequired(reqMap);
       fetchAvailability(productId);
     } catch (e) {
       console.error('Failed to fetch product ingredients:', e);
@@ -185,7 +191,7 @@ export default function Page() {
       .map(([ingId, qty]) => ({
         ingredientId: parseInt(ingId),
         quantity: qty,
-        required: ingredientRequired[parseInt(ingId)] ?? true,
+        required: true,
       }));
     
     try {
@@ -317,8 +323,8 @@ export default function Page() {
   async function saveProduct() {
     if (!productForm.name.trim() || !productForm.categoryId) return;
     
-    // Calculate final price from BIR pricing
-    const capitalCost = parseFloat(productForm.capitalCost) || 0;
+    // Calculate final price from BIR pricing (capital is derived from the recipe)
+    const capitalCost = computedCapital;
     const marginType = productForm.marginType || 'PERCENTAGE';
     const marginValue = parseFloat(productForm.marginValue) || 30;
     const vatExempt = productForm.vatExempt || false;
@@ -808,16 +814,11 @@ export default function Page() {
                 <p className="text-amber-600 text-xs font-semibold uppercase tracking-wider mb-3">BIR Pricing</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-slate-600 text-sm block mb-1">Capital Cost (₱)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.50"
-                      value={productForm.capitalCost || ''}
-                      onChange={(e) => setProductForm((f: any) => ({ ...f, capitalCost: parseFloat(e.target.value) || 0 }))}
-                      placeholder="0.00"
-                      className="w-full bg-slate-100 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
+                    <label className="text-slate-600 text-sm block mb-1">Capital Cost (₱) — auto from recipe</label>
+                    <div className="w-full bg-slate-100 text-slate-800 rounded-xl px-4 py-2.5 text-sm flex items-center justify-between">
+                      <span>₱{computedCapital.toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wide">Calculated</span>
+                    </div>
                   </div>
                   <div>
                     <label className="text-slate-600 text-sm block mb-1">Margin Type</label>
@@ -863,40 +864,40 @@ export default function Page() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Capital Cost:</span>
-                    <span className="font-medium">₱{(productForm.capitalCost || 0).toFixed(2)}</span>
+                    <span className="font-medium">₱{(computedCapital || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Margin ({productForm.marginType === 'PERCENTAGE' ? `${productForm.marginValue || 0}%` : '₱'}):</span>
                     <span className="font-medium">₱{productForm.marginType === 'PERCENTAGE' 
-                      ? ((productForm.capitalCost || 0) * (productForm.marginValue || 0) / 100).toFixed(2) 
+                      ? ((computedCapital || 0) * (productForm.marginValue || 0) / 100).toFixed(2) 
                       : (productForm.marginValue || 0).toFixed(2)}</span>
                   </div>
                   <div className="border-t border-emerald-200 pt-2 flex justify-between">
                     <span className="text-slate-600">Selling Price (before VAT):</span>
                     <span className="font-semibold">₱{((productForm.marginType === 'PERCENTAGE' 
-                      ? (productForm.capitalCost || 0) * (1 + (productForm.marginValue || 0) / 100) 
-                      : (productForm.capitalCost || 0) + (productForm.marginValue || 0))).toFixed(2)}</span>
+                      ? (computedCapital || 0) * (1 + (productForm.marginValue || 0) / 100) 
+                      : (computedCapital || 0) + (productForm.marginValue || 0))).toFixed(2)}</span>
                   </div>
                   {productForm.vatExempt ? (
                     <div className="border-t border-emerald-300 pt-2 flex justify-between bg-emerald-100 -mx-4 px-4 -mb-4 pb-2 rounded-b-xl">
                       <span className="text-emerald-800 font-semibold">Final Price (VAT Exempt):</span>
                       <span className="text-emerald-800 font-bold text-lg">₱{((productForm.marginType === 'PERCENTAGE' 
-                        ? (productForm.capitalCost || 0) * (1 + (productForm.marginValue || 0) / 100) 
-                        : (productForm.capitalCost || 0) + (productForm.marginValue || 0))).toFixed(2)}</span>
+                        ? (computedCapital || 0) * (1 + (productForm.marginValue || 0) / 100) 
+                        : (computedCapital || 0) + (productForm.marginValue || 0))).toFixed(2)}</span>
                     </div>
                   ) : (
                     <>
                       <div className="flex justify-between">
                         <span className="text-slate-600">VAT (12%):</span>
                         <span className="font-medium">₱{((productForm.marginType === 'PERCENTAGE' 
-                          ? (productForm.capitalCost || 0) * (1 + (productForm.marginValue || 0) / 100) 
-                          : (productForm.capitalCost || 0) + (productForm.marginValue || 0)) * 0.12).toFixed(2)}</span>
+                          ? (computedCapital || 0) * (1 + (productForm.marginValue || 0) / 100) 
+                          : (computedCapital || 0) + (productForm.marginValue || 0)) * 0.12).toFixed(2)}</span>
                       </div>
                       <div className="border-t border-emerald-300 pt-2 flex justify-between bg-emerald-100 -mx-4 px-4 -mb-4 pb-2 rounded-b-xl">
                         <span className="text-emerald-800 font-semibold">Final Price (incl. VAT):</span>
                         <span className="text-emerald-800 font-bold text-lg">₱{((productForm.marginType === 'PERCENTAGE' 
-                          ? (productForm.capitalCost || 0) * (1 + (productForm.marginValue || 0) / 100) 
-                          : (productForm.capitalCost || 0) + (productForm.marginValue || 0)) * 1.12).toFixed(2)}</span>
+                          ? (computedCapital || 0) * (1 + (productForm.marginValue || 0) / 100) 
+                          : (computedCapital || 0) + (productForm.marginValue || 0)) * 1.12).toFixed(2)}</span>
                       </div>
                     </>
                   )}
@@ -998,7 +999,7 @@ export default function Page() {
                         />
                         {g.name}
                         <span className="text-[10px] text-slate-400">
-                          ({g.selectionType === 'single' ? 'pick one' : 'add many'}{g.scalesRecipe ? ' · scales recipe' : ''})
+                          ({g.selectionType === 'single' ? 'pick one' : 'add many'})
                         </span>
                       </label>
                     ))}
@@ -1026,9 +1027,6 @@ export default function Page() {
                                   ...prev,
                                   [ing.id]: e.target.checked ? (prev[ing.id] || 1) : 0
                                 }));
-                                if (e.target.checked && !(ing.id in ingredientRequired)) {
-                                  setIngredientRequired(prev => ({ ...prev, [ing.id]: true }));
-                                }
                               }}
                               className="w-4 h-4 rounded"
                             />
@@ -1047,27 +1045,6 @@ export default function Page() {
                               disabled={!used}
                             />
                             <span className="text-slate-500 text-xs w-10">{ing.baseUnit}</span>
-                            {/* Required / Optional toggle (only while in use) */}
-                            <label className={`text-xs font-medium px-2 py-1 rounded ${used ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'} flex items-center gap-1`}>
-                              <input
-                                type="radio"
-                                name={`req-${ing.id}`}
-                                checked={used && (ingredientRequired[ing.id] ?? true)}
-                                onChange={() => setIngredientRequired(prev => ({ ...prev, [ing.id]: true }))}
-                                className="h-3 w-3"
-                                disabled={!used}
-                              />
-                              Required
-                              <input
-                                type="radio"
-                                name={`req-${ing.id}`}
-                                checked={used && !ingredientRequired[ing.id]}
-                                onChange={() => setIngredientRequired(prev => ({ ...prev, [ing.id]: false }))}
-                                className="h-3 w-3"
-                                disabled={!used}
-                              />
-                              Optional
-                            </label>
                           </div>
                         );
                       })}

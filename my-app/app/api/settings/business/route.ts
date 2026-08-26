@@ -70,6 +70,7 @@ export async function PUT(req: NextRequest) {
       receiptSerialPrefix,
       footerMessage,
       loyaltyEnabled,
+      studentPwdDiscountRate,
       // Payment methods
       gcashAccountName,
       gcashQrImage,
@@ -97,6 +98,7 @@ export async function PUT(req: NextRequest) {
           receiptSerialPrefix: String(receiptSerialPrefix ?? settings.receiptSerialPrefix),
           footerMessage: String(footerMessage ?? settings.footerMessage),
           loyaltyEnabled: loyaltyEnabled ?? settings.loyaltyEnabled,
+          studentPwdDiscountRate: studentPwdDiscountRate != null ? Number(studentPwdDiscountRate) : settings.studentPwdDiscountRate,
           gcashAccountName: gcashAccountName ?? settings.gcashAccountName,
           gcashQrImage: gcashQrImage ?? settings.gcashQrImage,
           paymayaAccountName: paymayaAccountName ?? settings.paymayaAccountName,
@@ -120,6 +122,7 @@ export async function PUT(req: NextRequest) {
           lastReceiptNumber: 0,
           footerMessage: String(footerMessage) || 'Thank you for your visit!',
           loyaltyEnabled: loyaltyEnabled ?? true,
+          studentPwdDiscountRate: studentPwdDiscountRate != null ? Number(studentPwdDiscountRate) : 20,
           gcashAccountName: gcashAccountName ?? null,
           gcashQrImage: gcashQrImage ?? null,
           paymayaAccountName: paymayaAccountName ?? null,

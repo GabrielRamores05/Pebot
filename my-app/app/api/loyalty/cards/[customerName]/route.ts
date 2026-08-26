@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { normalizeMemberName } from '@/lib/loyalty-utils';
 import { logAction } from '@/lib/audit-log';
+import { requirePermission } from '@/lib/auth';
 
 // GET /api/loyalty/cards/:customerName
 export async function GET(req: NextRequest, { params }: { params: Promise<{ customerName: string }> | { customerName: string } }) {
@@ -13,11 +14,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cust
 
     if (categoryId) {
       const targetId = parseInt(categoryId);
-      const existingCards = await prisma.loyaltyCard.findMany({
-        where: { categoryId: targetId },
+
+      // Person-level uniqueness: a name maps to ONE member everywhere.
+      // Return their existing card regardless of category instead of
+      // minting a duplicate for a different module.
+      const allCards = await prisma.loyaltyCard.findMany({
         include: { vouchers: { where: { status: 'ACTIVE' } }, category: true },
       });
-      let card = existingCards.find(c => normalizeMemberName(c.customerName) === normalizedCustomerName) || null;
+      let card = allCards.find(c => normalizeMemberName(c.customerName) === normalizedCustomerName) || null;
 
       if (!card) {
         card = await prisma.loyaltyCard.create({
@@ -27,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cust
       }
 
       const settings = await prisma.loyaltySetting.findUnique({
-        where: { categoryId: targetId }
+        where: { categoryId: card.categoryId ?? undefined }
       });
 
       return NextResponse.json(formatCard(card, settings));
@@ -91,6 +95,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
   try {
     const resolvedParams = await Promise.resolve(params);
     const { customerName } = resolvedParams as { customerName: string };
+    const auth = await requirePermission(req, 'loyalty');
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const normalizedCustomerName = normalizeMemberName(customerName);
     const body = await req.json();
     const { quantity = 1, categoryId } = body;
@@ -100,13 +106,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
     // A global card has no category. categoryId is a nullable unique field,
     // so findUnique can only use it when it holds a value — the no-category
     // case must look the row up by its null state instead.
-    const settings = targetCategoryId !== null
+    let settings = targetCategoryId !== null
       ? await prisma.loyaltySetting.findUnique({ where: { categoryId: targetCategoryId } })
       : await prisma.loyaltySetting.findFirst({ where: { categoryId: null } });
 
+    // No program for the requested scope — fall back to the shop's first
+    // enabled loyalty module so manual point adds always have a program.
     if (!settings || !settings.enabled) {
+      settings = await prisma.loyaltySetting.findFirst({ where: { enabled: true } });
+    }
+    if (!settings) {
       return NextResponse.json({ error: 'Loyalty not enabled for this category' }, { status: 400 });
     }
+
+    // The program we actually resolved (may differ from the requested scope
+    // when only a category-scoped module exists). Cards/vouchers follow it.
+    const effectiveCategoryId = settings.categoryId;
 
     const isMilestoneMode = settings.isMilestoneMode;
     const milestones = JSON.parse(settings.milestones || '[]') as any[];
@@ -116,12 +131,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
     }
 
     let card;
-    if (targetCategoryId !== null) {
-      const cardsByCategory = await prisma.loyaltyCard.findMany({ where: { categoryId: targetCategoryId } });
+    if (effectiveCategoryId !== null) {
+      const cardsByCategory = await prisma.loyaltyCard.findMany({ where: { categoryId: effectiveCategoryId } });
       card = cardsByCategory.find(c => normalizeMemberName(c.customerName) === normalizedCustomerName) || null;
       if (!card) {
         card = await prisma.loyaltyCard.create({
-          data: { customerName: normalizedCustomerName, categoryId: targetCategoryId },
+          data: { customerName: normalizedCustomerName, categoryId: effectiveCategoryId },
         });
       }
     } else {
@@ -153,7 +168,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
             discountValue: settings.rewardValue,
             rewardName: rewardName,
             targetType: 'CATEGORY',
-            targetCategoryId: targetCategoryId ?? undefined,
+            targetCategoryId: effectiveCategoryId ?? undefined,
             status: 'ACTIVE',
           },
         });
@@ -178,7 +193,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
               discountValue: milestone.rewardValue,
               rewardName: rewardName,
               targetType: 'CATEGORY',
-              targetCategoryId: targetCategoryId ?? undefined,
+              targetCategoryId: effectiveCategoryId ?? undefined,
               status: 'ACTIVE',
             },
           });
@@ -238,6 +253,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cu
   try {
     const resolvedParams = await Promise.resolve(params);
     const { customerName } = resolvedParams as { customerName: string };
+    const auth = await requirePermission(req, 'loyalty');
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const normalizedCustomerName = normalizeMemberName(customerName);
     const { newName } = await req.json();
 
@@ -291,6 +308,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ c
   try {
     const resolvedParams = await Promise.resolve(params);
     const { customerName } = resolvedParams as { customerName: string };
+    const auth = await requirePermission(req, 'loyalty');
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const normalizedCustomerName = normalizeMemberName(customerName);
 
     const cards = await prisma.loyaltyCard.findMany({});

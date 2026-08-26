@@ -55,8 +55,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
       },
     });
 
-    // currentStock changed (manual edit) — recompute derived sellable quantities
-    if (currentStock !== undefined) {
+    // currentStock or costPerUnit changed — recompute derived sellable quantities
+    // and the derived capital cost (costPerUnit drives product capital).
+    if (currentStock !== undefined || costPerUnit !== undefined) {
       const affected = await productsUsingIngredient(prisma, parseInt(id));
       await recomputeProducts(prisma, affected);
       emitEvent('ingredients-update', []);

@@ -12,7 +12,7 @@ import {
 import {
   resolveSelections,
   selectionsPriceAdder,
-  selectionsRecipeMultiplier,
+  selectionsIngredientDeltas,
   selectionsLabel,
   type ResolvedSelection,
 } from '@/lib/product-options';
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { customerName, loyaltyCustomerName, tableId, sessionId, items, notes, loyaltyDiscount, loyaltyVoucherCodes, paymentMethod, paymentScreenshot, paymentConfirmed, overrideStock, orderType, deliveryAddress, loyaltyAssignments } = body as {
+    const { customerName, loyaltyCustomerName, tableId, sessionId, items, notes, loyaltyDiscount, loyaltyVoucherCodes, paymentMethod, paymentScreenshot, paymentConfirmed, overrideStock, orderType, deliveryAddress,       loyaltyAssignments, discountRate, discountReason } = body as {
       customerName: string;
       loyaltyCustomerName?: string | null;
       tableId?: number;
@@ -100,6 +100,8 @@ export async function POST(req: NextRequest) {
       orderType?: string;
       deliveryAddress?: string | null;
       loyaltyAssignments?: { productId: number; quantity: number; loyaltyCardIds: number[]; quantitiesPerCard: number[] }[];
+      discountRate?: number;
+      discountReason?: string;
     };
 
     if (!customerName || !items || items.length === 0) {
@@ -161,7 +163,7 @@ export async function POST(req: NextRequest) {
               groupName: r.groupName,
               name: r.name,
               priceDelta: r.priceDelta,
-              sizeMultiplier: r.sizeMultiplier,
+              ingredientDeltas: r.ingredientDeltas,
             }))
           ),
         }),
@@ -172,6 +174,17 @@ export async function POST(req: NextRequest) {
     const isLoyaltyOrder = !!(loyaltyDiscount && loyaltyDiscount > 0);
     if (isLoyaltyOrder) {
       totalAmount = Math.max(0, totalAmount - loyaltyDiscount);
+    }
+
+    // Apply a percentage discount (e.g., Student / PWD statutory discount)
+    // configured in BIR Business Settings. The rate comes from the client but
+    // the monetary amount is recomputed server-side from the order total.
+    const appliedDiscountRate = discountRate && discountRate > 0 ? discountRate : 0;
+    const appliedDiscountReason = appliedDiscountRate > 0 && discountReason ? discountReason : null;
+    let appliedDiscountAmount = 0;
+    if (appliedDiscountRate > 0) {
+      appliedDiscountAmount = Math.round(totalAmount * appliedDiscountRate / 100 * 100) / 100;
+      totalAmount = Math.max(0, totalAmount - appliedDiscountAmount);
     }
 
     // Create order & deduct inventory in a transaction
@@ -201,6 +214,9 @@ export async function POST(req: NextRequest) {
           totalAmount,
           barcodeValue,
           notes,
+          discountAmount: appliedDiscountAmount,
+          discountReason: appliedDiscountReason,
+          discountRate: appliedDiscountRate > 0 ? appliedDiscountRate : null,
           loyaltyPromo: isLoyaltyOrder,
           paymentMethod: paymentMethod || 'CASH',
           paymentScreenshot: paymentScreenshot || null,
@@ -242,17 +258,17 @@ export async function POST(req: NextRequest) {
       // ingredients are decremented unconditionally (the check above guarantees
       // sufficiency in normal mode). Optional ingredients are only consumed
       // when enough stock exists — they never block a sale and never go
-      // negative (spec §3).
+      // negative (spec section 3).
       for (const [itemIdx, item] of items.entries()) {
-        // Size multipliers scale this line's recipe consumption so inventory
-        // stays truthful (e.g. Large = ×2 the milk/beans of a Small).
-        const multiplier = selectionsRecipeMultiplier(resolvedByItem[itemIdx] ?? []);
+        // Per-ingredient deltas from selected options (e.g. Large adds +8g beans).
+        const optionDeltas = selectionsIngredientDeltas(resolvedByItem[itemIdx] ?? []);
         const productIngredients = await tx.productIngredient.findMany({
           where: { productId: item.productId },
           include: { ingredient: true },
         });
         for (const pi of productIngredients) {
-          const totalNeeded = item.quantity * pi.quantity * multiplier;
+          const delta = optionDeltas.get(pi.ingredientId) ?? 0;
+          const totalNeeded = item.quantity * (pi.quantity + delta);
           if (totalNeeded <= 0) continue;
 
           if (pi.required ?? true) {
@@ -309,13 +325,13 @@ export async function POST(req: NextRequest) {
       // registered in the loyalty system before the order is finalized
       const normalizedName = normalizeMemberName(customerName);
       const existingCard = await tx.loyaltyCard.findFirst({
-        where: { customerName: normalizedName, categoryId: null },
+        where: { customerName: normalizedName, categoryId: 1 },
       });
       if (!existingCard) {
         await tx.loyaltyCard.create({
           data: {
             customerName: normalizedName,
-            categoryId: null,
+            categoryId: 1,
           },
         });
       }
@@ -366,24 +382,18 @@ export async function POST(req: NextRequest) {
       emitEvent('low-stock-alert', lowStock);
     }
 
-    // Award loyalty points to specific cards if loyaltyAssignments provided
-    if (loyaltyAssignments && customerName) {
-      try {
+    // Loyalty award. If the order carries per-item loyalty assignments, credit
+    // those specific cards. Otherwise, for paid (terminal) orders, auto-award
+    // one point per eligible coffee to the named customer. The two paths are
+    // mutually exclusive so an order is never awarded twice.
+    try {
+      if (loyaltyAssignments && loyaltyAssignments.length > 0) {
         await awardLoyaltyToSpecificCards({
           loyaltyAssignments,
           customerName,
           orderId: order.id,
         });
-      } catch (err) {
-        console.error('[LOYALTY] Failed to update specific cards:', err);
-      }
-    }
-
-    // Terminal orders are paid at the counter at placement time, so they earn
-    // loyalty points immediately. QR orders are created unpaid (paymentConfirmed
-    // absent) and earn points later when the cashier confirms payment.
-    if (paymentConfirmed === true) {
-      try {
+      } else if (paymentConfirmed === true) {
         await awardLoyaltyForPaidOrder({
           id: order.id,
           loyaltyPromo: order.loyaltyPromo,
@@ -393,9 +403,9 @@ export async function POST(req: NextRequest) {
           totalAmount: Number(order.totalAmount),
           items: order.items,
         });
-      } catch (err) {
-        console.error('[LOYALTY] Failed to update cards at order placement:', err);
       }
+    } catch (err) {
+      console.error('[LOYALTY] Award failed:', err);
     }
 
     return NextResponse.json(

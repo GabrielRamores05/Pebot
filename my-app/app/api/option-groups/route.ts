@@ -2,35 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
 
-// GET /api/option-groups — all groups with their options (ordered)
+// GET /api/option-groups — all groups with product counts (ordered)
 export async function GET(req: NextRequest) {
   const user = await requirePermission(req, 'products');
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const groups = await prisma.optionGroup.findMany({
     include: {
-      options: { orderBy: { sortOrder: 'asc' } },
-      _count: { select: { products: true } },
+      _count: { select: { products: true, productOptions: true } },
     },
     orderBy: { sortOrder: 'asc' },
   });
   return NextResponse.json(groups);
 }
 
-// POST /api/option-groups — create a group (optionally with options)
+// POST /api/option-groups — create a group
 export async function POST(req: NextRequest) {
   const user = await requirePermission(req, 'products');
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const body = await req.json();
-    const { name, selectionType, scalesRecipe, sortOrder, available, options } = body as {
+    const { name, selectionType, sortOrder, available } = body as {
       name: string;
       selectionType?: 'single' | 'multi';
-      scalesRecipe?: boolean;
       sortOrder?: number;
       available?: boolean;
-      options?: { name: string; priceDelta?: number; sizeMultiplier?: number; sortOrder?: number }[];
     };
 
     if (!name?.trim()) {
@@ -41,21 +38,9 @@ export async function POST(req: NextRequest) {
       data: {
         name: name.trim(),
         selectionType: selectionType === 'multi' ? 'multi' : 'single',
-        scalesRecipe: !!scalesRecipe,
         sortOrder: sortOrder ?? 0,
         available: available ?? true,
-        ...(Array.isArray(options) && options.length > 0 && {
-          options: {
-            create: options.map((o, i) => ({
-              name: o.name,
-              priceDelta: o.priceDelta ?? 0,
-              sizeMultiplier: o.sizeMultiplier ?? 1,
-              sortOrder: o.sortOrder ?? i + 1,
-            })),
-          },
-        }),
       },
-      include: { options: { orderBy: { sortOrder: 'asc' } } },
     });
 
     return NextResponse.json(group, { status: 201 });

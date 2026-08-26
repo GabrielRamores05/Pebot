@@ -14,26 +14,21 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
   const { id } = await params;
   try {
     const body = await req.json();
-    const { name, selectionType, scalesRecipe, sortOrder, available } = body as {
+    const { name, selectionType, sortOrder, available } = body as {
       name?: string;
       selectionType?: 'single' | 'multi';
-      scalesRecipe?: boolean;
       sortOrder?: number;
       available?: boolean;
     };
 
-    // Guard: removing recipe-scaling or switching to multi on a Size-like
-    // group changes order math — allowed, but the UI should warn.
     const group = await prisma.optionGroup.update({
       where: { id: Number(id) },
       data: {
         ...(name !== undefined && { name: name.trim() }),
         ...(selectionType !== undefined && { selectionType }),
-        ...(scalesRecipe !== undefined && { scalesRecipe }),
         ...(sortOrder !== undefined && { sortOrder }),
         ...(available !== undefined && { available }),
       },
-      include: { options: { orderBy: { sortOrder: 'asc' } } },
     });
     return NextResponse.json(group);
   } catch (error: any) {
@@ -47,8 +42,8 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
   }
 }
 
-// DELETE /api/option-groups/:id — deletes the group, its options and all
-// product attachments (cascades). Orders keep their stored selections JSON.
+// DELETE /api/option-groups/:id — deletes the group, its product options and
+// all product attachments (cascades). Orders keep their stored selections JSON.
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(req, 'products');
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

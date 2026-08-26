@@ -54,6 +54,7 @@ function formatSettings(settings: any) {
     rewardDescription,
     isMilestoneMode: settings.isMilestoneMode,
     milestones: JSON.parse(settings.milestones || '[]'),
+    maxHeldRewards: settings.maxHeldRewards,
   };
 }
 
@@ -73,6 +74,7 @@ export async function PATCH(req: NextRequest) {
       rewardValue,
       isMilestoneMode,
       milestones,
+      maxHeldRewards,
     } = body;
 
     // Validation
@@ -95,6 +97,7 @@ export async function PATCH(req: NextRequest) {
             rewardValue,
             isMilestoneMode,
             milestones: milestones ? JSON.stringify(milestones) : undefined,
+            maxHeldRewards: maxHeldRewards != null ? parseInt(maxHeldRewards as any) : undefined,
           },
           include: { category: true }
         });
@@ -126,6 +129,7 @@ export async function PATCH(req: NextRequest) {
             rewardValue: rewardValue ?? 0,
             isMilestoneMode: isMilestoneMode ?? false,
             milestones: milestones ? JSON.stringify(milestones) : "[]",
+            maxHeldRewards: maxHeldRewards != null ? parseInt(maxHeldRewards as any) : 3,
           },
           include: { category: true }
         });
