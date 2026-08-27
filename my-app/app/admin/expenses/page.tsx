@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface Category {
   id: number;
@@ -29,6 +30,7 @@ export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -44,12 +46,11 @@ export default function ExpensesPage() {
   const fetchExpenses = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/expenses');
-      const data = await res.json();
-      setExpenses(Array.isArray(data) ? data : []);
+      setExpenses(await fetchJson<Expense[]>('/api/expenses'));
+      setError(null);
     } catch (e) {
       console.error('Failed to fetch expenses:', e);
-      setExpenses([]);
+      setError(userMessage(e, 'Could not load expenses. Try again.'));
     } finally {
       setLoading(false);
     }
@@ -57,23 +58,19 @@ export default function ExpensesPage() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await fetch('/api/expense-categories');
-      const data = await res.json();
-      setCategories(Array.isArray(data) ? data : []);
+      setCategories(await fetchJson<Category[]>('/api/expense-categories'));
     } catch (e) {
       console.error('Failed to fetch categories:', e);
-      setCategories([]);
+      setError(userMessage(e, 'Could not load expense categories. Try again.'));
     }
   }, []);
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const res = await fetch('/api/suppliers');
-      const data = await res.json();
-      setSuppliers(Array.isArray(data) ? data : []);
+      setSuppliers(await fetchJson<Supplier[]>('/api/suppliers'));
     } catch (e) {
       console.error('Failed to fetch suppliers:', e);
-      setSuppliers([]);
+      setError(userMessage(e, 'Could not load suppliers. Try again.'));
     }
   }, []);
 
@@ -90,6 +87,7 @@ export default function ExpensesPage() {
     if (!form.categoryId || !form.amount) return;
 
     setSaving(true);
+    setError(null);
     try {
       const payload = {
         categoryId: parseInt(form.categoryId),
@@ -100,13 +98,13 @@ export default function ExpensesPage() {
       };
 
       if (editing) {
-        await fetch(`/api/expenses?id=${editing.id}`, {
+        await fetchJson(`/api/expenses?id=${editing.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } else {
-        await fetch('/api/expenses', {
+        await fetchJson('/api/expenses', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -119,6 +117,7 @@ export default function ExpensesPage() {
       setForm({ categoryId: '', supplierId: '', amount: '', description: '', expenseDate: '' });
     } catch (e) {
       console.error('Failed to save expense:', e);
+      setError(userMessage(e, 'Could not save the expense. Try again.'));
     } finally {
       setSaving(false);
     }
@@ -139,10 +138,11 @@ export default function ExpensesPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this expense?')) return;
     try {
-      await fetch(`/api/expenses?id=${id}`, { method: 'DELETE' });
+      await fetchJson(`/api/expenses?id=${id}`, { method: 'DELETE' });
       setExpenses((prev) => prev.filter((e) => e.id !== id));
     } catch (e) {
       console.error('Failed to delete expense:', e);
+      setError(userMessage(e, 'Could not delete the expense. Try again.'));
     }
   };
 
@@ -176,6 +176,12 @@ export default function ExpensesPage() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-6">
+        {error && (
+          <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} className="ml-4 font-medium hover:underline">Dismiss</button>
+          </div>
+        )}
         {loading ? (
           <div className="text-center py-16 text-gray-400">Loading expenses...</div>
         ) : expenses.length === 0 ? (
@@ -265,57 +271,7 @@ export default function ExpensesPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               {editing ? 'Edit Expense' : 'Add New Expense'}
             </h3>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const formEl = e.currentTarget;
-                const formData = {
-                  categoryId: (formEl.elements.namedItem('categoryId') as HTMLSelectElement).value,
-                  supplierId: (formEl.elements.namedItem('supplierId') as HTMLSelectElement).value,
-                  amount: (formEl.elements.namedItem('amount') as HTMLInputElement).value,
-                  description: (formEl.elements.namedItem('description') as HTMLTextAreaElement).value,
-                  expenseDate: (formEl.elements.namedItem('expenseDate') as HTMLInputElement).value,
-                };
-                setForm({
-                  categoryId: formData.categoryId,
-                  supplierId: formData.supplierId,
-                  amount: formData.amount,
-                  description: formData.description,
-                  expenseDate: formData.expenseDate,
-                });
-                const payload = {
-                  categoryId: parseInt(formData.categoryId),
-                  supplierId: formData.supplierId ? parseInt(formData.supplierId) : null,
-                  amount: parseFloat(formData.amount),
-                  description: formData.description || null,
-                  expenseDate: formData.expenseDate || undefined,
-                };
-                setSaving(true);
-                try {
-                  if (editing) {
-                    await fetch(`/api/expenses?id=${editing.id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(payload),
-                    });
-                  } else {
-                    await fetch('/api/expenses', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(payload),
-                    });
-                  }
-                  await fetchExpenses();
-                  setShowModal(false);
-                  setEditing(null);
-                  setForm({ categoryId: '', supplierId: '', amount: '', description: '', expenseDate: '' });
-                } catch (e) {
-                  console.error('Failed to save expense:', e);
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
+            <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Category *</label>
