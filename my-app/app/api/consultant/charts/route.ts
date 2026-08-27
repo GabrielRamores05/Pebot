@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
 import { badRequest, serverError, unauthorized } from '@/lib/api-response';
+import { daysWindowFromParams } from '@/lib/dates';
 
 // GET /api/consultant/charts?type=...&days=30
 // Types: daily-sales, category-sales, product-revenue, inventory-status, loyalty-growth, order-status
@@ -15,10 +16,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'daily-sales';
-    const days = parseInt(searchParams.get('days') || '30');
-
-    const dateFrom = new Date();
-    dateFrom.setDate(dateFrom.getDate() - days);
+    const { days, dateFrom } = daysWindowFromParams(searchParams);
 
     switch (type) {
       case 'daily-sales': {

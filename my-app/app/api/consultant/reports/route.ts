@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
 import { badRequest, serverError, unauthorized } from '@/lib/api-response';
+import { daysWindowFromParams, todayIsoDate } from '@/lib/dates';
 
 // GET /api/consultant/reports?type=sales&format=csv&days=30
 // Types: sales, profitability, inventory, loyalty
@@ -17,12 +18,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'sales';
     const format = searchParams.get('format') || 'csv';
-    const days = parseInt(searchParams.get('days') || '30');
+    const { days, dateFrom } = daysWindowFromParams(searchParams);
 
-    const dateFrom = new Date();
-    dateFrom.setDate(dateFrom.getDate() - days);
-
-    const fileName = `${type}-report-${new Date().toISOString().slice(0, 10)}`;
+    const fileName = `${type}-report-${todayIsoDate()}`;
 
     let csvContent = '';
     let jsonContent: any = {};

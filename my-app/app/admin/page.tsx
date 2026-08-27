@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useSocket } from '@/hooks/useSocket';
 import { playNewOrderSound, playMessageSound } from '@/lib/sounds';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
+import { minutesSince, todayIsoDate } from '@/lib/dates';
 import {
   type VoiceSettings,
   fetchVoiceSettings,
@@ -76,8 +77,7 @@ const statusColor = (status: string) => {
 };
 
 function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
+  const mins = minutesSince(dateStr);
   if (mins < 1) return 'Just now';
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
@@ -261,9 +261,8 @@ export default function AdminPage() {
       const allOrders: Order[] = await response.json();
       
       // Filter by today and yesterday (client-side, timezone-aware)
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-      const yesterdayStr = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const todayStr = todayIsoDate();
+      const yesterdayStr = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
       const filteredOrders = allOrders.filter(order => {
         const orderDate = new Date(order.createdAt).toISOString().split('T')[0];

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
+import { rewardLabel } from '@/lib/loyalty-utils';
 
 // GET /api/loyalty/settings
 export async function GET(req: NextRequest) {
@@ -34,13 +35,8 @@ export async function GET(req: NextRequest) {
 }
 
 function formatSettings(settings: any) {
-  let rewardDescription = 'Free Item';
-  if (settings.rewardType === 'PERCENTAGE') {
-    rewardDescription = `${settings.rewardValue}% Off`;
-  } else if (settings.rewardType === 'FIXED_AMOUNT') {
-    rewardDescription = `₱${settings.rewardValue} Off`;
-  }
-  
+  const rewardDescription = rewardLabel(settings.rewardType, settings.rewardValue);
+
   return {
     id: settings.id,
     categoryId: settings.categoryId,
