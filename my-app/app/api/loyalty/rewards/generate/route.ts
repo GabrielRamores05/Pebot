@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { badRequest, serverError } from '@/lib/api-response';
+import { guardStaff } from '@/lib/api-guards';
 
 // POST /api/loyalty/rewards/generate - Manually generate/sync vouchers for customer
 // Ensures vouchers exist for all earned thresholds
 export async function POST(req: NextRequest) {
+  const { error } = await guardStaff(req);
+  if (error) return error;
+
   try {
     const body = await req.json();
     const { customerName } = body as { customerName: string };

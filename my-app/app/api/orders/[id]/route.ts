@@ -7,6 +7,7 @@ import { runRecoverableStep } from '@/lib/recoverable';
 import { awardLoyaltyForPaidOrder, refundLoyaltyForCancelledOrder } from '@/lib/loyalty-award';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
 import { badRequest, notFound, serverError } from '@/lib/api-response';
+import { guardStaff } from '@/lib/api-guards';
 
 // GET /api/orders/[id] – fetch single order by orderNumber or id
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -41,6 +42,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const orderId = Number(id);
     if (isNaN(orderId)) return badRequest('Invalid id');
+
+    // Customers on the order-tracking page may cancel their own pending order,
+    // and nothing else: taking money, adding items, moving tables and every
+    // other status move belong to staff.
+    const bodyKeys = Object.keys(body as Record<string, unknown>);
+    const isCustomerCancel =
+      bodyKeys.length === 1 && bodyKeys[0] === 'status' && status === 'CANCELLED';
+    if (!isCustomerCancel) {
+      const { error } = await guardStaff(req);
+      if (error) return error;
+    }
 
     const existing = await prisma.order.findUnique({
       where: { id: orderId },

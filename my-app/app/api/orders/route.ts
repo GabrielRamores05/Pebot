@@ -24,6 +24,7 @@ import {
   ticketDatePart,
 } from '@/lib/ticket';
 import { badRequest, serverError } from '@/lib/api-response';
+import { guardStaff } from '@/lib/api-guards';
 
 class InsufficientStockError extends Error {
   items: { productId: number; name: string; requested: number; available: number }[];
@@ -36,6 +37,9 @@ class InsufficientStockError extends Error {
 
 // GET /api/orders – list orders (for admin/kitchen)
 export async function GET(req: NextRequest) {
+  const { error } = await guardStaff(req);
+  if (error) return error;
+
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
