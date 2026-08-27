@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 // CafeOS — Staff & HR (Philippine-friendly)
@@ -150,10 +150,10 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
     try {
       setStaff(await fetchJson<StaffMember[]>('/api/staff'));
       setError('');
-  } catch (e) {
-    console.error('Failed to load staff:', e);
-    setError(userMessage(e, 'Could not load staff. Try again.'));
-  }
+    } catch (e) {
+      console.error('Failed to load staff:', e);
+      setError(userMessage(e, 'Could not load staff. Try again.'));
+    }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -381,7 +381,7 @@ function ScheduleTab() {
   const [error, setError] = useState('');
 
   const loadShifts = async () => {
-    try { setShifts(await fetchJson<any[]>('/api/shifts')); }
+    try { setShifts(await fetchJson<Record<string, unknown>[]>('/api/shifts')); }
     catch (e) { console.error('Failed to load shifts:', e); setError(userMessage(e, 'Could not load shifts. Try again.')); }
   };
   const loadStaff = async () => {
@@ -425,7 +425,7 @@ function ScheduleTab() {
     if (!shiftForm.name) { setError('Name required'); return; }
     const body = { name: shiftForm.name, startTime: shiftForm.startTime, endTime: shiftForm.endTime, breakMinutes: Number(shiftForm.breakMinutes) };
     try {
-      await fetchJson(editingShift ? '/api/shifts' : '/api/shifts', {
+      await fetchJson('/api/shifts', {
         method: editingShift ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingShift ? { id: editingShift.id, ...body } : body),
@@ -536,44 +536,69 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
   const [records, setRecords] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+  const clockError = useRef('');
   const [from, setFrom] = useState(iso(addDays(new Date(), -30)));
   const [to, setTo] = useState(iso(new Date()));
 
   const loadSchedules = async () => {
     const t = iso(new Date());
-    try { setSchedules(await fetchJson<any[]>(`/api/schedules?from=${t}&to=${t}`)); }
-    catch (e) { console.error('Failed to load today’s schedules:', e); setMsg(userMessage(e, 'Could not load schedules. Try again.')); }
+    try { setSchedules(await fetchJson<Record<string, unknown>[]>(`/api/schedules?from=${t}&to=${t}`)); }
+    catch (e) {
+      console.error('Failed to load today’s schedules:', e);
+      const message = userMessage(e, 'Could not load schedules. Try again.');
+      clockError.current = message;
+      setError(message);
+    }
   };
 
   useEffect(() => {
     (async () => {
       try { setStaff(await fetchJson<StaffMember[]>('/api/staff')); }
-      catch (e) { console.error('Failed to load staff:', e); setMsg(userMessage(e, 'Could not load staff. Try again.')); }
+      catch (e) {
+        console.error('Failed to load staff:', e);
+        const message = userMessage(e, 'Could not load staff. Try again.');
+        clockError.current = message;
+        setError(message);
+      }
       await loadRecords();
       await loadSchedules();
     })();
   }, []);
   const loadRecords = async () => {
-    try { setRecords(await fetchJson<any[]>(`/api/attendance?from=${from}&to=${to}`)); }
-    catch (e) { console.error('Failed to load attendance:', e); setMsg(userMessage(e, 'Could not load attendance. Try again.')); }
+    try { setRecords(await fetchJson<Record<string, unknown>[]>(`/api/attendance?from=${from}&to=${to}`)); }
+    catch (e) {
+      console.error('Failed to load attendance:', e);
+      const message = userMessage(e, 'Could not load attendance. Try again.');
+      clockError.current = message;
+      setError(message);
+    }
   };
 
-  async function clockIn(staffId: number) {
+  async function clockIn(staffId: number): Promise<boolean> {
     try {
       await fetchJson('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: staffId }) });
       await loadRecords(); onChanged();
+      return true;
     } catch (e) {
       console.error('Failed to clock in staff:', e);
-      setMsg(userMessage(e, 'Could not clock in staff. Try again.'));
+      const message = userMessage(e, 'Could not clock in staff. Try again.');
+      clockError.current = message;
+      setError(message);
+      return false;
     }
   }
-  async function clockOut(recId: number) {
+  async function clockOut(recId: number): Promise<boolean> {
     try {
       await fetchJson('/api/attendance', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attendanceId: recId }) });
       await loadRecords(); onChanged();
+      return true;
     } catch (e) {
       console.error('Failed to clock out staff:', e);
-      setMsg(userMessage(e, 'Could not clock out staff. Try again.'));
+      const message = userMessage(e, 'Could not clock out staff. Try again.');
+      clockError.current = message;
+      setError(message);
+      return false;
     }
   }
 
@@ -581,33 +606,55 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
 
   async function clockInScheduledNow() {
     setMsg('');
+    setError('');
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     let done = 0;
+    const failed: string[] = [];
     for (const s of schedules) {
       const sm = toMin(s.shift?.startTime);
       const em = toMin(s.shift?.endTime);
       if (sm == null || em == null) continue;
       const scheduled = sm <= em ? (nowMin >= sm && nowMin <= em) : (nowMin >= sm || nowMin <= em);
-      if (scheduled && !activeByUser.get(s.userId)) { await clockIn(s.userId); done++; }
+      if (scheduled && !activeByUser.get(s.userId)) {
+        clockError.current = '';
+        if (await clockIn(s.userId)) done++;
+        else failed.push(clockError.current || 'Could not clock in staff. Try again.');
+      }
     }
-    setMsg(done ? `Clocked in ${done} scheduled staff.` : 'No staff currently scheduled to clock in.');
-    loadSchedules();
+    const attempted = done + failed.length;
+    if (failed.length) {
+      setError(`Clocked in ${done} of ${attempted} — ${failed.length} could not be clocked in: ${[...new Set(failed)].join('; ')}`);
+    } else {
+      setMsg(done ? `Clocked in ${done} scheduled staff.` : 'No staff currently scheduled to clock in.');
+    }
+    await loadSchedules();
   }
 
   async function clockOutEnded() {
     setMsg('');
+    setError('');
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     let done = 0;
+    const failed: string[] = [];
     for (const rec of records) {
       if (rec.clockOut) continue;
       const ends = schedules.filter((s: any) => s.userId === rec.userId).map((s: any) => toMin(s.shift?.endTime)).filter((x): x is number => x != null);
       if (!ends.length) continue;
       const latestEnd = Math.max(...ends);
-      if (nowMin > latestEnd) { await clockOut(rec.id); done++; }
+      if (nowMin > latestEnd) {
+        clockError.current = '';
+        if (await clockOut(rec.id)) done++;
+        else failed.push(clockError.current || 'Could not clock out staff. Try again.');
+      }
     }
-    setMsg(done ? `Clocked out ${done} ended shift(s).` : 'No ended shifts to clock out.');
+    const attempted = done + failed.length;
+    if (failed.length) {
+      setError(`Clocked out ${done} of ${attempted} — ${failed.length} could not be clocked out: ${[...new Set(failed)].join('; ')}`);
+    } else {
+      setMsg(done ? `Clocked out ${done} ended shift(s).` : 'No ended shifts to clock out.');
+    }
   }
 
   const activeByUser = new Map<number, any>();
@@ -627,6 +674,7 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
         <button onClick={clockOutEnded} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-sm">Clock out ended shifts</button>
         {msg && <span className="text-sm text-slate-600">{msg}</span>}
       </div>
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {staff.map(s => {

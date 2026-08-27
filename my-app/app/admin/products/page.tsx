@@ -264,6 +264,7 @@ export default function Page() {
       }
     } catch (e) {
       console.error('Failed to load products/categories:', e);
+      notif(`❌ ${userMessage(e, 'Could not load products and categories. Try again.')}`);
     } finally {
       setLoading(false);
     }

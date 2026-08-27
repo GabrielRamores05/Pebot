@@ -85,6 +85,7 @@ export default function OptionGroupManager() {
       setIngredients(await fetchJson<{ id: number; name: string; baseUnit: string }[]>('/api/ingredients'));
     } catch (e) {
       console.error('Failed to load ingredients:', e);
+      setError(userMessage(e, 'Could not load ingredients. Try again.'));
     }
   }, []);
 
@@ -96,6 +97,7 @@ export default function OptionGroupManager() {
       setProducts(data.map((p) => ({ id: p.id, name: p.name, price: p.price })));
     } catch (e) {
       console.error('Failed to load products:', e);
+      setError(userMessage(e, 'Could not load products. Try again.'));
     }
   }, []);
 

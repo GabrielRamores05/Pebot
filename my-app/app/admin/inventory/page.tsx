@@ -56,6 +56,7 @@ interface SupplierItem {
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterCat, setFilterCat] = useState('All');
   const [editId, setEditId] = useState<number | null>(null);
   const [editQty, setEditQty] = useState('');
@@ -104,6 +105,7 @@ export default function InventoryPage() {
       }
     } catch (e) {
       console.error('Failed to fetch capacity:', e);
+      setError(userMessage(e, 'Could not load production capacity. Try again.'));
     } finally {
       setCapacityLoading(false);
     }
@@ -138,6 +140,7 @@ const [shopName, setShopName] = useState('CafeOS');
       setInventory(await fetchJson<InventoryItem[]>('/api/inventory'));
     } catch (e) {
       console.error('Failed to fetch inventory:', e);
+      setError(userMessage(e, 'Could not load inventory. Try again.'));
     } finally {
       setLoading(false);
     }
@@ -158,6 +161,7 @@ const [shopName, setShopName] = useState('CafeOS');
       }
     } catch (e) {
       console.error('Failed to fetch ingredients:', e);
+      setError(userMessage(e, 'Could not load ingredients. Try again.'));
     } finally {
       setLoadingIngredients(false);
     }
@@ -168,6 +172,7 @@ const [shopName, setShopName] = useState('CafeOS');
       setSuppliers(await fetchJson<SupplierItem[]>('/api/suppliers'));
     } catch (e) {
       console.error('Failed to fetch suppliers:', e);
+      setError(userMessage(e, 'Could not load suppliers. Try again.'));
     }
   }, []);
 
@@ -690,6 +695,12 @@ const [shopName, setShopName] = useState('CafeOS');
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-6">
+        {error && (
+          <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} className="ml-4 font-medium hover:underline">Dismiss</button>
+          </div>
+        )}
         {/* Tab Navigation */}
         <div className="flex gap-2 mb-4">
           <button

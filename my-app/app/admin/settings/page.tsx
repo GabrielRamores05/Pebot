@@ -351,7 +351,7 @@ export default function SettingsPage() {
          {/* Header */}
          <div className="mb-4">
            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-         <p className="text-gray-500 text-sm mt-1">Manage branding and user accounts</p>
+           <p className="text-gray-500 text-sm mt-1">Manage branding and user accounts</p>
          </div>
          {usersError && <div className="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{usersError}</div>}
 
