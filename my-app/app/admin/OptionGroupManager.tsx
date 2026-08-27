@@ -55,7 +55,6 @@ export default function OptionGroupManager() {
 
   // Per-product option editing: key = `${productId}:${optionId}`
   const [drafts, setDrafts] = useState<Record<string, Partial<ProductOption>>>({});
-  const [deltaDrafts, setDeltaDrafts] = useState<Record<string, Record<number, string>>>({});
 
   // Per-product new option forms: key = productId
   const [newOption, setNewOption] = useState<Record<number, { name: string; priceDelta: string }>>({});
@@ -196,14 +195,19 @@ export default function OptionGroupManager() {
 
   async function saveOption(optId: number) {
     const patch = drafts[`opt-${optId}`] ?? {};
-    const res = await fetch(`/api/product-options/${optId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert(err.error || 'Failed to save option');
+    try {
+      const res = await fetch(`/api/product-options/${optId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Failed to save option');
+      }
+    } catch (e) {
+      console.error('Failed to save option:', e);
+      alert('Failed to save option — check the console for details');
     }
   }
 
@@ -212,16 +216,7 @@ export default function OptionGroupManager() {
     await fetch(`/api/product-options/${optId}`, { method: 'DELETE' });
   }
 
-  // ── Ingredient deltas ────────────────────────────────────────────────────
-  async function saveDelta(optId: number, ingredientId: number) {
-    const val = parseFloat(deltaDrafts[`opt-${optId}`]?.[ingredientId] ?? '0') || 0;
-    await fetch(`/api/product-options/${optId}/ingredients`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ingredientId, deltaQty: val }),
-    });
-  }
-
+  // ── Option drafts ────────────────────────────────────────────────────────
   function draftVal(optId: number, field: string, fallback: any) {
     const k = `opt-${optId}`;
     return (drafts[k] as any)?.[field] ?? String(fallback ?? '');
@@ -229,17 +224,6 @@ export default function OptionGroupManager() {
 
   function setDraftVal(optId: number, field: string, value: any) {
     setDrafts((prev) => ({ ...prev, [`opt-${optId}`]: { ...prev[`opt-${optId}`], [field]: value } }));
-  }
-
-  function deltaVal(optId: number, ingredientId: number, fallback: number) {
-    return deltaDrafts[`opt-${optId}`]?.[ingredientId] ?? String(fallback);
-  }
-
-  function setDeltaVal(optId: number, ingredientId: number, value: string) {
-    setDeltaDrafts((prev) => ({
-      ...prev,
-      [`opt-${optId}`]: { ...prev[`opt-${optId}`], [ingredientId]: value },
-    }));
   }
 
   return (
@@ -263,6 +247,7 @@ export default function OptionGroupManager() {
             <option value="multi">Add many</option>
           </select>
           <button
+            type="button"
             onClick={createGroup}
             disabled={creating || !newName.trim()}
             className="rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
@@ -290,6 +275,7 @@ export default function OptionGroupManager() {
               <div key={g.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 {/* Group header */}
                 <button
+                  type="button"
                   onClick={() => setExpanded(isOpen ? null : g.id)}
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
                 >
@@ -325,6 +311,8 @@ export default function OptionGroupManager() {
     const [productOptions, setProductOptions] = useState<Record<number, ProductOption[]>>({});
     const [detailLoading, setDetailLoading] = useState(true);
     const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
+    const [deltaDrafts, setDeltaDrafts] = useState<Record<string, Record<number, string>>>({});
+    const [deltaSaveStates, setDeltaSaveStates] = useState<Record<string, 'saving' | 'saved' | 'error'>>({});
 
     useEffect(() => {
       let cancelled = false;
@@ -396,6 +384,54 @@ export default function OptionGroupManager() {
       } catch {}
     }
 
+    async function saveDelta(productId: number, optId: number, ingredientId: number) {
+      const saveKey = `${optId}:${ingredientId}`;
+      const val = parseFloat(deltaDrafts[`opt-${optId}`]?.[ingredientId] ?? '0') || 0;
+      setDeltaSaveStates((prev) => ({ ...prev, [saveKey]: 'saving' }));
+      try {
+        const res = await fetch(`/api/product-options/${optId}/ingredients`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ingredientId, deltaQty: val }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to save ingredient quantity');
+        }
+        setDeltaSaveStates((prev) => ({ ...prev, [saveKey]: 'saved' }));
+        await refreshProductOptions(productId);
+        setDeltaDrafts((prev) => {
+          const key = `opt-${optId}`;
+          if (!prev[key]) return prev;
+          const next = { ...prev };
+          delete next[key][ingredientId];
+          if (Object.keys(next[key]).length === 0) delete next[key];
+          return next;
+        });
+        window.setTimeout(() => {
+          setDeltaSaveStates((prev) => {
+            const next = { ...prev };
+            delete next[saveKey];
+            return next;
+          });
+        }, 1800);
+      } catch (error) {
+        setDeltaSaveStates((prev) => ({ ...prev, [saveKey]: 'error' }));
+        alert(error instanceof Error ? error.message : 'Failed to save ingredient quantity');
+      }
+    }
+
+    function deltaVal(optId: number, ingredientId: number, fallback: number) {
+      return deltaDrafts[`opt-${optId}`]?.[ingredientId] ?? String(fallback);
+    }
+
+    function setDeltaVal(optId: number, ingredientId: number, value: string) {
+      setDeltaDrafts((prev) => ({
+        ...prev,
+        [`opt-${optId}`]: { ...prev[`opt-${optId}`], [ingredientId]: value },
+      }));
+    }
+
     if (detailLoading) {
       return <div className="p-4 text-sm text-gray-400">Loading...</div>;
     }
@@ -408,6 +444,7 @@ export default function OptionGroupManager() {
           <div className="flex flex-wrap gap-2">
             {detailProducts.map((p) => (
               <button
+                type="button"
                 key={p.id}
                 onClick={() => toggleProduct(p.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -451,12 +488,22 @@ export default function OptionGroupManager() {
                         className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-center"
                       />
                       <button
-                        onClick={() => saveOption(opt.id)}
+                        type="button"
+                        onClick={async () => {
+                          await saveOption(opt.id);
+                          await refreshProductOptions(p.id);
+                          setDrafts((prev) => {
+                            const next = { ...prev };
+                            delete next[`opt-${opt.id}`];
+                            return next;
+                          });
+                        }}
                         className="px-2 py-1.5 rounded-lg bg-black text-white text-xs font-medium hover:bg-gray-800"
                       >
                         Save
                       </button>
                       <button
+                        type="button"
                         onClick={() => deleteOption(opt.id)}
                         className="px-2 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100"
                       >
@@ -477,11 +524,30 @@ export default function OptionGroupManager() {
                               step="0.1"
                               value={deltaVal(opt.id, ing.id, currentDelta)}
                               onChange={(e) => setDeltaVal(opt.id, ing.id, e.target.value)}
-                              onBlur={() => saveDelta(opt.id, ing.id)}
+                              onBlur={() => saveDelta(p.id, opt.id, ing.id)}
                               className="w-16 rounded border border-slate-200 px-1.5 py-1 text-xs text-center"
                               placeholder={`+${ing.baseUnit}`}
                             />
                             <span className="text-slate-400">{ing.baseUnit}</span>
+                            <span
+                              className={`min-w-12 text-[10px] transition-opacity ${
+                                deltaSaveStates[`${opt.id}:${ing.id}`] === 'saved'
+                                  ? 'animate-pulse text-emerald-600 opacity-100'
+                                  : deltaSaveStates[`${opt.id}:${ing.id}`] === 'saving'
+                                    ? 'text-slate-400 opacity-100'
+                                    : deltaSaveStates[`${opt.id}:${ing.id}`] === 'error'
+                                      ? 'text-red-600 opacity-100'
+                                      : 'opacity-0'
+                              }`}
+                            >
+                              {deltaSaveStates[`${opt.id}:${ing.id}`] === 'saved'
+                                ? 'Saved'
+                                : deltaSaveStates[`${opt.id}:${ing.id}`] === 'saving'
+                                  ? 'Saving...'
+                                  : deltaSaveStates[`${opt.id}:${ing.id}`] === 'error'
+                                    ? 'Failed'
+                                    : 'Saved'}
+                            </span>
                           </div>
                         );
                       })}
@@ -516,6 +582,7 @@ export default function OptionGroupManager() {
                     className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-center"
                   />
                   <button
+                    type="button"
                     onClick={async () => {
                       await addOption(p.id, group.id);
                       refreshProductOptions(p.id);
@@ -547,7 +614,8 @@ export default function OptionGroupManager() {
             />
             Available
           </label>
-          <button
+           <button
+            type="button"
             onClick={() => {
               if (confirm(`Delete "${group.name}" and all its options?`)) {
                 fetch(`/api/option-groups/${group.id}`, { method: 'DELETE' }).then(() => {

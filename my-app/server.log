@@ -159,3 +159,674 @@
  GET /api/loyalty/cards/Gab 200 in 1598ms
  GET /api/products/1/option-groups 200 in 49ms
  GET /api/products/1/option-groups 200 in 40ms
+ GET /api/loyalty/cards/Gab 200 in 32ms
+[ORDER CREATED] ORD-082726-A010 for Gab (est. 130 min)
+[Socket emit] Broadcasting "new-order" to all clients
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "inventory-update" to all clients
+[Socket emit] Broadcasting "ingredients-update" to all clients
+ ✓ Compiled in 333ms (721 modules)
+[Socket emit] Broadcasting "low-stock-alert" to all clients
+ POST /api/orders 201 in 408ms
+ GET /api/categories 200 in 323ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ ✓ Compiled in 382ms (721 modules)
+ GET /api/settings/voice 200 in 288ms
+ GET /api/categories 200 in 300ms
+ GET /api/categories 200 in 315ms
+ GET /api/loyalty/cards/Gab 200 in 286ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/loyalty/settings 200 in 324ms
+ GET /api/product-option-groups 200 in 209ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ ○ Compiling /order/[orderNumber] ...
+ ✓ Compiled /order/[orderNumber] in 1939ms (1546 modules)
+ GET /api/categories 200 in 1757ms
+ GET /api/product-option-groups 200 in 1657ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/settings/branding 200 in 144ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/menu/best-sellers 200 in 183ms
+ GET /api/reviews 200 in 191ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/categories 200 in 193ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 17ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/categories 200 in 17ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 10ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 561ms (1573 modules)
+ ✓ Compiled /api/auth/me in 191ms (797 modules)
+ GET /api/orders 200 in 585ms
+ GET /api/auth/me 200 in 590ms
+ GET /api/settings/business 200 in 598ms
+ GET /api/auth/me 200 in 19ms
+ ✓ Compiled /api/orders/[id]/messages in 191ms (799 modules)
+ GET /api/orders/ORD-082726-A010/messages 200 in 552ms
+ GET /api/orders/ORD-082726-A010/messages 200 in 27ms
+ ✓ Compiled /api/orders/[id] in 341ms (801 modules)
+ GET /api/orders/ORD-082726-A002/messages 200 in 517ms
+[Socket emit] Broadcasting "order-status-update" to all clients
+[Socket emit] Broadcasting "order-status-update" to room: order-ORD-082726-A010
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "analytics-update" to all clients
+[Socket emit] Broadcasting "order-completed-notification" to room: customer-Gab
+ PATCH /api/orders/42 200 in 965ms
+ ✓ Compiled in 366ms (792 modules)
+ ✓ Compiled in 270ms (792 modules)
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[Socket emit] Broadcasting "order-status-update" to all clients
+[Socket emit] Broadcasting "order-status-update" to room: order-ORD-082726-A009
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "analytics-update" to all clients
+[Socket emit] Broadcasting "order-completed-notification" to room: customer-Walk-In
+ PATCH /api/orders/40 200 in 53ms
+ ✓ Compiled in 282ms (792 modules)
+ ✓ Compiled in 246ms (792 modules)
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[Socket emit] Broadcasting "order-status-update" to all clients
+[Socket emit] Broadcasting "order-status-update" to room: order-ORD-082726-A008
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "analytics-update" to all clients
+[Socket emit] Broadcasting "order-completed-notification" to room: customer-Walk-In
+ PATCH /api/orders/39 200 in 55ms
+ ✓ Compiled in 248ms (792 modules)
+ ✓ Compiled in 247ms (792 modules)
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[Socket emit] Broadcasting "order-status-update" to all clients
+[Socket emit] Broadcasting "order-status-update" to room: order-ORD-082726-A007
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "analytics-update" to all clients
+[Socket emit] Broadcasting "order-completed-notification" to room: customer-Walk-In
+ PATCH /api/orders/38 200 in 84ms
+ ✓ Compiled in 256ms (792 modules)
+ ✓ Compiled in 238ms (792 modules)
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[Socket emit] Broadcasting "order-status-update" to all clients
+[Socket emit] Broadcasting "order-status-update" to room: order-ORD-082726-A006
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "analytics-update" to all clients
+[Socket emit] Broadcasting "order-completed-notification" to room: customer-Walk-In
+ PATCH /api/orders/37 200 in 45ms
+ ✓ Compiled in 238ms (792 modules)
+ ✓ Compiled in 260ms (792 modules)
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[Socket emit] Broadcasting "order-status-update" to all clients
+[Socket emit] Broadcasting "order-status-update" to room: order-ORD-082726-A005
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "analytics-update" to all clients
+[Socket emit] Broadcasting "order-completed-notification" to room: customer-Walk-In
+ PATCH /api/orders/36 200 in 54ms
+ ✓ Compiled in 247ms (792 modules)
+ ✓ Compiled in 230ms (792 modules)
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[Socket emit] Broadcasting "order-status-update" to all clients
+[Socket emit] Broadcasting "order-status-update" to room: order-ORD-082726-A004
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "analytics-update" to all clients
+[Socket emit] Broadcasting "order-completed-notification" to room: customer-Walk-In
+ PATCH /api/orders/33 200 in 40ms
+ ✓ Compiled in 245ms (792 modules)
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/orders/ORD-082726-A010/messages 200 in 28ms
+ GET /api/orders?date=2026-08-26 200 in 36ms
+ GET /api/auth/me 200 in 46ms
+ GET /api/categories 200 in 52ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 53ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/orders 200 in 39ms
+ GET /api/auth/me 200 in 39ms
+ GET /api/orders?date=2026-08-26 200 in 43ms
+ ○ Compiling /admin/products ...
+ ✓ Compiled /admin/products in 636ms (1574 modules)
+ ✓ Compiled /api/products in 199ms (795 modules)
+ ✓ Compiled /api/stations in 0ms (797 modules)
+ ✓ Compiled in 0ms (799 modules)
+ ✓ Compiled in 0ms (799 modules)
+ GET /api/settings/branding 200 in 775ms
+ GET /api/categories 200 in 776ms
+ GET /api/option-groups 200 in 1090ms
+ ✓ Compiled in 0ms (799 modules)
+ GET /api/products 200 in 1344ms
+ ✓ Compiled in 1ms (799 modules)
+ GET /api/stations 200 in 1284ms
+ GET /api/reviews?productId=2 200 in 470ms
+ GET /api/reviews?productId=1 200 in 471ms
+ ✓ Compiled /api/products/[id]/option-groups in 184ms (801 modules)
+ ✓ Compiled (805 modules)
+ GET /api/ingredients 200 in 589ms
+ GET /api/products/1/option-groups 200 in 560ms
+ GET /api/ingredients/product/1 200 in 755ms
+ ✓ Compiled /api/ingredients/production-capacity in 216ms (807 modules)
+ GET /api/ingredients/production-capacity?productId=1 200 in 354ms
+ GET /api/categories 200 in 39ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 50ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/categories 200 in 35ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 42ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/ingredients 200 in 53ms
+ GET /api/ingredients/product/2 200 in 80ms
+ GET /api/products/2/option-groups 200 in 101ms
+ GET /api/ingredients/production-capacity?productId=2 200 in 19ms
+[Socket emit] Broadcasting "ingredients-update" to all clients
+[Socket emit] Broadcasting "inventory-update" to all clients
+ PUT /api/ingredients/product/2 200 in 114ms
+ GET /api/categories 200 in 295ms
+ ✓ Compiled in 355ms (795 modules)
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/ingredients 200 in 317ms
+ GET /api/ingredients/production-capacity?productId=2 200 in 171ms
+ GET /api/products 200 in 216ms
+ GET /api/categories 200 in 229ms
+ GET /api/categories 200 in 232ms
+ GET /api/settings/branding 200 in 249ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/ingredients/production-capacity?productId=2 200 in 300ms
+ ✓ Compiled in 361ms (795 modules)
+ GET /api/product-option-groups 200 in 78ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 95ms
+ GET /api/categories 200 in 98ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/ingredients/production-capacity?productId=2 200 in 67ms
+ GET /api/product-option-groups 200 in 42ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/categories 200 in 55ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/reviews?productId=1 200 in 56ms
+ GET /api/reviews?productId=2 200 in 57ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 7ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/categories 200 in 35ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 21ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[Socket emit] Broadcasting "ingredients-update" to all clients
+[Socket emit] Broadcasting "inventory-update" to all clients
+ PUT /api/ingredients/product/2 200 in 58ms
+ GET /api/categories 200 in 255ms
+ GET /api/categories 200 in 265ms
+ GET /api/ingredients 200 in 288ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/settings/branding 200 in 287ms
+ GET /api/products 200 in 296ms
+ GET /api/ingredients/production-capacity?productId=2 200 in 305ms
+ ✓ Compiled in 345ms (795 modules)
+ GET /api/categories 200 in 229ms
+ GET /api/categories 200 in 197ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 219ms
+ GET /api/product-option-groups 200 in 220ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/ingredients/production-capacity?productId=2 200 in 228ms
+ GET /api/categories 200 in 112ms
+ GET /api/reviews?productId=2 200 in 112ms
+ GET /api/reviews?productId=1 200 in 113ms
+ ✓ Compiled in 331ms (795 modules)
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 110ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/ingredients/production-capacity?productId=2 200 in 82ms
+ GET /api/product-option-groups 200 in 36ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[Socket emit] Broadcasting "product-update" to all clients
+ PATCH /api/products 200 in 105ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/categories 200 in 226ms
+ GET /api/categories 200 in 228ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/settings/branding 200 in 239ms
+ GET /api/products 200 in 242ms
+ GET /api/products 200 in 243ms
+ GET /api/product-option-groups 200 in 248ms
+ GET /api/product-option-groups 200 in 250ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ ✓ Compiled in 319ms (795 modules)
+ GET /api/categories 200 in 110ms
+ GET /api/settings/branding 200 in 100ms
+ GET /api/reviews?productId=2 200 in 96ms
+ GET /api/product-option-groups 200 in 97ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/reviews?productId=1 200 in 110ms
+ GET /api/categories 200 in 27ms
+ GET /api/reviews?productId=2 200 in 26ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/reviews?productId=1 200 in 28ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 18ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/ingredients 200 in 35ms
+ GET /api/ingredients/product/1 200 in 46ms
+ GET /api/products/1/option-groups 200 in 52ms
+ GET /api/ingredients/production-capacity?productId=1 200 in 18ms
+[Socket emit] Broadcasting "product-update" to all clients
+ PATCH /api/products 200 in 38ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/products 200 in 283ms
+ GET /api/categories 200 in 324ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ ✓ Compiled in 380ms (795 modules)
+ GET /api/categories 200 in 126ms
+ GET /api/settings/branding 200 in 134ms
+ GET /api/products 200 in 79ms
+ GET /api/product-option-groups 200 in 84ms
+ GET /api/product-option-groups 200 in 83ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/categories 200 in 55ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/settings/branding 200 in 48ms
+ GET /api/reviews?productId=2 200 in 57ms
+ GET /api/reviews?productId=1 200 in 62ms
+ GET /api/product-option-groups 200 in 65ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/categories 200 in 51ms
+ GET /api/product-option-groups 200 in 40ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/reviews?productId=1 200 in 35ms
+ GET /api/reviews?productId=2 200 in 49ms
+ GET /api/ingredients 200 in 46ms
+ GET /api/ingredients/product/1 200 in 63ms
+ GET /api/products/1/option-groups 200 in 68ms
+ GET /api/ingredients/production-capacity?productId=1 200 in 21ms
+[Socket emit] Broadcasting "ingredients-update" to all clients
+[Socket emit] Broadcasting "inventory-update" to all clients
+ PUT /api/ingredients/product/1 200 in 112ms
+ GET /api/ingredients 200 in 200ms
+ ✓ Compiled in 280ms (795 modules)
+ GET /api/ingredients/production-capacity?productId=1 200 in 152ms
+ ✓ Compiled in 297ms (795 modules)
+ GET /api/ingredients/production-capacity?productId=1 200 in 192ms
+ GET /api/products 200 in 206ms
+ GET /api/categories 200 in 210ms
+ GET /api/categories 200 in 210ms
+ GET /api/settings/branding 200 in 211ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/ingredients/production-capacity?productId=1 200 in 54ms
+ GET /api/categories 200 in 47ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/categories 200 in 54ms
+ GET /api/product-option-groups 200 in 53ms
+ GET /api/product-option-groups 200 in 55ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/categories 200 in 40ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/reviews?productId=1 200 in 46ms
+ GET /api/product-option-groups 200 in 48ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[Socket emit] Broadcasting "product-update" to all clients
+ PATCH /api/products 200 in 53ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/reviews?productId=2 200 in 71ms
+ GET /api/product-option-groups 200 in 198ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/categories 200 in 198ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/products 200 in 211ms
+ GET /api/products 200 in 212ms
+ GET /api/categories 200 in 254ms
+ GET /api/settings/branding 200 in 254ms
+ GET /api/product-option-groups 200 in 255ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ ✓ Compiled in 320ms (795 modules)
+ GET /api/product-option-groups 200 in 153ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/categories 200 in 99ms
+ GET /api/product-option-groups 200 in 99ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/settings/branding 200 in 108ms
+ GET /api/reviews?productId=2 200 in 109ms
+ GET /api/reviews?productId=1 200 in 112ms
+ GET /api/categories 200 in 49ms
+ GET /api/reviews?productId=2 200 in 38ms
+ GET /api/reviews?productId=1 200 in 39ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 14ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/option-groups 200 in 44ms
+ GET /api/ingredients 200 in 47ms
+ GET /api/products 200 in 28ms
+ GET /api/products/1/option-groups 200 in 33ms
+ GET /api/products/2/option-groups 200 in 34ms
+ GET /api/categories 200 in 29ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 19ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/products 200 in 25ms
+ GET /api/products/2/option-groups 200 in 27ms
+ GET /api/products/1/option-groups 200 in 28ms
+ GET /api/categories 200 in 19ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 24ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/products 200 in 20ms
+ GET /api/products/1/option-groups 200 in 21ms
+ GET /api/products/2/option-groups 200 in 22ms
+ GET /api/products 200 in 17ms
+ GET /api/products/1/option-groups 200 in 37ms
+ GET /api/products/2/option-groups 200 in 44ms
+ GET /api/products 200 in 26ms
+ GET /api/products/1/option-groups 200 in 34ms
+ GET /api/products/2/option-groups 200 in 40ms
+ GET /api/products 200 in 26ms
+ GET /api/products/1/option-groups 200 in 48ms
+ GET /api/products/2/option-groups 200 in 57ms
+ ✓ Compiled /api/product-options/[id] in 304ms (696 modules)
+ PUT /api/product-options/55 200 in 685ms
+ PUT /api/product-options/55 200 in 45ms
+ GET /api/categories 200 in 39ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/product-option-groups 200 in 46ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/products 200 in 37ms
+ GET /api/products/1/option-groups 200 in 28ms
+ GET /api/products/2/option-groups 200 in 15ms
+ GET /api/products 200 in 25ms
+ GET /api/products/1/option-groups 200 in 42ms
+ GET /api/products/2/option-groups 200 in 50ms
+ GET /api/products 200 in 18ms
+ GET /api/products/2/option-groups 200 in 38ms
+ GET /api/products/1/option-groups 200 in 40ms
+ GET /api/products 200 in 23ms
+ GET /api/products/1/option-groups 200 in 35ms
+ GET /api/products/2/option-groups 200 in 37ms
+ PUT /api/product-options/55 200 in 35ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+ GET /api/products/1/option-groups 200 in 31ms
+[WS] O0-A1biBPWfIoBBGAAAF joined room: tables
+[WS] Client disconnected: O0-A1biBPWfIoBBGAAAF
+ GET /menu 200 in 203ms
+[WS] Client connected: JIjzbZ-I6JpRO0P7AAAH
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 819ms (698 modules)
+ ✓ Compiled (725 modules)
+ GET /api/reviews 200 in 1489ms
+ GET /api/categories 200 in 1489ms
+ GET /api/settings/branding 200 in 1491ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/menu/best-sellers 200 in 1530ms
+ GET /favicon.ico 200 in 1539ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/product-option-groups 200 in 70ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/products/1/option-groups 200 in 43ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/categories 200 in 26ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 24ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/ingredients 200 in 56ms
+ GET /api/ingredients/product/1 200 in 81ms
+ GET /api/products/1/option-groups 200 in 82ms
+ GET /api/ingredients/production-capacity?productId=1 200 in 37ms
+ GET /api/categories 200 in 24ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/product-option-groups 200 in 15ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/ingredients 200 in 42ms
+ GET /api/option-groups 200 in 88ms
+ GET /api/products 200 in 60ms
+ GET /api/products/1/option-groups 200 in 32ms
+ GET /api/products/2/option-groups 200 in 34ms
+ GET /api/products 200 in 25ms
+ GET /api/products/1/option-groups 200 in 32ms
+ GET /api/products/2/option-groups 200 in 16ms
+ GET /api/products 200 in 23ms
+ GET /api/products/1/option-groups 200 in 29ms
+ GET /api/products/2/option-groups 200 in 37ms
+ GET /api/products 200 in 23ms
+ GET /api/products/1/option-groups 200 in 31ms
+ GET /api/products/2/option-groups 200 in 35ms
+ GET /api/categories 200 in 36ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/product-option-groups 200 in 26ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/products 200 in 21ms
+ GET /api/products/1/option-groups 200 in 37ms
+ GET /api/products/2/option-groups 200 in 44ms
+ PUT /api/product-options/55 200 in 39ms
+ PUT /api/product-options/55 200 in 30ms
+ PUT /api/product-options/55 200 in 24ms
+ PUT /api/product-options/55 200 in 28ms
+ PUT /api/product-options/55 200 in 27ms
+ PUT /api/product-options/55 200 in 24ms
+ PUT /api/product-options/55 200 in 24ms
+ ✓ Compiled /admin/products in 442ms (703 modules)
+[WS] Client disconnected: B_VVcOTrgDDxdf1ZAAAD
+ GET /admin/products 200 in 585ms
+ ✓ Compiled /api/auth/me in 138ms (705 modules)
+[WS] Client connected: LpRwt9bbBW_Ob4lOAAAJ
+ ✓ Compiled (709 modules)
+ GET /api/option-groups 200 in 1105ms
+ GET /api/products 200 in 1214ms
+ GET /api/stations 200 in 1247ms
+ GET /api/auth/me 200 in 1214ms
+ GET /api/categories 200 in 1215ms
+ GET /api/settings/branding 200 in 1215ms
+ GET /api/settings/branding 200 in 55ms
+ ✓ Compiled /api/reviews in 161ms (711 modules)
+ GET /api/categories 200 in 387ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/reviews?productId=2 200 in 434ms
+ GET /api/reviews?productId=1 200 in 437ms
+ GET /api/product-option-groups 200 in 97ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/option-groups 200 in 91ms
+ GET /api/ingredients 200 in 134ms
+ GET /api/products 200 in 58ms
+ GET /api/products/1/option-groups 200 in 54ms
+ GET /api/products/2/option-groups 200 in 64ms
+ GET /api/products 200 in 38ms
+ GET /api/products/1/option-groups 200 in 32ms
+ GET /api/products/2/option-groups 200 in 41ms
+ GET /api/products 200 in 45ms
+ GET /api/products/1/option-groups 200 in 46ms
+ GET /api/products/2/option-groups 200 in 65ms
+ GET /api/products 200 in 24ms
+ GET /api/products/2/option-groups 200 in 39ms
+ GET /api/products/1/option-groups 200 in 43ms
+ PUT /api/product-options/55 200 in 43ms
+ PUT /api/product-options/55 200 in 30ms
+ PUT /api/product-options/55 200 in 28ms
+ PUT /api/product-options/55 200 in 24ms
+ PUT /api/product-options/55 200 in 26ms
+ PUT /api/product-options/55 200 in 25ms
+ PUT /api/product-options/55 200 in 22ms
+ PUT /api/product-options/55 200 in 32ms
+ PUT /api/product-options/55 200 in 27ms
+ PUT /api/product-options/55 200 in 31ms
+ PUT /api/product-options/56 200 in 30ms
+ PUT /api/product-options/56 200 in 24ms
+ PUT /api/product-options/55 200 in 27ms
+ PUT /api/product-options/55 200 in 25ms
+ PUT /api/product-options/55 200 in 30ms
+ PUT /api/product-options/55 200 in 20ms
+ PUT /api/product-options/55 200 in 30ms
+ PUT /api/product-options/55 200 in 23ms
+ PUT /api/product-options/55 200 in 29ms
+ PUT /api/product-options/55 200 in 33ms
+ PUT /api/product-options/55 200 in 16ms
+ PUT /api/product-options/55 200 in 31ms
+ PUT /api/product-options/55 200 in 24ms
+ PUT /api/product-options/55 200 in 21ms
+ PUT /api/product-options/55 200 in 19ms
+ PUT /api/product-options/55 200 in 30ms
+ DELETE /api/products/2/option-groups?groupId=12 200 in 71ms
+ GET /api/option-groups 200 in 242ms
+ ✓ Compiled in 484ms (795 modules)
+ GET /api/products 200 in 240ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/products/1/option-groups 200 in 28ms
+ GET /api/products/2/option-groups 200 in 16ms
+ GET /api/products 200 in 14ms
+ GET /api/products/1/option-groups 200 in 15ms
+ GET /api/products/2/option-groups 200 in 18ms
+ PUT /api/product-options/55 200 in 27ms
+ PUT /api/product-options/55 200 in 25ms
+ PUT /api/product-options/55 200 in 35ms
+[WS] Client disconnected: LpRwt9bbBW_Ob4lOAAAJ
+ GET /admin/products 200 in 150ms
+ GET /api/option-groups 200 in 54ms
+ GET /api/settings/branding 200 in 114ms
+ GET /api/stations 200 in 116ms
+ GET /api/products 200 in 117ms
+ GET /api/categories 200 in 117ms
+ GET /api/auth/me 200 in 116ms
+ GET /api/settings/branding 200 in 40ms
+ GET /api/reviews?productId=1 200 in 41ms
+ GET /api/reviews?productId=2 200 in 47ms
+[WS] Client connected: ZGt3Ncha4SdPmyVAAAAL
+ GET /api/categories 200 in 30ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/option-groups 200 in 30ms
+ GET /api/ingredients 200 in 37ms
+ GET /api/product-option-groups 200 in 30ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/products 200 in 24ms
+ GET /api/products/1/option-groups 200 in 29ms
+ GET /api/products/2/option-groups 200 in 30ms
+ GET /api/products 200 in 27ms
+ GET /api/products/1/option-groups 200 in 29ms
+ GET /api/products/2/option-groups 200 in 37ms
+ GET /api/products 200 in 26ms
+ GET /api/products/1/option-groups 200 in 34ms
+ GET /api/products/2/option-groups 200 in 35ms
+ ○ Compiling /admin/loyalty ...
+ ✓ Compiled /admin/loyalty in 824ms (1493 modules)
+ ✓ Compiled /api/loyalty/settings in 200ms (712 modules)
+ ✓ Compiled in 0ms (714 modules)
+ ✓ Compiled in 1ms (714 modules)
+ GET /api/categories 200 in 612ms
+ ✓ Compiled in 1ms (714 modules)
+ GET /api/loyalty/cards 200 in 1054ms
+ GET /api/loyalty/settings 200 in 1502ms
+ ✓ Compiled /api/loyalty/vouchers/[code] in 178ms (716 modules)
+ GET /api/loyalty/vouchers/GAB 404 in 488ms
+ GET /api/categories 200 in 33ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/product-option-groups 200 in 52ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/categories 200 in 19ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 26ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ ○ Compiling /admin/terminal ...
+ ✓ Compiled /admin/terminal in 507ms (987 modules)
+ GET /api/categories 200 in 51ms
+ ✓ Compiled /api/settings/business in 383ms (989 modules)
+ ✓ Compiled (992 modules)
+ GET /api/tables 200 in 772ms
+ GET /api/settings/business 200 in 549ms
+ GET /api/products/1/option-groups 200 in 49ms
+ GET /api/loyalty/cards 200 in 45ms
+ GET /api/loyalty/cards 200 in 33ms
+ ✓ Compiled /api/orders in 277ms (1000 modules)
+[ORDER CREATED] ORD-082726-A011 for Walk-In (est. 5 min)
+[Socket emit] Broadcasting "new-order" to all clients
+[Socket emit] Broadcasting "queue-update" to all clients
+[Socket emit] Broadcasting "inventory-update" to all clients
+[Socket emit] Broadcasting "ingredients-update" to all clients
+ ✓ Compiled in 389ms (797 modules)
+ POST /api/orders 201 in 868ms
+ GET /api/categories 200 in 240ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/categories 200 in 359ms
+ ○ Compiling /api/settings/voice ...
+ ✓ Compiled /api/settings/voice in 1263ms (1799 modules)
+ GET /api/categories 200 in 1052ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/categories 200 in 1000ms
+ GET /api/settings/voice 200 in 1463ms
+ GET /api/product-option-groups 200 in 905ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/categories 200 in 62ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/product-option-groups 200 in 76ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ ✓ Compiled /favicon.ico in 496ms (1029 modules)
+ GET /favicon.ico 200 in 1108ms
+ GET /api/categories 200 in 1079ms
+ GET /api/product-option-groups 200 in 1066ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/categories 200 in 22ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/product-option-groups 200 in 19ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/product-option-groups 200 in 8ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/categories 200 in 8ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+ GET /api/product-option-groups 200 in 8ms
+[WS] JIjzbZ-I6JpRO0P7AAAH joined room: tables
+[WS] Client disconnected: ZGt3Ncha4SdPmyVAAAAL
+ GET /api/categories 200 in 12ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 12ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] Client disconnected: JIjzbZ-I6JpRO0P7AAAH
+ GET /api/categories 200 in 13ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 11ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/categories 200 in 19ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/product-option-groups 200 in 16ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ GET /api/products/2/option-groups 200 in 45ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+ ✓ Compiled /api/files/[filename] in 372ms (966 modules)
+ GET /api/files/1787675565601-emdy7pj5sra.jpg 200 in 670ms
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] TXB3aifBLaaaUvYwAAAB joined room: tables
+[WS] Client disconnected: TXB3aifBLaaaUvYwAAAB
