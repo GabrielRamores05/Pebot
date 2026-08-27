@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import { formatPeso } from '@/lib/format';
 import { calculateLoyaltyDiscountForItems } from '@/lib/pos-utils';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface InventoryData { quantity: number; lowStockThreshold: number; }
 interface Product { id: number; name: string; description?: string; price: number; imageUrl?: string; available: boolean; inventory?: InventoryData; vatExempt?: boolean; marginType?: string; marginValue?: number; capitalCost?: number; }
@@ -754,19 +755,24 @@ export default function PosTerminalPage() {
 
        // Redeem loyalty vouchers automatically for this order
        if (loyaltyVoucherCodes.length > 0 && data.id) {
+         const failedVoucherCodes: string[] = [];
          await Promise.all(
            loyaltyVoucherCodes.map(async (code) => {
              try {
-               await fetch(`/api/loyalty/vouchers/${encodeURIComponent(code)}`, {
+               await fetchJson(`/api/loyalty/vouchers/${encodeURIComponent(code)}`, {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
                  body: JSON.stringify({ orderId: data.id }),
                });
              } catch (e) {
-               console.error('[LOYALTY] Failed to redeem voucher:', code, e);
+               failedVoucherCodes.push(code);
+               console.error('[LOYALTY] Failed to redeem voucher:', code, userMessage(e, 'Request failed'));
              }
            })
          );
+         if (failedVoucherCodes.length > 0) {
+           setError(`Order placed, but these vouchers could not be redeemed: ${failedVoucherCodes.join(', ')}. Please retry them.`);
+         }
        }
       
       // Calculate tax breakdown from BIR pricing for RECEIPT DISPLAY ONLY

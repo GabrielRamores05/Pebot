@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { useState, useEffect, useCallback, Fragment, useRef, useMemo } from 'react';
 import { useSocket } from '@/hooks/useSocket';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface InventoryItem {
   id: number;
@@ -95,12 +96,14 @@ export default function InventoryPage() {
   const fetchCapacity = useCallback(async () => {
     setCapacityLoading(true);
     try {
-      const res = await fetch('/api/ingredients/production-capacity');
-      const data = await res.json();
-      setCapacity(Array.isArray(data) ? data : (data.entries ? data.entries : []));
+      const data = await fetchJson<unknown>('/api/ingredients/production-capacity');
+      if (Array.isArray(data)) {
+        setCapacity(data);
+      } else if (data && typeof data === 'object' && 'entries' in data && Array.isArray(data.entries)) {
+        setCapacity(data.entries);
+      }
     } catch (e) {
       console.error('Failed to fetch capacity:', e);
-      setCapacity([]);
     } finally {
       setCapacityLoading(false);
     }
@@ -131,10 +134,13 @@ const [shopName, setShopName] = useState('CafeOS');
   // Purchase history UI removed — superseded by the Stock History page
 
   const fetchInventory = useCallback(async () => {
-    const res = await fetch('/api/inventory');
-    const data = await res.json();
-    setInventory(Array.isArray(data) ? data : []);
-    setLoading(false);
+    try {
+      setInventory(await fetchJson<InventoryItem[]>('/api/inventory'));
+    } catch (e) {
+      console.error('Failed to fetch inventory:', e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchInventory(); }, [fetchInventory]);
@@ -142,20 +148,16 @@ const [shopName, setShopName] = useState('CafeOS');
   const fetchIngredients = useCallback(async () => {
     setLoadingIngredients(true);
     try {
-      const res = await fetch('/api/ingredients/dashboard');
-      const data = await res.json();
+      const data = await fetchJson<{ ingredients?: IngredientItem[]; summary?: unknown }>('/api/ingredients/dashboard');
       if (data.ingredients) {
         setIngredients(data.ingredients);
         setIngredientStats(data.summary);
       } else {
         // Fallback: fetch from basic endpoint if dashboard not yet available
-        const res2 = await fetch('/api/ingredients');
-        const fallback = await res2.json();
-        setIngredients(Array.isArray(fallback) ? fallback : []);
+        setIngredients(await fetchJson<IngredientItem[]>('/api/ingredients'));
       }
     } catch (e) {
       console.error('Failed to fetch ingredients:', e);
-      setIngredients([]);
     } finally {
       setLoadingIngredients(false);
     }
@@ -163,12 +165,9 @@ const [shopName, setShopName] = useState('CafeOS');
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const res = await fetch('/api/suppliers');
-      const data = await res.json();
-      setSuppliers(Array.isArray(data) ? data : []);
+      setSuppliers(await fetchJson<SupplierItem[]>('/api/suppliers'));
     } catch (e) {
       console.error('Failed to fetch suppliers:', e);
-      setSuppliers([]);
     }
   }, []);
 
@@ -181,18 +180,17 @@ const [shopName, setShopName] = useState('CafeOS');
         ? `/api/suppliers?id=${editingSupplier.id}`
         : '/api/suppliers';
       const method = editingSupplier ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      await fetchJson(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
-      if (res.ok) {
-        await fetchSuppliers();
-        setShowSupplierModal(false);
-        setEditingSupplier(null);
-      }
+      await fetchSuppliers();
+      setShowSupplierModal(false);
+      setEditingSupplier(null);
     } catch (e) {
       console.error('Failed to save supplier:', e);
+      alert(userMessage(e, 'Failed to save supplier'));
     }
   }
 
@@ -245,17 +243,23 @@ const [shopName, setShopName] = useState('CafeOS');
 
   async function saveEdit(productId: number) {
     setSaving(true);
-    await fetch('/api/inventory', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        productId,
-        lowStockThreshold: parseInt(editThreshold),
-      }),
-    });
-    setSaving(false);
-    setEditId(null);
-    fetchInventory();
+    try {
+      await fetchJson('/api/inventory', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId,
+          lowStockThreshold: parseInt(editThreshold),
+        }),
+      });
+      setEditId(null);
+      await fetchInventory();
+    } catch (e) {
+      console.error('Failed to save inventory settings:', e);
+      alert(userMessage(e, 'Failed to save inventory settings'));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function applyAdjustment(productId: number) {
@@ -263,20 +267,19 @@ const [shopName, setShopName] = useState('CafeOS');
     if (isNaN(amt) || amt === 0) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/inventory', {
+      await fetchJson('/api/inventory', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId, adjustment: amt }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || 'Failed to adjust stock');
-      }
-    } finally {
-      setSaving(false);
       setAdjustId(null);
       setAdjustAmt('');
-      fetchInventory();
+      await fetchInventory();
+    } catch (e) {
+      console.error('Failed to adjust stock:', e);
+      alert(userMessage(e, 'Failed to adjust stock'));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -284,7 +287,7 @@ const [shopName, setShopName] = useState('CafeOS');
     if (isNaN(parseInt(ingEditStock)) || isNaN(parseInt(ingEditThreshold))) return;
     setIngSaving(true);
     try {
-      await fetch(`/api/ingredients/${id}`, {
+      await fetchJson(`/api/ingredients/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -295,9 +298,10 @@ const [shopName, setShopName] = useState('CafeOS');
         }),
       });
       setIngEditId(null);
-      fetchIngredients();
+      await fetchIngredients();
     } catch (e) {
       console.error('Failed to update ingredient:', e);
+      alert(userMessage(e, 'Failed to update ingredient'));
     } finally {
       setIngSaving(false);
     }
@@ -335,23 +339,23 @@ const [shopName, setShopName] = useState('CafeOS');
     setFormSaving(true);
     try {
       if (editingIngredientFull) {
-        await fetch(`/api/ingredients/${editingIngredientFull.id}`, {
+        await fetchJson(`/api/ingredients/${editingIngredientFull.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(ingredientForm),
         });
       } else {
-        await fetch('/api/ingredients', {
+        await fetchJson('/api/ingredients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(ingredientForm),
         });
       }
       setShowIngredientModal(false);
-      fetchIngredients();
+      await fetchIngredients();
     } catch (e) {
       console.error('Failed to save ingredient:', e);
-      alert('Failed to save ingredient');
+      alert(userMessage(e, 'Failed to save ingredient'));
     } finally {
       setFormSaving(false);
     }
@@ -383,11 +387,11 @@ const [shopName, setShopName] = useState('CafeOS');
   async function deleteIngredient(id: number) {
     if (!confirm('Delete this ingredient? This will also remove it from all products that use it.')) return;
     try {
-      await fetch(`/api/ingredients/${id}`, { method: 'DELETE' });
-      fetchIngredients();
+      await fetchJson(`/api/ingredients/${id}`, { method: 'DELETE' });
+      await fetchIngredients();
     } catch (e) {
       console.error('Failed to delete ingredient:', e);
-      alert('Failed to delete ingredient');
+      alert(userMessage(e, 'Failed to delete ingredient'));
     }
   }
 
@@ -2071,5 +2075,3 @@ const [shopName, setShopName] = useState('CafeOS');
      </div>
    );
 }
-
-

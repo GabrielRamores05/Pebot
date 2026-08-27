@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface Review {
   id: number;
@@ -24,16 +25,17 @@ export default function AdminReviewsPage() {
   const [filterProduct, setFilterProduct] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'reviews' | 'suggestions'>('reviews');
+  const [error, setError] = useState<string | null>(null);
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/reviews');
-      const data = await res.json();
+      const data = await fetchJson<{ reviews: Review[] }>('/api/reviews');
       setReviews(Array.isArray(data.reviews) ? data.reviews : []);
+      setError(null);
     } catch (e) {
       console.error('Failed to fetch reviews:', e);
-      setReviews([]);
+      setError(userMessage(e, 'Could not load reviews. Try again.'));
     } finally {
       setLoading(false);
     }
@@ -46,10 +48,11 @@ export default function AdminReviewsPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this review? This cannot be undone.')) return;
     try {
-      await fetch(`/api/reviews?id=${id}`, { method: 'DELETE' });
+      await fetchJson(`/api/reviews?id=${id}`, { method: 'DELETE' });
       setReviews((prev) => prev.filter((r) => r.id !== id));
     } catch (e) {
       console.error('Failed to delete review:', e);
+      setError(userMessage(e, 'Could not delete the review. Try again.'));
     }
   };
 
@@ -97,6 +100,12 @@ export default function AdminReviewsPage() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-4">
+        {error && (
+          <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} className="ml-4 font-medium hover:underline">Dismiss</button>
+          </div>
+        )}
         {/* View toggle */}
         <div className="flex gap-2">
           <button

@@ -5,6 +5,7 @@ import { useSocket } from '@/hooks/useSocket';
 import OptionGroupManager from '../OptionGroupManager';
 import html2canvas from 'html2canvas';
 import { VAT_RATE, basePrice, marginAmount, sellingPrice, vatAmount } from '@/lib/bir-pricing';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface Category {
   id: number;
@@ -94,27 +95,21 @@ export default function Page() {
 
   async function toggleProductOptionGroup(productId: number, groupId: number, attach: boolean) {
     try {
-      let res: Response;
       if (attach) {
-        res = await fetch(`/api/products/${productId}/option-groups`, {
+        await fetchJson(`/api/products/${productId}/option-groups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ groupId }),
         });
       } else {
-        res = await fetch(`/api/products/${productId}/option-groups?groupId=${groupId}`, { method: 'DELETE' });
-      }
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || 'Failed to update customization');
-        return;
+        await fetchJson(`/api/products/${productId}/option-groups?groupId=${groupId}`, { method: 'DELETE' });
       }
       setAttachedGroupIds((prev) =>
         attach ? [...prev, groupId] : prev.filter((id) => id !== groupId)
       );
     } catch (e) {
       console.error('Failed to update customization:', e);
-      alert('Failed to update customization');
+      alert(userMessage(e, 'Failed to update customization'));
     }
   }
 
@@ -200,15 +195,16 @@ export default function Page() {
       }));
     
     try {
-      await fetch(`/api/ingredients/product/${productId}`, {
+      await fetchJson(`/api/ingredients/product/${productId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ingredients: items }),
       });
       notif('✅ Ingredients saved!');
-      fetchAvailability(productId);
+      await fetchAvailability(productId);
     } catch (e) {
       console.error('Failed to save product ingredients:', e);
+      notif(`❌ ${userMessage(e, 'Failed to save product ingredients')}`);
     }
   };
 
@@ -254,12 +250,11 @@ export default function Page() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [pRes, cRes, bRes] = await Promise.all([
-        fetch('/api/products'),
-        fetch('/api/categories'),
-        fetch('/api/settings/branding'),
+      const [p, c, b] = await Promise.all([
+        fetchJson<Product[]>('/api/products'),
+        fetchJson<Category[]>('/api/categories'),
+        fetchJson<{ shopName?: string }>('/api/settings/branding'),
       ]);
-      const [p, c, b] = await Promise.all([pRes.json(), cRes.json(), bRes.json()]);
       setProducts(p);
       setCategories(c);
       if (b?.shopName) setShopName(b.shopName);
@@ -349,34 +344,45 @@ export default function Page() {
       marginValue,
       vatExempt,
     };
-    if (editingProduct) {
-      await fetch('/api/products', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editingProduct.id, ...body }),
-      });
-      notif('✅ Product updated!');
-    } else {
-      await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      notif('✅ Product added!');
+    try {
+      if (editingProduct) {
+        await fetchJson('/api/products', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingProduct.id, ...body }),
+        });
+        notif('✅ Product updated!');
+      } else {
+        await fetchJson('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        notif('✅ Product added!');
+      }
+      setShowProductModal(false);
+      await fetchAll();
+    } catch (e) {
+      console.error('Failed to save product:', e);
+      notif(`❌ ${userMessage(e, 'Failed to save product')}`);
+    } finally {
+      setProductSaving(false);
     }
-    setProductSaving(false);
-    setShowProductModal(false);
-    fetchAll();
   }
 
   async function toggleAvailable(p: Product) {
-    await fetch('/api/products', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: p.id, available: !p.available }),
-    });
-    notif(p.available ? '⚠️ Product hidden from menu' : '✅ Product visible on menu');
-    fetchAll();
+    try {
+      await fetchJson('/api/products', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id, available: !p.available }),
+      });
+      notif(p.available ? '⚠️ Product hidden from menu' : '✅ Product visible on menu');
+      await fetchAll();
+    } catch (e) {
+      console.error('Failed to update product availability:', e);
+      notif(`❌ ${userMessage(e, 'Failed to update product availability')}`);
+    }
   }
 
   function openDeleteModal(targets: Product[]) {
@@ -390,18 +396,14 @@ export default function Page() {
     if (deleteInput.trim() !== expected) return;
     setDeleteLoading(true);
     try {
-      const results = await Promise.all(
+      await Promise.all(
         targets.map(async (p) => {
-          const res = await fetch('/api/products', {
+          await fetchJson('/api/products', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: p.id }),
           });
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.error || `Failed to delete ${p.name}`);
-          }
-          return data;
+          return p;
         })
       );
       setDeleteModal({ open: false, targets: [] });
@@ -410,7 +412,7 @@ export default function Page() {
       await fetchAll();
     } catch (err) {
       console.error('Delete error:', err);
-      notif(`❌ ${err instanceof Error ? err.message : 'Error deleting products'}`);
+      notif(`❌ ${userMessage(err, 'Error deleting products')}`);
     } finally {
       setDeleteLoading(false);
     }

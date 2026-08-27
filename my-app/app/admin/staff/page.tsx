@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Fragment } from 'react';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 // CafeOS — Staff & HR (Philippine-friendly)
 // Tabs: Team · Schedule · Time Clock · Time Off · Payroll · Reviews · Documents · Training
@@ -52,25 +53,28 @@ const DEPARTMENTS = ['Front of House', 'Back of House', 'Management'];
 export default function StaffPage() {
   const [activeTab, setActiveTab] = useState<Tab>('Team');
   const [overview, setOverview] = useState<{ team: number; inToday: number; pendingLeave: number; lastPayroll: string | null }>({ team: 0, inToday: 0, pendingLeave: 0, lastPayroll: null });
+  const [overviewError, setOverviewError] = useState<string | null>(null);
 
   const loadOverview = useCallback(async () => {
-    const today = iso(new Date());
-    const [s, a, l, p] = await Promise.all([
-      fetch('/api/staff').then(r => r.json()).catch(() => []),
-      fetch(`/api/attendance?from=${today}&to=${today}`).then(r => r.json()).catch(() => []),
-      fetch('/api/leave-requests').then(r => r.json()).catch(() => []),
-      fetch('/api/payroll').then(r => r.json()).catch(() => []),
-    ]);
-    const staffArr = Array.isArray(s) ? s : [];
-    const attArr = Array.isArray(a) ? a : [];
-    const leaveArr = Array.isArray(l) ? l : [];
-    const payArr = Array.isArray(p) ? p : [];
-    setOverview({
-      team: staffArr.filter((x: any) => x.active).length,
-      inToday: attArr.filter((x: any) => !x.clockOut).length,
-      pendingLeave: leaveArr.filter((x: any) => x.status === 'PENDING').length,
-      lastPayroll: payArr.length ? iso(new Date(payArr[0].periodEnd)) : null,
-    });
+    try {
+      const today = iso(new Date());
+      const [staffArr, attArr, leaveArr, payArr] = await Promise.all([
+        fetchJson<StaffMember[]>('/api/staff'),
+        fetchJson<{ clockOut?: string | null }[]>(`/api/attendance?from=${today}&to=${today}`),
+        fetchJson<{ status?: string }[]>('/api/leave-requests'),
+        fetchJson<{ periodEnd: string }[]>('/api/payroll'),
+      ]);
+      setOverview({
+        team: staffArr.filter((x) => x.active).length,
+        inToday: attArr.filter((x) => !x.clockOut).length,
+        pendingLeave: leaveArr.filter((x) => x.status === 'PENDING').length,
+        lastPayroll: payArr.length ? iso(new Date(payArr[0].periodEnd)) : null,
+      });
+      setOverviewError(null);
+    } catch (e) {
+      console.error('Failed to load staff overview:', e);
+      setOverviewError(userMessage(e, 'Could not load the staff overview. Try again.'));
+    }
   }, []);
 
   useEffect(() => { loadOverview(); }, [loadOverview]);
@@ -81,6 +85,7 @@ export default function StaffPage() {
         <h1 className="text-2xl font-bold text-slate-800">Staff &amp; HR</h1>
         <p className="text-sm text-slate-500 mt-1">Your team, their schedule, attendance, leave and pay — in one place.</p>
       </div>
+      {overviewError && <div className="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{overviewError}</div>}
 
       {/* Overview strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -143,10 +148,12 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/staff');
-      const data = await res.json();
-      setStaff(Array.isArray(data) ? data : []);
-    } catch { setStaff([]); }
+      setStaff(await fetchJson<StaffMember[]>('/api/staff'));
+      setError('');
+  } catch (e) {
+    console.error('Failed to load staff:', e);
+    setError(userMessage(e, 'Could not load staff. Try again.'));
+  }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -177,26 +184,48 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
     };
     if (editingId) {
       if (!payload.password) delete payload.password;
-      const res = await fetch(`/api/staff/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); setError(e.error || 'Update failed'); return; }
+      try {
+        await fetchJson(`/api/staff/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      } catch (e) {
+        console.error('Failed to update staff:', e);
+        setError(userMessage(e, 'Update failed'));
+        return;
+      }
       setSuccess('Staff updated');
     } else {
       if (!payload.password) { setError('Password is required for new staff'); return; }
-      const res = await fetch('/api/staff', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); setError(e.error || 'Create failed'); return; }
+      try {
+        await fetchJson('/api/staff', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      } catch (e) {
+        console.error('Failed to create staff:', e);
+        setError(userMessage(e, 'Create failed'));
+        return;
+      }
       setSuccess('Staff created');
     }
-    setShowForm(false); load(); onChanged();
+    setShowForm(false); await load(); onChanged();
   }
 
   async function toggleActive(s: StaffMember) {
-    await fetch(`/api/staff/${s.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active: !s.active }) });
-    load(); onChanged();
+    try {
+      await fetchJson(`/api/staff/${s.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active: !s.active }) });
+      await load();
+      onChanged();
+    } catch (e) {
+      console.error('Failed to update staff status:', e);
+      setError(userMessage(e, 'Could not update staff status. Try again.'));
+    }
   }
   async function remove(s: StaffMember) {
     if (!confirm(`Delete ${s.name}? This cannot be undone.`)) return;
-    await fetch(`/api/staff/${s.id}`, { method: 'DELETE' });
-    load(); onChanged();
+    try {
+      await fetchJson(`/api/staff/${s.id}`, { method: 'DELETE' });
+      await load();
+      onChanged();
+    } catch (e) {
+      console.error('Failed to delete staff:', e);
+      setError(userMessage(e, 'Could not delete staff. Try again.'));
+    }
   }
 
   const filtered = staff.filter(s => s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase()));
@@ -351,11 +380,18 @@ function ScheduleTab() {
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [error, setError] = useState('');
 
-  const loadShifts = async () => { const r = await fetch('/api/shifts'); const d = await r.json(); setShifts(Array.isArray(d) ? d : []); };
-  const loadStaff = async () => { const r = await fetch('/api/staff'); const d = await r.json(); setStaff(Array.isArray(d) ? d : []); };
+  const loadShifts = async () => {
+    try { setShifts(await fetchJson<any[]>('/api/shifts')); }
+    catch (e) { console.error('Failed to load shifts:', e); setError(userMessage(e, 'Could not load shifts. Try again.')); }
+  };
+  const loadStaff = async () => {
+    try { setStaff(await fetchJson<StaffMember[]>('/api/staff')); }
+    catch (e) { console.error('Failed to load staff:', e); setError(userMessage(e, 'Could not load staff. Try again.')); }
+  };
   const loadSchedules = async () => {
     const from = iso(weekStart); const to = iso(addDays(weekStart, 6));
-    const r = await fetch(`/api/schedules?from=${from}&to=${to}`); const d = await r.json(); setSchedules(Array.isArray(d) ? d : []);
+    try { setSchedules(await fetchJson<Record<string, unknown>[]>(`/api/schedules?from=${from}&to=${to}`)); }
+    catch (e) { console.error('Failed to load schedules:', e); setError(userMessage(e, 'Could not load schedules. Try again.')); }
   };
   useEffect(() => { loadStaff(); loadShifts(); loadSchedules(); }, [weekStart]);
 
@@ -365,13 +401,22 @@ function ScheduleTab() {
   }
 
   async function assign(userId: number, shiftId: number, day: Date) {
-    const r = await fetch('/api/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, shiftId, dates: [iso(day)] }) });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); setError(e.error || 'Failed'); return; }
-    setError(''); loadSchedules();
+    try {
+      await fetchJson('/api/schedules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, shiftId, dates: [iso(day)] }) });
+      setError(''); await loadSchedules();
+    } catch (e) {
+      console.error('Failed to assign schedule:', e);
+      setError(userMessage(e, 'Could not assign the schedule. Try again.'));
+    }
   }
   async function unassign(s: any) {
-    await fetch('/api/schedules', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) });
-    loadSchedules();
+    try {
+      await fetchJson('/api/schedules', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) });
+      await loadSchedules();
+    } catch (e) {
+      console.error('Failed to remove schedule:', e);
+      setError(userMessage(e, 'Could not remove the schedule. Try again.'));
+    }
   }
 
   function openNewShift() { setEditingShift(null); setShiftForm({ name: '', startTime: '08:00', endTime: '17:00', breakMinutes: 60 }); setShowShiftForm(true); setError(''); }
@@ -379,16 +424,27 @@ function ScheduleTab() {
   async function saveShift() {
     if (!shiftForm.name) { setError('Name required'); return; }
     const body = { name: shiftForm.name, startTime: shiftForm.startTime, endTime: shiftForm.endTime, breakMinutes: Number(shiftForm.breakMinutes) };
-    const r = editingShift
-      ? await fetch('/api/shifts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingShift.id, ...body }) })
-      : await fetch('/api/shifts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!r.ok) { setError('Save failed'); return; }
-    setShowShiftForm(false); loadShifts();
+    try {
+      await fetchJson(editingShift ? '/api/shifts' : '/api/shifts', {
+        method: editingShift ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingShift ? { id: editingShift.id, ...body } : body),
+      });
+      setShowShiftForm(false); await loadShifts();
+    } catch (e) {
+      console.error('Failed to save shift:', e);
+      setError(userMessage(e, 'Save failed'));
+    }
   }
   async function deleteShift(id: number) {
     if (!confirm('Delete this shift template?')) return;
-    await fetch('/api/shifts', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
-    loadShifts();
+    try {
+      await fetchJson('/api/shifts', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+      await loadShifts();
+    } catch (e) {
+      console.error('Failed to delete shift:', e);
+      setError(userMessage(e, 'Could not delete the shift. Try again.'));
+    }
   }
 
   return (
@@ -485,28 +541,40 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
 
   const loadSchedules = async () => {
     const t = iso(new Date());
-    const r = await fetch(`/api/schedules?from=${t}&to=${t}`); const d = await r.json();
-    setSchedules(Array.isArray(d) ? d : []);
+    try { setSchedules(await fetchJson<any[]>(`/api/schedules?from=${t}&to=${t}`)); }
+    catch (e) { console.error('Failed to load today’s schedules:', e); setMsg(userMessage(e, 'Could not load schedules. Try again.')); }
   };
 
   useEffect(() => {
     (async () => {
-      const r = await fetch('/api/staff'); const d = await r.json(); setStaff(Array.isArray(d) ? d : []);
-      loadRecords();
-      loadSchedules();
+      try { setStaff(await fetchJson<StaffMember[]>('/api/staff')); }
+      catch (e) { console.error('Failed to load staff:', e); setMsg(userMessage(e, 'Could not load staff. Try again.')); }
+      await loadRecords();
+      await loadSchedules();
     })();
   }, []);
   const loadRecords = async () => {
-    const r = await fetch(`/api/attendance?from=${from}&to=${to}`); const d = await r.json(); setRecords(Array.isArray(d) ? d : []);
+    try { setRecords(await fetchJson<any[]>(`/api/attendance?from=${from}&to=${to}`)); }
+    catch (e) { console.error('Failed to load attendance:', e); setMsg(userMessage(e, 'Could not load attendance. Try again.')); }
   };
 
   async function clockIn(staffId: number) {
-    const r = await fetch('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: staffId }) });
-    if (r.ok) { loadRecords(); onChanged(); }
+    try {
+      await fetchJson('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: staffId }) });
+      await loadRecords(); onChanged();
+    } catch (e) {
+      console.error('Failed to clock in staff:', e);
+      setMsg(userMessage(e, 'Could not clock in staff. Try again.'));
+    }
   }
   async function clockOut(recId: number) {
-    const r = await fetch('/api/attendance', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attendanceId: recId }) });
-    if (r.ok) { loadRecords(); onChanged(); }
+    try {
+      await fetchJson('/api/attendance', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attendanceId: recId }) });
+      await loadRecords(); onChanged();
+    } catch (e) {
+      console.error('Failed to clock out staff:', e);
+      setMsg(userMessage(e, 'Could not clock out staff. Try again.'));
+    }
   }
 
   const toMin = (t?: string | null) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
@@ -603,25 +671,46 @@ function TimeOffTab({ onChanged }: { onChanged: () => void }) {
   const [requests, setRequests] = useState<any[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [form, setForm] = useState({ userId: '', leaveTypeId: '', startDate: '', endDate: '', reason: '' });
+  const [error, setError] = useState('');
 
   const load = async () => {
-    const [t, r, s] = await Promise.all([fetch('/api/leave-types').then(x => x.json()), fetch('/api/leave-requests').then(x => x.json()), fetch('/api/staff').then(x => x.json())]);
-    setTypes(Array.isArray(t) ? t : []); setRequests(Array.isArray(r) ? r : []); setStaff(Array.isArray(s) ? s : []);
+    try {
+      const [t, r, s] = await Promise.all([
+        fetchJson<Record<string, unknown>[]>('/api/leave-types'),
+        fetchJson<Record<string, unknown>[]>('/api/leave-requests'),
+        fetchJson<StaffMember[]>('/api/staff'),
+      ]);
+      setTypes(t); setRequests(r); setStaff(s); setError('');
+    } catch (e) {
+      console.error('Failed to load time off:', e);
+      setError(userMessage(e, 'Could not load time off. Try again.'));
+    }
   };
   useEffect(() => { load(); }, []);
 
   async function submit() {
-    const r = await fetch('/api/leave-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId) }) });
-    if (r.ok) { setForm({ userId: '', leaveTypeId: '', startDate: '', endDate: '', reason: '' }); load(); onChanged(); }
+    try {
+      await fetchJson('/api/leave-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId) }) });
+      setForm({ userId: '', leaveTypeId: '', startDate: '', endDate: '', reason: '' }); await load(); onChanged();
+    } catch (e) {
+      console.error('Failed to submit leave request:', e);
+      setError(userMessage(e, 'Could not submit the leave request. Try again.'));
+    }
   }
   async function review(id: number, status: string) {
-    await fetch('/api/leave-requests', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) });
-    load(); onChanged();
+    try {
+      await fetchJson('/api/leave-requests', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) });
+      await load(); onChanged();
+    } catch (e) {
+      console.error('Failed to review leave request:', e);
+      setError(userMessage(e, 'Could not update the leave request. Try again.'));
+    }
   }
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-800">Time off</h2>
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
         <p className="text-sm font-semibold text-slate-700">Request leave</p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -666,20 +755,36 @@ function PayrollTab() {
   const [records, setRecords] = useState<any[]>([]);
   const [form, setForm] = useState({ userId: '', periodStart: '', periodEnd: '', deductions: '0' });
   const [openId, setOpenId] = useState<number | null>(null);
+  const [error, setError] = useState('');
 
   const load = async () => {
-    const [s, r] = await Promise.all([fetch('/api/staff').then(x => x.json()), fetch('/api/payroll').then(x => x.json())]);
-    setStaff(Array.isArray(s) ? s : []); setRecords(Array.isArray(r) ? r : []);
+    try {
+      const [s, r] = await Promise.all([fetchJson<StaffMember[]>('/api/staff'), fetchJson<Record<string, unknown>[]>('/api/payroll')]);
+      setStaff(s); setRecords(r); setError('');
+    } catch (e) {
+      console.error('Failed to load payroll:', e);
+      setError(userMessage(e, 'Could not load payroll. Try again.'));
+    }
   };
   useEffect(() => { load(); }, []);
 
   async function generate() {
-    const r = await fetch('/api/payroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId), deductions: Number(form.deductions) }) });
-    if (r.ok) { setForm({ userId: '', periodStart: '', periodEnd: '', deductions: '0' }); load(); }
+    try {
+      await fetchJson('/api/payroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId), deductions: Number(form.deductions) }) });
+      setForm({ userId: '', periodStart: '', periodEnd: '', deductions: '0' }); await load();
+    } catch (e) {
+      console.error('Failed to generate payroll:', e);
+      setError(userMessage(e, 'Could not generate payroll. Try again.'));
+    }
   }
   async function markPaid(id: number) {
-    await fetch('/api/payroll', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'PAID' }) });
-    load();
+    try {
+      await fetchJson('/api/payroll', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'PAID' }) });
+      await load();
+    } catch (e) {
+      console.error('Failed to mark payroll paid:', e);
+      setError(userMessage(e, 'Could not mark payroll as paid. Try again.'));
+    }
   }
 
   return (
@@ -688,6 +793,7 @@ function PayrollTab() {
         Payslips follow Philippine rules: SSS, PhilHealth and Pag-IBIG employee shares are deducted first, then BIR withholding tax is computed on what remains. This is a calculation guide — you still file and pay the agencies.
       </div>
       <h2 className="text-lg font-semibold text-slate-800">Payroll</h2>
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
         <p className="text-sm font-semibold text-slate-700">Run payroll for a period</p>
         <div className="flex flex-wrap gap-2 items-end">
@@ -757,21 +863,33 @@ function ReviewsTab() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [form, setForm] = useState({ userId: '', period: '', rating: '3', strengths: '', improvements: '', goals: '' });
+  const [error, setError] = useState('');
 
   const load = async () => {
-    const [s, r] = await Promise.all([fetch('/api/staff').then(x => x.json()), fetch('/api/performance-reviews').then(x => x.json())]);
-    setStaff(Array.isArray(s) ? s : []); setReviews(Array.isArray(r) ? r : []);
+    try {
+      const [s, r] = await Promise.all([fetchJson<StaffMember[]>('/api/staff'), fetchJson<Record<string, unknown>[]>('/api/performance-reviews')]);
+      setStaff(s); setReviews(r); setError('');
+    } catch (e) {
+      console.error('Failed to load performance reviews:', e);
+      setError(userMessage(e, 'Could not load reviews. Try again.'));
+    }
   };
   useEffect(() => { load(); }, []);
 
   async function submit() {
-    const r = await fetch('/api/performance-reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId), rating: Number(form.rating) }) });
-    if (r.ok) { setForm({ userId: '', period: '', rating: '3', strengths: '', improvements: '', goals: '' }); load(); }
+    try {
+      await fetchJson('/api/performance-reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, userId: Number(form.userId), rating: Number(form.rating) }) });
+      setForm({ userId: '', period: '', rating: '3', strengths: '', improvements: '', goals: '' }); await load();
+    } catch (e) {
+      console.error('Failed to submit performance review:', e);
+      setError(userMessage(e, 'Could not submit the review. Try again.'));
+    }
   }
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-800">Reviews</h2>
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
         <p className="text-sm font-semibold text-slate-700">New review</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -810,29 +928,43 @@ function DocumentsTab() {
   const [selectedId, setSelectedId] = useState<number | ''>('');
   const [docs, setDocs] = useState<any[]>([]);
   const [form, setForm] = useState({ name: '', type: 'CONTRACT', fileUrl: '', expiryDate: '', notes: '' });
+  const [error, setError] = useState('');
 
   const load = async () => {
-    const r = await fetch('/api/staff'); const d = await r.json(); setStaff(Array.isArray(d) ? d : []);
+    try { setStaff(await fetchJson<StaffMember[]>('/api/staff')); setError(''); }
+    catch (e) { console.error('Failed to load staff for documents:', e); setError(userMessage(e, 'Could not load staff. Try again.')); }
   };
+  async function loadDocs(id: number) {
+    try { setDocs(await fetchJson<Record<string, unknown>[]>(`/api/staff/${id}/documents`)); setError(''); }
+    catch (e) { console.error('Failed to load staff documents:', e); setError(userMessage(e, 'Could not load documents. Try again.')); }
+  }
   useEffect(() => { load(); }, []);
   useEffect(() => { if (selectedId) loadDocs(Number(selectedId)); }, [selectedId]);
-  const loadDocs = async (id: number) => {
-    const r = await fetch(`/api/staff/${id}/documents`); const d = await r.json(); setDocs(Array.isArray(d) ? d : []);
-  };
 
   async function submit() {
     if (!selectedId) return;
-    const r = await fetch(`/api/staff/${selectedId}/documents`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-    if (r.ok) { setForm({ name: '', type: 'CONTRACT', fileUrl: '', expiryDate: '', notes: '' }); loadDocs(Number(selectedId)); }
+    try {
+      await fetchJson(`/api/staff/${selectedId}/documents`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      setForm({ name: '', type: 'CONTRACT', fileUrl: '', expiryDate: '', notes: '' }); await loadDocs(Number(selectedId));
+    } catch (e) {
+      console.error('Failed to add document:', e);
+      setError(userMessage(e, 'Could not add the document. Try again.'));
+    }
   }
   async function remove(id: number) {
-    await fetch(`/api/staff/documents/${id}`, { method: 'DELETE' });
-    if (selectedId) loadDocs(Number(selectedId));
+    try {
+      await fetchJson(`/api/staff/documents/${id}`, { method: 'DELETE' });
+      if (selectedId) await loadDocs(Number(selectedId));
+    } catch (e) {
+      console.error('Failed to delete document:', e);
+      setError(userMessage(e, 'Could not delete the document. Try again.'));
+    }
   }
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-800">Documents</h2>
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
       <select value={selectedId} onChange={e => setSelectedId(e.target.value ? Number(e.target.value) : '')} className="rounded-lg border border-slate-200 px-3 py-2 text-sm max-w-xs">
         <option value="">Select staff member…</option>
         {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -876,30 +1008,52 @@ function TrainingTab() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [newName, setNewName] = useState('');
+  const [error, setError] = useState('');
 
   const load = async () => {
-    const [s, c] = await Promise.all([fetch('/api/staff').then(x => x.json()), fetch('/api/training').then(x => x.json())]);
-    setStaff(Array.isArray(s) ? s : []); setCourses(Array.isArray(c) ? c : []);
+    try {
+      const [s, c] = await Promise.all([fetchJson<StaffMember[]>('/api/staff'), fetchJson<Record<string, unknown>[]>('/api/training')]);
+      setStaff(s); setCourses(c); setError('');
+    } catch (e) {
+      console.error('Failed to load training:', e);
+      setError(userMessage(e, 'Could not load training. Try again.'));
+    }
   };
   useEffect(() => { load(); }, []);
 
   async function addCourse() {
     if (!newName.trim()) return;
-    await fetch('/api/training', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) });
-    setNewName(''); load();
+    try {
+      await fetchJson('/api/training', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) });
+      setNewName(''); await load();
+    } catch (e) {
+      console.error('Failed to create training course:', e);
+      setError(userMessage(e, 'Could not create the course. Try again.'));
+    }
   }
   async function enroll(courseId: number, userId: number) {
-    await fetch(`/api/training/${courseId}/enroll`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
-    load();
+    try {
+      await fetchJson(`/api/training/${courseId}/enroll`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+      await load();
+    } catch (e) {
+      console.error('Failed to enroll staff in training:', e);
+      setError(userMessage(e, 'Could not enroll staff. Try again.'));
+    }
   }
   async function complete(courseId: number, userId: number) {
-    await fetch(`/api/training/${courseId}/enroll`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, status: 'COMPLETED', completedAt: new Date().toISOString() }) });
-    load();
+    try {
+      await fetchJson(`/api/training/${courseId}/enroll`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, status: 'COMPLETED', completedAt: new Date().toISOString() }) });
+      await load();
+    } catch (e) {
+      console.error('Failed to complete training:', e);
+      setError(userMessage(e, 'Could not mark training complete. Try again.'));
+    }
   }
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-800">Training</h2>
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
       <div className="flex gap-2">
         <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New course name…" className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm flex-1 max-w-xs" />
         <button onClick={addCourse} className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold">Add course</button>

@@ -28,6 +28,11 @@ interface Product {
   price: number;
 }
 
+interface AttachedProductGroup {
+  group: { id: number };
+  options: ProductOption[];
+}
+
 interface GroupRow {
   id: number;
   name: string;
@@ -40,6 +45,7 @@ interface GroupRow {
 export default function OptionGroupManager() {
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<number | null>(null);
 
   // New group form
@@ -64,12 +70,11 @@ export default function OptionGroupManager() {
   const fetchGroups = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/option-groups');
-      const data = await res.json();
-      setGroups(Array.isArray(data) ? data : []);
+      setGroups(await fetchJson<GroupRow[]>('/api/option-groups'));
+      setError('');
     } catch (e) {
       console.error('Failed to load option groups:', e);
-      setGroups([]);
+      setError(userMessage(e, 'Could not load option groups. Try again.'));
     } finally {
       setLoading(false);
     }
@@ -77,12 +82,9 @@ export default function OptionGroupManager() {
 
   const fetchIngredients = useCallback(async () => {
     try {
-      const res = await fetch('/api/ingredients');
-      const data = await res.json();
-      setIngredients(Array.isArray(data) ? data : []);
+      setIngredients(await fetchJson<{ id: number; name: string; baseUnit: string }[]>('/api/ingredients'));
     } catch (e) {
       console.error('Failed to load ingredients:', e);
-      setIngredients([]);
     }
   }, []);
 
@@ -90,12 +92,10 @@ export default function OptionGroupManager() {
 
   const fetchProducts = useCallback(async () => {
     try {
-      const res = await fetch('/api/products');
-      const data = await res.json();
-      setProducts(Array.isArray(data) ? data.map((p: any) => ({ id: p.id, name: p.name, price: p.price })) : []);
+      const data = await fetchJson<Product[]>('/api/products');
+      setProducts(data.map((p) => ({ id: p.id, name: p.name, price: p.price })));
     } catch (e) {
       console.error('Failed to load products:', e);
-      setProducts([]);
     }
   }, []);
 
@@ -121,7 +121,7 @@ export default function OptionGroupManager() {
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch('/api/option-groups', {
+      await fetchJson('/api/option-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,13 +130,11 @@ export default function OptionGroupManager() {
           sortOrder: groups.length + 1,
         }),
       });
-      if (res.ok) {
-        setNewName('');
-        await fetchGroups();
-      } else {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || 'Failed to create group');
-      }
+      setNewName('');
+      await fetchGroups();
+    } catch (e) {
+      console.error('Failed to create option group:', e);
+      alert(userMessage(e, 'Failed to create group'));
     } finally {
       setCreating(false);
     }
@@ -144,94 +142,113 @@ export default function OptionGroupManager() {
 
   async function removeGroup(g: GroupRow) {
     if (!confirm(`Delete "${g.name}" and all its options? This cannot be undone.`)) return;
-    const res = await fetch(`/api/option-groups/${g.id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      await fetchJson(`/api/option-groups/${g.id}`, { method: 'DELETE' });
       if (expanded === g.id) setExpanded(null);
-      fetchGroups();
+      await fetchGroups();
+    } catch (e) {
+      console.error('Failed to delete option group:', e);
+      alert(userMessage(e, 'Failed to delete group'));
     }
   }
 
   async function toggleGroupAvailable(g: GroupRow) {
-    await fetch(`/api/option-groups/${g.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ available: !g.available }),
-    });
-    fetchGroups();
+    try {
+      await fetchJson(`/api/option-groups/${g.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ available: !g.available }),
+      });
+      await fetchGroups();
+    } catch (e) {
+      console.error('Failed to update option group:', e);
+      alert(userMessage(e, 'Failed to update group'));
+    }
   }
 
   // ── Product attachment ────────────────────────────────────────────────────
   async function toggleAttach(productId: number, groupId: number) {
-    if (attachedIds.has(productId)) {
-      await fetch(`/api/products/${productId}/option-groups?groupId=${groupId}`, { method: 'DELETE' });
-      attachedIds.delete(productId);
-    } else {
-      await fetch(`/api/products/${productId}/option-groups`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupId }),
-      });
-      attachedIds.add(productId);
+    try {
+      if (attachedIds.has(productId)) {
+        await fetchJson(`/api/products/${productId}/option-groups?groupId=${groupId}`, { method: 'DELETE' });
+        attachedIds.delete(productId);
+      } else {
+        await fetchJson(`/api/products/${productId}/option-groups`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groupId }),
+        });
+        attachedIds.add(productId);
+      }
+      setAttachedIds(new Set(attachedIds));
+      await fetchGroups();
+    } catch (e) {
+      console.error('Failed to update product option group:', e);
+      alert(userMessage(e, 'Failed to update product attachment'));
     }
-    setAttachedIds(new Set(attachedIds));
-    fetchGroups();
   }
 
   // ── Per-product option CRUD ──────────────────────────────────────────────
   async function addOption(productId: number, groupId: number) {
     const draft = newOption[productId];
-    if (!draft?.name.trim()) { alert('Option name required'); return; }
-    const res = await fetch(`/api/products/${productId}/options?groupId=${groupId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: draft.name.trim(),
-        priceDelta: parseFloat(draft.priceDelta) || 0,
-      }),
-    });
-    if (res.ok) {
+    if (!draft?.name.trim()) { alert('Option name required'); return false; }
+    try {
+      await fetchJson(`/api/products/${productId}/options?groupId=${groupId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: draft.name.trim(),
+          priceDelta: parseFloat(draft.priceDelta) || 0,
+        }),
+      });
       setNewOption((prev) => ({ ...prev, [productId]: { name: '', priceDelta: '' } }));
-    } else {
-      const err = await res.json().catch(() => ({}));
-      alert(err.error || 'Failed to add option');
+      return true;
+    } catch (e) {
+      console.error('Failed to add option:', e);
+      alert(userMessage(e, 'Failed to add option'));
+      return false;
     }
   }
 
   async function saveOption(optId: number) {
     const patch = drafts[`opt-${optId}`] ?? {};
     try {
-      const res = await fetch(`/api/product-options/${optId}`, {
+      await fetchJson(`/api/product-options/${optId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || 'Failed to save option');
-      }
+      return true;
     } catch (e) {
       console.error('Failed to save option:', e);
-      alert('Failed to save option — check the console for details');
+      alert(userMessage(e, 'Failed to save option'));
+      return false;
     }
   }
 
   async function deleteOption(optId: number) {
     if (!confirm('Delete this option?')) return;
-    await fetch(`/api/product-options/${optId}`, { method: 'DELETE' });
+    try {
+      await fetchJson(`/api/product-options/${optId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error('Failed to delete option:', e);
+      alert(userMessage(e, 'Failed to delete option'));
+    }
   }
 
   // ── Option drafts ────────────────────────────────────────────────────────
-  function draftVal(optId: number, field: string, fallback: any) {
+  function draftVal(optId: number, field: string, fallback: string | number) {
     const k = `opt-${optId}`;
-    return (drafts[k] as any)?.[field] ?? String(fallback ?? '');
+    return (drafts[k]?.[field as keyof ProductOption] as string | number | undefined) ?? String(fallback ?? '');
   }
 
-  function setDraftVal(optId: number, field: string, value: any) {
+  function setDraftVal(optId: number, field: string, value: string | number) {
     setDrafts((prev) => ({ ...prev, [`opt-${optId}`]: { ...prev[`opt-${optId}`], [field]: value } }));
   }
 
   return (
     <div className="space-y-4">
+      {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
       {/* Create group */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p className="text-sm font-semibold text-slate-800 mb-3">Create an option group</p>
@@ -317,36 +334,33 @@ export default function OptionGroupManager() {
     const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
     const [deltaDrafts, setDeltaDrafts] = useState<Record<string, Record<number, string>>>({});
     const [deltaSaveStates, setDeltaSaveStates] = useState<Record<string, 'saving' | 'saved' | 'error'>>({});
+    const [detailError, setDetailError] = useState('');
 
     useEffect(() => {
       let cancelled = false;
       (async () => {
         setDetailLoading(true);
         try {
-          const [allProdRes] = await Promise.all([
-            fetch('/api/products'),
-          ]);
-          const allProds = allProdRes.ok ? await allProdRes.json() : [];
+          const allProds = await fetchJson<Product[]>('/api/products');
           if (cancelled) return;
-          setDetailProducts(allProds.map((p: any) => ({ id: p.id, name: p.name, price: p.price })));
+          setDetailProducts(allProds.map((p) => ({ id: p.id, name: p.name, price: p.price })));
 
           // Determine which products have this group attached
           // by trying to fetch options for each product
           const attachedSet = new Set<number>();
           const optsMap: Record<number, ProductOption[]> = {};
           await Promise.all(
-            allProds.map(async (p: any) => {
+            allProds.map(async (p) => {
               try {
-                const res = await fetch(`/api/products/${p.id}/option-groups`);
-                if (!res.ok) return;
-                const groups = await res.json();
-                const match = Array.isArray(groups) ? groups.find((g: any) => g.group.id === group.id) : null;
+                const groups = await fetchJson<AttachedProductGroup[]>(`/api/products/${p.id}/option-groups`);
+                const match = groups.find((g) => g.group.id === group.id);
                 if (match) {
                   attachedSet.add(p.id);
                   optsMap[p.id] = match.options ?? [];
                 }
               } catch (e) {
                 console.error(`Failed to load option groups for product ${p.id}:`, e);
+                setDetailError(userMessage(e, 'Could not load group details. Try again.'));
               }
             })
           );
@@ -355,6 +369,7 @@ export default function OptionGroupManager() {
           setProductOptions(optsMap);
         } catch (e) {
           console.error(`Failed to load the products for option group ${group.id}:`, e);
+          setDetailError(userMessage(e, 'Could not load group details. Try again.'));
         } finally {
           if (!cancelled) setDetailLoading(false);
         }
@@ -385,15 +400,13 @@ export default function OptionGroupManager() {
         return;
       }
       setAttached(new Set(attached));
-      fetchGroups();
+      await fetchGroups();
     }
 
     async function refreshProductOptions(productId: number) {
       try {
-        const res = await fetch(`/api/products/${productId}/option-groups`);
-        if (!res.ok) return;
-        const groups = await res.json();
-        const match = Array.isArray(groups) ? groups.find((g: any) => g.group.id === group.id) : null;
+        const groups = await fetchJson<AttachedProductGroup[]>(`/api/products/${productId}/option-groups`);
+        const match = groups.find((g) => g.group.id === group.id);
         setProductOptions((prev) => ({ ...prev, [productId]: match?.options ?? [] }));
       } catch (e) {
         console.error(`Failed to refresh the options for product ${productId}:`, e);
@@ -405,15 +418,11 @@ export default function OptionGroupManager() {
       const val = parseFloat(deltaDrafts[`opt-${optId}`]?.[ingredientId] ?? '0') || 0;
       setDeltaSaveStates((prev) => ({ ...prev, [saveKey]: 'saving' }));
       try {
-        const res = await fetch(`/api/product-options/${optId}/ingredients`, {
+        await fetchJson(`/api/product-options/${optId}/ingredients`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ingredientId, deltaQty: val }),
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to save ingredient quantity');
-        }
         setDeltaSaveStates((prev) => ({ ...prev, [saveKey]: 'saved' }));
         await refreshProductOptions(productId);
         setDeltaDrafts((prev) => {
@@ -454,6 +463,7 @@ export default function OptionGroupManager() {
 
     return (
       <div className="border-t border-slate-100 p-4 space-y-4">
+        {detailError && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{detailError}</div>}
         {/* Attached products */}
         <div>
           <p className="text-xs font-semibold text-slate-600 mb-2">Attached products</p>
@@ -506,13 +516,14 @@ export default function OptionGroupManager() {
                       <button
                         type="button"
                         onClick={async () => {
-                          await saveOption(opt.id);
-                          await refreshProductOptions(p.id);
-                          setDrafts((prev) => {
-                            const next = { ...prev };
-                            delete next[`opt-${opt.id}`];
-                            return next;
-                          });
+                          if (await saveOption(opt.id)) {
+                            await refreshProductOptions(p.id);
+                            setDrafts((prev) => {
+                              const next = { ...prev };
+                              delete next[`opt-${opt.id}`];
+                              return next;
+                            });
+                          }
                         }}
                         className="px-2 py-1.5 rounded-lg bg-black text-white text-xs font-medium hover:bg-gray-800"
                       >
@@ -600,8 +611,9 @@ export default function OptionGroupManager() {
                   <button
                     type="button"
                     onClick={async () => {
-                      await addOption(p.id, group.id);
-                      refreshProductOptions(p.id);
+                      if (await addOption(p.id, group.id)) {
+                        await refreshProductOptions(p.id);
+                      }
                     }}
                     className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200"
                   >
@@ -620,12 +632,17 @@ export default function OptionGroupManager() {
               type="checkbox"
               checked={group.available}
               onChange={async () => {
-                await fetch(`/api/option-groups/${group.id}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ available: !group.available }),
-                });
-                fetchGroups();
+                try {
+                  await fetchJson(`/api/option-groups/${group.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ available: !group.available }),
+                  });
+                  await fetchGroups();
+                } catch (e) {
+                  console.error('Failed to update option group availability:', e);
+                  alert(userMessage(e, 'Failed to update group availability'));
+                }
               }}
             />
             Available
@@ -634,10 +651,15 @@ export default function OptionGroupManager() {
             type="button"
             onClick={() => {
               if (confirm(`Delete "${group.name}" and all its options?`)) {
-                fetch(`/api/option-groups/${group.id}`, { method: 'DELETE' }).then(() => {
-                  setExpanded(null);
-                  fetchGroups();
-                });
+                fetchJson(`/api/option-groups/${group.id}`, { method: 'DELETE' })
+                  .then(async () => {
+                    setExpanded(null);
+                    await fetchGroups();
+                  })
+                  .catch((e) => {
+                    console.error('Failed to delete option group:', e);
+                    alert(userMessage(e, 'Failed to delete group'));
+                  });
               }
             }}
             className="ml-auto text-xs text-red-500 hover:text-red-700 font-medium"

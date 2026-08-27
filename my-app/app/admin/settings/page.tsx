@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import type { SubscriptionTier } from '@/lib/subscription';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 import AdminToolsSection from '../AdminToolsSection';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ export default function SettingsPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [brandingSaving, setBrandingSaving] = useState(false);
   const [brandingMsg, setBrandingMsg] = useState('');
+  const [usersError, setUsersError] = useState('');
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   // BIR Business Settings
@@ -102,13 +104,15 @@ export default function SettingsPage() {
 
   // ── Load branding ──────────────────────────────────────────────────────────
   useEffect(() => {
-    fetch('/api/settings/branding')
-      .then((r) => r.json())
+    fetchJson<{ shopName?: string; logoUrl?: string | null }>('/api/settings/branding')
       .then((d) => {
         setShopName(d.shopName ?? 'CaféOS');
         setLogoUrl(d.logoUrl ?? null);
       })
-      .catch(() => {});
+      .catch((e) => {
+        console.error('Failed to load branding:', e);
+        setBrandingMsg(`Failed to load branding: ${userMessage(e, 'Try again.')}`);
+      });
   }, []);
 
   useEffect(() => {
@@ -196,11 +200,11 @@ export default function SettingsPage() {
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
-      const r = await fetch('/api/settings/users');
-      const data = await r.json();
-      setUsers(data);
-    } catch {
-      // ignore
+      setUsers(await fetchJson<AppUser[]>('/api/settings/users'));
+      setUsersError('');
+    } catch (e) {
+      console.error('Failed to fetch users:', e);
+      setUsersError(userMessage(e, 'Could not load users. Try again.'));
     } finally {
       setUsersLoading(false);
     }
@@ -347,8 +351,9 @@ export default function SettingsPage() {
          {/* Header */}
          <div className="mb-4">
            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-           <p className="text-gray-500 text-sm mt-1">Manage branding and user accounts</p>
+         <p className="text-gray-500 text-sm mt-1">Manage branding and user accounts</p>
          </div>
+         {usersError && <div className="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{usersError}</div>}
 
          {/* Tabs */}
         <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 mb-4 w-fit shadow-sm">
