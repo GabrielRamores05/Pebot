@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
-import { checkFeatureAccess } from '@/lib/auth';
 import { recomputeProduct } from '@/lib/availability';
+import { serverError } from '@/lib/api-response';
+import { guardFeature } from '@/lib/api-guards';
 
 export async function GET(req: NextRequest) {
   // Check if user has access to inventory feature
-  const { user, hasAccess } = await checkFeatureAccess(req, 'inventory');
-  
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Feature not available in your subscription tier' }, { status: 403 });
-  }
+  const { error } = await guardFeature(req, 'inventory');
+  if (error) return error;
 
   try {
     const inventory = await prisma.inventory.findMany({
@@ -32,22 +26,14 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json(inventory);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 
 export async function PATCH(req: NextRequest) {
   // Check if user has access to inventory feature
-  const { user, hasAccess } = await checkFeatureAccess(req, 'inventory');
-  
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Feature not available in your subscription tier' }, { status: 403 });
-  }
+  const { error } = await guardFeature(req, 'inventory');
+  if (error) return error;
 
   try {
     const { productId, quantity, lowStockThreshold, adjustment } = await req.json() as {
@@ -102,7 +88,6 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(inv);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }

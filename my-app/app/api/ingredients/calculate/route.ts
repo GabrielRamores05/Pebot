@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, serverError } from '@/lib/api-response';
 
 // POST /api/ingredients/calculate - Calculate total ingredients needed
 export async function POST(request: Request) {
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
     const { items } = body; // Array of { productId, quantity }
 
     if (!items || items.length === 0) {
-      return NextResponse.json({ error: 'No items provided' }, { status: 400 });
+      return badRequest('No items provided');
     }
 
     // Get all product ingredients for the requested products
@@ -73,7 +74,6 @@ export async function POST(request: Request) {
       itemCount: items.length,
     });
   } catch (error) {
-    console.error('Error calculating ingredients:', error);
-    return NextResponse.json({ error: 'Failed to calculate ingredients' }, { status: 500 });
+    return serverError(error, 'Failed to calculate ingredients');
   }
 }

@@ -2,23 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { signToken, JWTPayload } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
 
     if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
+      return badRequest('Email and password required');
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.active) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      return unauthorized('Invalid credentials');
     }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      return unauthorized('Invalid credentials');
     }
 
     // Parse permissions from JSON string
@@ -29,7 +30,9 @@ export async function POST(req: NextRequest) {
           ? JSON.parse(user.permissions) 
           : user.permissions;
       } catch (e) {
-        console.error('Error parsing permissions:', e);
+        // Signing in with no permissions is safe, but the stored value is broken
+        // and someone has to know which account to repair.
+        console.error(`[LOGIN] Corrupt permissions for user ${user.id} (${user.email}), signing in with none:`, e);
       }
     }
     console.log('[LOGIN] User:', user.email, 'Permissions from DB:', JSON.stringify(permissions));
@@ -67,7 +70,6 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }

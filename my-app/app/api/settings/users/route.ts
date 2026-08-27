@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { badRequest, conflict } from '@/lib/api-response';
+import { guardAdmin } from '@/lib/api-guards';
 
 // GET /api/settings/users — list all users (ADMIN only)
 export async function GET(req: NextRequest) {
-  const me = await getAuthUser(req);
-  if (!me || me.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const { error } = await guardAdmin(req);
+  if (error) return error;
 
   const users = await prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
@@ -20,25 +19,23 @@ export async function GET(req: NextRequest) {
 
 // POST /api/settings/users — create new user (ADMIN only)
 export async function POST(req: NextRequest) {
-  const me = await getAuthUser(req);
-  if (!me || me.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const { error } = await guardAdmin(req);
+  if (error) return error;
 
   const { name, email, password, role } = await req.json();
 
   if (!name || !email || !password || !role) {
-    return NextResponse.json({ error: 'All fields required' }, { status: 400 });
+    return badRequest('All fields required');
   }
 
   const allowed = ['ADMIN', 'STAFF', 'KITCHEN'];
   if (!allowed.includes(role)) {
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+    return badRequest('Invalid role');
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    return NextResponse.json({ error: 'Email already in use' }, { status: 409 });
+    return conflict('Email already in use');
   }
 
   const hashed = await bcrypt.hash(password, 10);

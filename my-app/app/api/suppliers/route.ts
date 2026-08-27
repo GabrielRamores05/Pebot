@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/suppliers - list all suppliers
 export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const suppliers = await prisma.supplier.findMany({
@@ -29,8 +30,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(suppliers);
   } catch (error) {
-    console.error('Error fetching suppliers:', error);
-    return NextResponse.json({ error: 'Failed to fetch suppliers' }, { status: 500 });
+    return serverError(error, 'Failed to fetch suppliers');
   }
 }
 
@@ -39,14 +39,14 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const body = await req.json();
     const { name, contactPerson, phone, email, address, notes, status } = body;
 
     if (!name || typeof name !== 'string') {
-      return NextResponse.json({ error: 'Supplier name is required' }, { status: 400 });
+      return badRequest('Supplier name is required');
     }
 
     const supplier = await prisma.supplier.create({
@@ -63,8 +63,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(supplier, { status: 201 });
   } catch (error) {
-    console.error('Error creating supplier:', error);
-    return NextResponse.json({ error: 'Failed to create supplier' }, { status: 500 });
+    return serverError(error, 'Failed to create supplier');
   }
 }
 
@@ -73,12 +72,12 @@ export async function PUT(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'Supplier ID required' }, { status: 400 });
+    if (!id) return badRequest('Supplier ID required');
 
     const body = await req.json();
     const { name, contactPerson, phone, email, address, notes, status } = body;
@@ -99,10 +98,9 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json(supplier);
   } catch (error: any) {
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
+      return notFound('Supplier not found');
     }
-    console.error('Error updating supplier:', error);
-    return NextResponse.json({ error: 'Failed to update supplier' }, { status: 500 });
+    return serverError(error, 'Failed to update supplier');
   }
 }
 
@@ -111,12 +109,12 @@ export async function DELETE(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'Supplier ID required' }, { status: 400 });
+    if (!id) return badRequest('Supplier ID required');
 
     await prisma.supplier.delete({
       where: { id: Number(id) },
@@ -125,9 +123,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
+      return notFound('Supplier not found');
     }
-    console.error('Error deleting supplier:', error);
-    return NextResponse.json({ error: 'Failed to delete supplier' }, { status: 500 });
+    return serverError(error, 'Failed to delete supplier');
   }
 }

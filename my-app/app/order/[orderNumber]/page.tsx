@@ -6,6 +6,22 @@ import { useSocket } from '@/hooks/useSocket';
 import { playPreparingSound, playCompletedSound, fetchVoiceSettings } from '@/lib/sounds';
 import { ticketCode } from '@/lib/ticket';
 import { selectionsLabelFromJson } from '@/lib/product-options';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
+
+interface OrderMessage {
+  id: number;
+  type: string;
+  content: string;
+  sender: string;
+  createdAt: string;
+}
+
+interface BusinessSettings {
+  gcashAccountName?: string | null;
+  gcashQrImage?: string | null;
+  paymayaAccountName?: string | null;
+  paymayaQrImage?: string | null;
+}
 
 interface BrandingState {
   shopName: string;
@@ -61,7 +77,7 @@ function BarcodeDisplay({ value }: { value: string }) {
           margin: 8,
         });
       }
-    }).catch(() => {});
+    }).catch((e) => console.error('Failed to render order barcode:', e));
   }, [value]);
 
   const downloadBarcode = async () => {
@@ -166,7 +182,7 @@ function BarcodeDisplay({ value }: { value: string }) {
 export default function OrderStatusPage({ params }: { params: { orderNumber: string } }) {
   const { orderNumber } = params;
   const [branding, setBranding] = useState<BrandingState>({ shopName: 'CaféOS', logoUrl: null });
-  const [businessSettings, setBusinessSettings] = useState<any>(null);
+  const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -184,7 +200,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
   const [waitData, setWaitData] = useState<{ estimatedTimes: Record<string, number>; estimatedWait: number; queuePosition: number } | null>(null);
 
   // Follow-up messages state
-  const [messages, setMessages] = useState<Array<{ id: number; type: string; content: string; sender: string; createdAt: string }>>([]);
+  const [messages, setMessages] = useState<OrderMessage[]>([]);
   const [msgText, setMsgText] = useState('');
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -195,17 +211,15 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
   const audioFileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    fetch('/api/settings/branding')
-      .then((r) => r.json())
+    fetchJson<{ shopName?: string; logoUrl?: string | null }>('/api/settings/branding')
       .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
-      .catch(() => {});
+      .catch((e) => console.error('Failed to load branding, using defaults:', e));
     // Pre-fetch voice settings so customer hears admin's custom messages
     fetchVoiceSettings();
     // Fetch business settings for payment QR display
-    fetch('/api/settings/business')
-      .then((r) => r.ok ? r.json() : null)
+    fetchJson<BusinessSettings>('/api/settings/business')
       .then((data) => setBusinessSettings(data))
-      .catch(() => {});
+      .catch((e) => console.error('Failed to load business settings:', e));
   }, []);
 
   // Tick for countdown timer
@@ -214,29 +228,26 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
   // Fetch estimated wait time
   useEffect(() => {
     if (!order || order.status === 'COMPLETED' || order.status === 'CANCELLED') return;
-    fetch(`/api/orders/${orderNumber}/wait-time`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data) setWaitData(data)
-        setTick(0); })
-      .catch(() => {});
+    fetchJson<{ estimatedTimes: Record<string, number>; estimatedWait: number; queuePosition: number }>(`/api/orders/${orderNumber}/wait-time`)
+      .then((data) => { setWaitData(data); setTick(0); })
+      .catch((e) => console.error('Failed to load estimated wait time:', e));
   }, [order?.id, order?.status, orderNumber]);
 
   // Fetch follow-up messages
   useEffect(() => {
     if (!order) return;
-    fetch(`/api/orders/${orderNumber}/messages`)
-      .then((r) => r.ok ? r.json() : [])
+    fetchJson<OrderMessage[]>(`/api/orders/${orderNumber}/messages`)
       .then(setMessages)
-      .catch(() => {});
+      .catch((e) => console.error('Failed to load follow-up messages:', e));
   }, [order?.id, orderNumber]);
 
-  // Poll messages every 10s
+  // Poll messages every 10s. A failed poll keeps the messages already shown
+  // rather than blanking the thread.
   useEffect(() => {
     const interval = setInterval(() => {
-      fetch(`/api/orders/${orderNumber}/messages`)
-        .then((r) => r.ok ? r.json() : [])
+      fetchJson<OrderMessage[]>(`/api/orders/${orderNumber}/messages`)
         .then(setMessages)
-        .catch(() => {});
+        .catch((e) => console.error('Failed to refresh follow-up messages:', e));
     }, 10000);
     return () => clearInterval(interval);
   }, [orderNumber]);
@@ -245,18 +256,18 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
     if (!msgText.trim() || sending) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/orders/${orderNumber}/messages`, {
+      const msg = await fetchJson<OrderMessage>(`/api/orders/${orderNumber}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'text', content: msgText.trim(), sender: order?.customerName || 'customer' }),
       });
-      if (res.ok) {
-        const msg = await res.json();
-        setMessages((prev) => [...prev, msg]);
-        setMsgText('');
-        showToast('Message sent!');
-      }
-    } catch {}
+      setMessages((prev) => [...prev, msg]);
+      setMsgText('');
+      showToast('Message sent!');
+    } catch (e) {
+      console.error('Failed to send message:', e);
+      showToast(userMessage(e, 'Your message did not send. Try again.'));
+    }
     setSending(false);
   }
 
@@ -265,21 +276,18 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
     try {
       const formData = new FormData();
       formData.append('file', audioBlob, fileName);
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-      if (uploadRes.ok) {
-        const { url } = await uploadRes.json();
-        const res = await fetch(`/api/orders/${orderNumber}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'voice', content: url, sender: order?.customerName || 'customer' }),
-        });
-        if (res.ok) {
-          const msg = await res.json();
-          setMessages((prev) => [...prev, msg]);
-          showToast('Voice message sent!');
-        }
-      }
-    } catch {}
+      const { url } = await fetchJson<{ url: string }>('/api/upload', { method: 'POST', body: formData });
+      const msg = await fetchJson<OrderMessage>(`/api/orders/${orderNumber}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'voice', content: url, sender: order?.customerName || 'customer' }),
+      });
+      setMessages((prev) => [...prev, msg]);
+      showToast('Voice message sent!');
+    } catch (e) {
+      console.error('Failed to send voice message:', e);
+      showToast(userMessage(e, 'Your voice message did not send. Try again.'));
+    }
     setSending(false);
   }
 

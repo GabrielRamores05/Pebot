@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
 import { getAuthUser, requireRole } from '@/lib/auth';
+import { badRequest, notFound } from '@/lib/api-response';
 
 // GET /api/orders/[id]/messages — list messages for an order
 export async function GET(
@@ -34,7 +35,7 @@ export async function POST(
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return badRequest('Invalid JSON body');
   }
 
   const { type, content } = body as {
@@ -44,7 +45,7 @@ export async function POST(
   };
 
   if (!content || !content.trim()) {
-    return NextResponse.json({ error: 'Message content is required' }, { status: 400 });
+    return badRequest('Message content is required');
   }
 
   // Find the order
@@ -53,12 +54,12 @@ export async function POST(
     : await prisma.order.findUnique({ where: { orderNumber: id } });
 
   if (!order) {
-    return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    return notFound('Order not found');
   }
 
   // Verify the order is active (not completed or cancelled)
   if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
-    return NextResponse.json({ error: 'Cannot send message for completed or cancelled order' }, { status: 400 });
+    return badRequest('Cannot send message for completed or cancelled order');
   }
 
   // A message is either from the customer or from a signed-in staff member.

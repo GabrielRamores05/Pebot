@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serverError, unauthorized } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 
 // GET /api/ingredients - Get all ingredients
@@ -10,15 +11,14 @@ export async function GET() {
     });
     return NextResponse.json(ingredients);
   } catch (error) {
-    console.error('Error fetching ingredients:', error);
-    return NextResponse.json({ error: 'Failed to fetch ingredients' }, { status: 500 });
+    return serverError(error, 'Failed to fetch ingredients');
   }
 }
 
 // POST /api/ingredients - Create new ingredient
 export async function POST(request: NextRequest) {
   const user = await requirePermission(request, 'inventory');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const body = await request.json();
@@ -47,7 +47,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(ingredient, { status: 201 });
   } catch (error) {
-    console.error('Error creating ingredient:', error);
-    return NextResponse.json({ error: 'Failed to create ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to create ingredient');
   }
 }

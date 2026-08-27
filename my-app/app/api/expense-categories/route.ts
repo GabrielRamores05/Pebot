@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, conflict, serverError, unauthorized } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const categories = await prisma.expenseCategory.findMany({
@@ -16,8 +17,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(categories);
   } catch (error) {
-    console.error('Error fetching expense categories:', error);
-    return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 });
+    return serverError(error, 'Failed to fetch categories');
   }
 }
 
@@ -25,14 +25,14 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const body = await req.json();
     const { name, description } = body;
 
     if (!name || typeof name !== 'string') {
-      return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
+      return badRequest('Category name is required');
     }
 
     const category = await prisma.expenseCategory.create({
@@ -45,9 +45,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     if ((error as { code?: string }).code === 'P2002') {
-      return NextResponse.json({ error: 'Category already exists' }, { status: 409 });
+      return conflict('Category already exists');
     }
-    console.error('Error creating expense category:', error);
-    return NextResponse.json({ error: 'Failed to create category' }, { status: 500 });
+    return serverError(error, 'Failed to create category');
   }
 }

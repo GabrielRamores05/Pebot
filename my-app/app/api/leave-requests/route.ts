@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/leave-requests?userId=X&status=PENDING
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get('userId');
@@ -26,13 +27,13 @@ export async function GET(req: NextRequest) {
 // POST /api/leave-requests — create a leave request
 export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
     const { userId, leaveTypeId, startDate, endDate, reason } = body;
     if (!userId || !leaveTypeId || !startDate || !endDate) {
-      return NextResponse.json({ error: 'userId, leaveTypeId, startDate, endDate required' }, { status: 400 });
+      return badRequest('userId, leaveTypeId, startDate, endDate required');
     }
     const request = await prisma.leaveRequest.create({
       data: {
@@ -43,19 +44,19 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(request, { status: 201 });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to create leave request' }, { status: 500 });
+    return serverError(e, 'Failed to create leave request');
   }
 }
 
 // PUT /api/leave-requests — approve/reject: { id, status, notes }
 export async function PUT(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
     const { id, status, notes } = body;
-    if (!id || !status) return NextResponse.json({ error: 'id and status required' }, { status: 400 });
+    if (!id || !status) return badRequest('id and status required');
 
     const updated = await prisma.leaveRequest.update({
       where: { id },
@@ -66,6 +67,6 @@ export async function PUT(req: NextRequest) {
     });
     return NextResponse.json(updated);
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to update leave request' }, { status: 500 });
+    return serverError(e, 'Failed to update leave request');
   }
 }

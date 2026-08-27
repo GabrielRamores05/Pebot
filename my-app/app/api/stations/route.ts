@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, conflict, serverError, unauthorized } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 
 const DEFAULT_STATIONS = ['coffee', 'kitchen', 'bar', 'pastry', 'general'];
@@ -23,27 +24,26 @@ export async function GET() {
 
     return NextResponse.json(stations);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to fetch stations' }, { status: 500 });
+    return serverError(e, 'Failed to fetch stations');
   }
 }
 
 // POST /api/stations — create a new station
 export async function POST(req: NextRequest) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { stationType, staffCount, emoji } = (await req.json()) as { stationType: string; staffCount?: number; emoji?: string };
 
     const name = stationType?.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
     if (!name || name.length < 2 || name.length > 30) {
-      return NextResponse.json({ error: 'Station name must be 2-30 alphanumeric characters' }, { status: 400 });
+      return badRequest('Station name must be 2-30 alphanumeric characters');
     }
 
     const existing = await prisma.staffStationControl.findUnique({ where: { stationType: name } });
     if (existing) {
-      return NextResponse.json({ error: 'Station already exists' }, { status: 409 });
+      return conflict('Station already exists');
     }
 
     const station = await prisma.staffStationControl.create({
@@ -56,15 +56,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(station, { status: 201 });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to create station' }, { status: 500 });
+    return serverError(e, 'Failed to create station');
   }
 }
 
 // PATCH /api/stations — update staff count or rename a station
 export async function PATCH(req: NextRequest) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { id, staffCount, stationType, emoji } = (await req.json()) as {
@@ -75,7 +74,7 @@ export async function PATCH(req: NextRequest) {
     };
 
     if (!id) {
-      return NextResponse.json({ error: 'Missing station id' }, { status: 400 });
+      return badRequest('Missing station id');
     }
 
     const data: Record<string, unknown> = {};
@@ -87,7 +86,7 @@ export async function PATCH(req: NextRequest) {
     if (emoji) data.emoji = emoji;
 
     if (Object.keys(data).length === 0) {
-      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+      return badRequest('Nothing to update');
     }
 
     const station = await prisma.staffStationControl.update({
@@ -97,27 +96,25 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(station);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to update station' }, { status: 500 });
+    return serverError(e, 'Failed to update station');
   }
 }
 
 // DELETE /api/stations — remove a station
 export async function DELETE(req: NextRequest) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { id } = (await req.json()) as { id: number };
 
     if (!id) {
-      return NextResponse.json({ error: 'Missing station id' }, { status: 400 });
+      return badRequest('Missing station id');
     }
 
     await prisma.staffStationControl.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to delete station' }, { status: 500 });
+    return serverError(e, 'Failed to delete station');
   }
 }

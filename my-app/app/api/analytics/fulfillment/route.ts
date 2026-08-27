@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { unauthorized, serverError } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 
 interface OrderMetric {
@@ -45,7 +46,7 @@ function getDateRange(range: string) {
 
 export async function GET(req: NextRequest) {
   const user = await requirePermission(req, 'analytics');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const range = req.nextUrl.searchParams.get('range') || 'today';
@@ -188,7 +189,6 @@ export async function GET(req: NextRequest) {
       orders: orderMetrics.slice(0, 100), // Return last 100 orders
     });
   } catch (e) {
-    console.error('[FULFILLMENT API] Error:', e);
-    return NextResponse.json({ error: 'Failed to fetch fulfillment metrics' }, { status: 500 });
+    return serverError(e, 'Failed to fetch fulfillment metrics');
   }
 }

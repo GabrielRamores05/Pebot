@@ -5,69 +5,18 @@ import { useSocket } from '@/hooks/useSocket';
 import { playNewOrderSound, playMessageSound } from '@/lib/sounds';
 import { selectionsLabelFromJson } from '@/lib/product-options';
 import { ticketCode } from '@/lib/ticket';
+import {
+  STATIONS,
+  StationKey,
+  StationOrder,
+  StationOrderItem,
+  StationOrderMessage,
+  groupByStation,
+} from '@/lib/kitchen-stations';
 
-interface OrderItem {
-  id: number;
-  quantity: number;
-  selections?: string | null;
-  product: { name: string; stationType?: string };
-}
-
-interface OrderMessage {
-  id: number;
-  orderId: number;
-  type: string;
-  content: string;
-  sender: string;
-  createdAt: string;
-}
-
-interface Order {
-  id: number;
-  orderNumber: string;
-  customerName: string;
-  status: 'PENDING' | 'PREPARING' | 'COMPLETED' | 'CANCELLED';
-  totalAmount: number;
-  createdAt: string;
-  table?: { name: string };
-  orderType?: string;
-  deliveryAddress?: string | null;
-  items: OrderItem[];
-  messages?: OrderMessage[];
-}
-
-type StationKey = 'coffee' | 'kitchen' | 'bar' | 'pastry' | 'general';
-
-const STATIONS: { key: StationKey; icon: string; label: string; border: string; bg: string; badge: string }[] = [
-  { key: 'coffee',  icon: '☕', label: 'Coffee',  border: 'border-amber-500/50', bg: 'bg-amber-500/10', badge: 'bg-amber-500' },
-  { key: 'kitchen', icon: '🍳', label: 'Kitchen', border: 'border-red-500/50',   bg: 'bg-red-500/10',   badge: 'bg-red-500' },
-  { key: 'bar',     icon: '🥤', label: 'Bar',     border: 'border-blue-500/50',  bg: 'bg-blue-500/10',  badge: 'bg-blue-500' },
-  { key: 'pastry',  icon: '🧁', label: 'Pastry',  border: 'border-pink-500/50',  bg: 'bg-pink-500/10',  badge: 'bg-pink-500' },
-  { key: 'general', icon: '📦', label: 'General', border: 'border-gray-500/50',  bg: 'bg-gray-500/10',  badge: 'bg-gray-500' },
-];
-
-function getItemStation(item: OrderItem): StationKey {
-  const s = item.product.stationType?.toLowerCase();
-  if (s && STATIONS.some((st) => st.key === s)) return s as StationKey;
-  return 'general';
-}
-
-function groupByStation(orders: Order[]) {
-  const grouped: Record<StationKey, { order: Order; items: OrderItem[] }[]> = {
-    coffee: [], kitchen: [], bar: [], pastry: [], general: [],
-  };
-  for (const order of orders) {
-    const byStation: Record<string, OrderItem[]> = {};
-    for (const item of order.items) {
-      const st = getItemStation(item);
-      (byStation[st] ||= []).push(item);
-    }
-    for (const [st, items] of Object.entries(byStation)) {
-      grouped[st as StationKey].push({ order, items });
-    }
-  }
-  return grouped;
-}
+type Order = StationOrder;
+type OrderItem = StationOrderItem;
+type OrderMessage = StationOrderMessage;
 
 export default function AdminKitchenPage() {
   const [orders, setOrders] = useState<Order[]>([]);

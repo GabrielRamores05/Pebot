@@ -53,7 +53,9 @@ function MyOrdersPanel({ onClose }: { onClose: () => void }) {
     try {
       const savedOrders = JSON.parse(localStorage.getItem('cafe_orders') || '[]');
       setOrders(savedOrders);
-    } catch {}
+    } catch (e) {
+      console.error('Could not read this device\u2019s saved orders:', e);
+    }
   }, []);
 
   // Fetch real-time status for all orders
@@ -174,9 +176,6 @@ function MyLoyaltyCardPanel({ onClose }: { onClose: () => void }) {
   const [cards, setCards] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [inputName, setInputName] = useState('');
-  const [view, setView] = useState<'progress' | 'claim'>('progress');
-  const [claimedVouchers, setClaimedVouchers] = useState<string[]>([]);
-  const [claiming, setClaiming] = useState(false);
   const [settings, setSettings] = useState<any>(null);
 
 
@@ -219,10 +218,6 @@ function MyLoyaltyCardPanel({ onClose }: { onClose: () => void }) {
     }
   }
 
-  async function handleClaimVouchers() {
-    setView('progress');
-  }
-
   async function handleRegister() {
     const name = inputName.trim();
     if (!name) {
@@ -261,7 +256,6 @@ function MyLoyaltyCardPanel({ onClose }: { onClose: () => void }) {
 
   function handleLogout() {
     localStorage.removeItem('loyaltyCustomerName');
-    localStorage.removeItem('selectedLoyaltyVoucher');
     setCustomerName('');
     setCards([]);
     setInputName('');
@@ -354,103 +348,51 @@ function MyLoyaltyCardPanel({ onClose }: { onClose: () => void }) {
               <p className="text-gray-500 text-sm">Loading...</p>
             </div>
           </div>
-        ) : error && view === 'progress' ? (
+        ) : error ? (
           <div className="flex-1 px-4 pb-6 flex items-center justify-center">
             <div className="text-center">
               <p className="text-red-600 font-medium mb-4">{error}</p>
             </div>
           </div>
-          ) : cards.length > 0 ? (
+        ) : cards.length > 0 ? (
           <div className="flex-1 px-4 pb-6 space-y-4 overflow-y-auto">
-            {/* Progress View */}
-            {view === 'progress' && (
-              <>
-                <div className="flex flex-col gap-6 pt-2">
-                  {cards.map((card, idx) => (
-                    <div key={card.id || idx} className="space-y-3">
-                      {card.activeVoucherCount > 0 && (
-                        <div className="w-full bg-linear-to-r from-green-500 to-emerald-500 text-white font-semibold py-3 px-4 rounded-2xl shadow-lg flex items-center gap-2 mb-2 animate-bounce-subtle">
-                          <span className="text-xl">🎁</span>
-                          <span className="text-sm">{card.categoryName}: {card.activeVoucherCount} reward(s) ready!</span>
-                        </div>
-                      )}
-
-                      <div 
-                        style={card.cardColor ? { backgroundColor: card.cardColor } : { backgroundColor: '#8B4513' }}
-                        className="text-white shadow-xl rounded-3xl p-6 text-center relative overflow-hidden"
-                      >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
-                        <div className="flex justify-between items-start mb-2 relative z-10">
-                           <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">{card.categoryName}</span>
-                        </div>
-                        <div className="flex items-center justify-center gap-3 mb-4 relative z-10">
-                          <div className="w-12 h-12 bg-white/20 backdrop-blur-xl rounded-xl flex items-center justify-center shadow-inner">
-                            <span className="text-2xl">☕</span>
-                          </div>
-                          <div className="text-4xl font-bold">{card.progress}/{card.coffeesRequiredForFree}</div>
-                        </div>
-                        <div className="w-full bg-white/20 backdrop-blur-sm rounded-full h-3 overflow-hidden relative z-10">
-                          <div
-                            className="h-full transition-all duration-700 ease-out rounded-full bg-white/50"
-                            style={{ width: `${Math.min((card.progress / card.coffeesRequiredForFree) * 100, 100)}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-white/70 mt-3 relative z-10 uppercase tracking-wide font-bold">
-                          {card.message}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Claim View - One click claim */}
-            {view === 'claim' && (
-              <>
-                {/* One-Click Claim Button - Liquid Glass */}
-                <button
-                  onClick={handleClaimVouchers}
-                  disabled={claiming}
-                  className="w-full bg-linear-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 disabled:opacity-70 text-white font-semibold py-5 rounded-2xl transition-all duration-300 ease-out shadow-xl active:scale-[0.98]"
-                >
-                  {claiming ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                      </svg>
-                      Claiming...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
+            <div className="flex flex-col gap-6 pt-2">
+              {cards.map((card, idx) => (
+                <div key={card.id || idx} className="space-y-3">
+                  {card.activeVoucherCount > 0 && (
+                    <div className="w-full bg-linear-to-r from-green-500 to-emerald-500 text-white font-semibold py-3 px-4 rounded-2xl shadow-lg flex items-center gap-2 mb-2">
                       <span className="text-xl">🎁</span>
-                      <span className="text-lg">Claim Free Coffee Now</span>
-                    </span>
-                  )}
-                </button>
-
-                {error && (
-                  <p className="text-red-600 text-sm mb-3 font-medium text-center">{error}</p>
-                )}
-
-                {/* Claimed Vouchers Display */}
-                {claimedVouchers.length > 0 && (
-                  <div className="bg-green-50/80 backdrop-blur-xl border border-green-200 rounded-3xl p-5 shadow-lg">
-                    <p className="text-green-800 text-sm font-semibold mb-3">✓ Successfully Claimed!</p>
-                    <div className="space-y-2">
-                      {claimedVouchers.map((code, idx) => (
-                        <div key={idx} className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-green-100">
-                          <p className="text-xs text-gray-500 mb-1">Voucher Code</p>
-                          <p className="text-lg font-mono font-bold text-green-700 break-all">{code}</p>
-                        </div>
-                      ))}
+                      <span className="text-sm">{card.categoryName}: {card.activeVoucherCount} reward(s) ready! Automatically applied at checkout.</span>
                     </div>
-                    <p className="text-xs text-green-600 mt-3">Use these codes at checkout to get your free coffee!</p>
+                  )}
+
+                  <div 
+                    style={card.cardColor ? { backgroundColor: card.cardColor } : { backgroundColor: '#8B4513' }}
+                    className="text-white shadow-xl rounded-3xl p-6 text-center relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
+                    <div className="flex justify-between items-start mb-2 relative z-10">
+                       <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">{card.categoryName}</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 mb-4 relative z-10">
+                      <div className="w-12 h-12 bg-white/20 backdrop-blur-xl rounded-xl flex items-center justify-center shadow-inner">
+                        <span className="text-2xl">☕</span>
+                      </div>
+                      <div className="text-4xl font-bold">{card.progress}/{card.coffeesRequiredForFree}</div>
+                    </div>
+                    <div className="w-full bg-white/20 backdrop-blur-sm rounded-full h-3 overflow-hidden relative z-10">
+                      <div
+                        className="h-full transition-all duration-700 ease-out rounded-full bg-white/50"
+                        style={{ width: `${Math.min((card.progress / card.coffeesRequiredForFree) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-white/70 mt-3 relative z-10 uppercase tracking-wide font-bold">
+                      {card.message}
+                    </p>
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
       </div>
@@ -1046,6 +988,12 @@ function MenuPageInner() {
       setGuestMoodEmoji(savedMood);
     }
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('loyalty') === '1') {
+      setShowLoyalty(true);
+    }
+  }, [searchParams]);
 
   function refreshCategories() {
     fetch('/api/categories')
@@ -1679,7 +1627,9 @@ function MenuPageInner() {
                           });
                         }
                       }
-                    } catch {}
+                    } catch (e) {
+                      console.error('Failed to save the guest mood to the table:', e);
+                    }
                   }
 
                   localStorage.setItem('customerMood', guestMoodEmoji);

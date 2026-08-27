@@ -25,6 +25,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ bestSellers: productIds });
   } catch (error) {
     console.error('Error fetching best sellers:', error);
-    return NextResponse.json({ bestSellers: [] });
+    return NextResponse.json({ error: 'Failed to fetch best sellers' }, { status: 500 });
   }
 }

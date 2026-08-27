@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { checkFeatureAccess } from '@/lib/auth';
+import { serverError } from '@/lib/api-response';
+import { guardFeature } from '@/lib/api-guards';
 
 function getDateRange(filter: string): { start: Date; end: Date } {
   const now = new Date();
@@ -34,15 +35,8 @@ function getDateRange(filter: string): { start: Date; end: Date } {
 
 export async function GET(req: NextRequest) {
   // Check if user has access to analytics feature
-  const { user, hasAccess } = await checkFeatureAccess(req, 'analytics');
-  
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Feature not available in your subscription tier' }, { status: 403 });
-  }
+  const { error } = await guardFeature(req, 'analytics');
+  if (error) return error;
 
   try {
     const { searchParams } = new URL(req.url);
@@ -143,7 +137,6 @@ export async function GET(req: NextRequest) {
       salesByCategory,
     });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }

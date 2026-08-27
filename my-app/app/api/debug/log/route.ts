@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { forbidden, serverError, unauthorized } from '@/lib/api-response';
 import { getAuthUser, requireRole } from '@/lib/auth';
 
 // Get log file path - same as electron main process
@@ -18,8 +19,8 @@ function getLogFilePath() {
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!requireRole(user, ['ADMIN'])) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!user) return unauthorized();
+  if (!requireRole(user, ['ADMIN'])) return forbidden();
 
   try {
     const logPath = getLogFilePath();
@@ -33,15 +34,14 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json({ content, lines });
   } catch (error) {
-    console.error('Failed to read log:', error);
-    return NextResponse.json({ error: 'Failed to read log' }, { status: 500 });
+    return serverError(error, 'Failed to read log');
   }
 }
 
 export async function DELETE(req: NextRequest) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!requireRole(user, ['ADMIN'])) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!user) return unauthorized();
+  if (!requireRole(user, ['ADMIN'])) return forbidden();
 
   try {
     const logPath = getLogFilePath();
@@ -52,7 +52,6 @@ export async function DELETE(req: NextRequest) {
     
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to clear log:', error);
-    return NextResponse.json({ error: 'Failed to clear log' }, { status: 500 });
+    return serverError(error, 'Failed to clear log');
   }
 }

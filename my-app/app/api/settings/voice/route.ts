@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { guardAdmin } from '@/lib/api-guards';
 
 const VOICE_KEY = 'voiceSettings';
 
@@ -10,17 +10,18 @@ export async function GET() {
   if (!row) return NextResponse.json({});
   try {
     return NextResponse.json(JSON.parse(row.value));
-  } catch {
+  } catch (e) {
+    // Stored value is corrupt — fall back to defaults, but leave a trace so it
+    // can be repaired instead of silently never applying.
+    console.error(`[SETTINGS] Corrupt "${VOICE_KEY}" value, falling back to defaults:`, e);
     return NextResponse.json({});
   }
 }
 
 // POST /api/settings/voice — admin only
 export async function POST(req: NextRequest) {
-  const me = await getAuthUser(req);
-  if (!me || me.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const { error } = await guardAdmin(req);
+  if (error) return error;
 
   const body = await req.json();
 

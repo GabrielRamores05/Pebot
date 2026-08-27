@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 // POST /api/tables/guests
 // Register a guest seated at a table with optional mood metadata
@@ -21,10 +22,7 @@ export async function POST(req: NextRequest) {
     const moodNote = body.moodNote ?? null;
 
     if (!tableId || !sessionId || !displayName) {
-      return NextResponse.json(
-        { error: 'tableId, sessionId and displayName are required' },
-        { status: 400 }
-      );
+      return badRequest('tableId, sessionId and displayName are required');
     }
 
     // Ensure table & session exist (lightweight checks)
@@ -34,13 +32,10 @@ export async function POST(req: NextRequest) {
     ]);
 
     if (!table) {
-      return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+      return notFound('Table not found');
     }
     if (!session || session.tableId !== tableId) {
-      return NextResponse.json(
-        { error: 'Session not found for this table' },
-        { status: 404 }
-      );
+      return notFound('Session not found for this table');
     }
 
     const guest = await prisma.tableGuest.create({
@@ -63,8 +58,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(guest, { status: 201 });
   } catch (e) {
-    console.error('❌ POST /api/tables/guests error:', e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 
@@ -81,7 +75,7 @@ export async function PATCH(req: NextRequest) {
 
     const id = Number(body.id);
     if (!id) {
-      return NextResponse.json({ error: 'Guest id is required' }, { status: 400 });
+      return badRequest('Guest id is required');
     }
 
     const updateData: Record<string, unknown> = {};
@@ -95,7 +89,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+      return badRequest('No fields to update');
     }
 
     const existing = await prisma.tableGuest.findUnique({
@@ -104,7 +98,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!existing) {
-      return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
+      return notFound('Guest not found');
     }
 
     const guest = await prisma.tableGuest.update({
@@ -128,8 +122,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(guest);
   } catch (e) {
-    console.error('❌ PATCH /api/tables/guests error:', e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 

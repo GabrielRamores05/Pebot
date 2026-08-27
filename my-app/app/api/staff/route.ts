@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
-import { checkFeatureAccess, requirePermission } from '@/lib/auth';
+import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError } from '@/lib/api-response';
+import { guardFeature } from '@/lib/api-guards';
 
 const DEFAULT_PERMISSIONS = {
   liveOrders: false,
@@ -26,9 +28,8 @@ const STAFF_SELECT = {
 } as const;
 
 export async function GET(req: NextRequest) {
-  const { user, hasAccess } = await checkFeatureAccess(req, 'staff');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!hasAccess) return NextResponse.json({ error: 'Feature not available in your subscription tier' }, { status: 403 });
+  const { user, error } = await guardFeature(req, 'staff');
+  if (error) return error;
 
   try {
     const staff = await prisma.user.findMany({ select: STAFF_SELECT, orderBy: { createdAt: 'desc' } });
@@ -38,15 +39,13 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json(staffWithParsed);
   } catch (e) {
-    console.error('[STAFF API] Error fetching staff:', e);
-    return NextResponse.json({ error: 'Failed to fetch staff' }, { status: 500 });
+    return serverError(e, 'Failed to fetch staff');
   }
 }
 
 export async function POST(req: NextRequest) {
-  const { user, hasAccess } = await checkFeatureAccess(req, 'staff');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!hasAccess) return NextResponse.json({ error: 'Feature not available in your subscription tier' }, { status: 403 });
+  const { user, error } = await guardFeature(req, 'staff');
+  if (error) return error;
 
   try {
     const body = await req.json();
@@ -58,12 +57,12 @@ export async function POST(req: NextRequest) {
     } = body;
 
     if (!name || !email || !password) {
-      return NextResponse.json({ error: 'Name, email, and password are required' }, { status: 400 });
+      return badRequest('Name, email, and password are required');
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
+      return badRequest('Email already in use');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -91,7 +90,6 @@ export async function POST(req: NextRequest) {
       permissions: typeof newStaff.permissions === 'string' ? JSON.parse(newStaff.permissions) : newStaff.permissions,
     }, { status: 201 });
   } catch (e) {
-    console.error('[STAFF API] Error creating staff:', e);
-    return NextResponse.json({ error: 'Failed to create staff member' }, { status: 500 });
+    return serverError(e, 'Failed to create staff member');
   }
 }

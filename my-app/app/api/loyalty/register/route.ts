@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, conflict } from '@/lib/api-response';
 
 function normalizeMemberName(value: string) {
   return value.trim().replace(/\s+/g, ' ').toUpperCase();
@@ -30,10 +31,7 @@ export async function POST(req: NextRequest) {
     const { customerName } = body;
 
     if (!customerName || typeof customerName !== 'string' || customerName.trim() === '') {
-      return NextResponse.json(
-        { error: 'Customer name is required' },
-        { status: 400 }
-      );
+      return badRequest('Customer name is required');
     }
 
     const normalizedName = normalizeMemberName(customerName);
@@ -43,10 +41,7 @@ export async function POST(req: NextRequest) {
     const duplicateNameExists = existingCards.some(card => normalizeMemberName(card.customerName) === normalizedName);
 
     if (duplicateNameExists) {
-      return NextResponse.json(
-        { error: 'This name is already registered. Please view your existing cards.' },
-        { status: 409 }
-      );
+      return conflict('This name is already registered. Please view your existing cards.');
     }
 
     const membershipCode = await generateMembershipCode(normalizedName, new Date());

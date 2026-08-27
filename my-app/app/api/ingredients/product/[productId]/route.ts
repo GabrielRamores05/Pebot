@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
 import { recomputeProduct } from '@/lib/availability';
+import { serverError } from '@/lib/api-response';
 
 interface RouteParams {
   params: Promise<{ productId: string }>;
@@ -21,8 +22,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(productIngredients);
   } catch (error) {
-    console.error('Error fetching product ingredients:', error);
-    return NextResponse.json({ error: 'Failed to fetch product ingredients' }, { status: 500 });
+    return serverError(error, 'Failed to fetch product ingredients');
   }
 }
 
@@ -66,7 +66,6 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(productIngredients);
   } catch (error) {
-    console.error('Error updating product ingredients:', error);
-    return NextResponse.json({ error: 'Failed to update product ingredients' }, { status: 500 });
+    return serverError(error, 'Failed to update product ingredients');
   }
 }

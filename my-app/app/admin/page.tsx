@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSocket } from '@/hooks/useSocket';
 import { playNewOrderSound, playMessageSound } from '@/lib/sounds';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 import {
   type VoiceSettings,
   fetchVoiceSettings,
@@ -108,7 +109,8 @@ export default function AdminPage() {
         // User is logged in, allow access
         setAuthorized(true);
       })
-      .catch(() => {
+      .catch((e) => {
+        console.error('Could not confirm the signed-in user, returning to sign-in:', e);
         router.push('/login');
       })
       .finally(() => {
@@ -204,6 +206,7 @@ export default function AdminPage() {
   const [orderMessages, setOrderMessages] = useState<OrderMessage[]>([]);
   const [replyText, setReplyText] = useState('');
   const [replySending, setReplySending] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [msgNotif, setMsgNotif] = useState<Array<{ orderNumber: string; customerName: string }>>([]);
   const [followUpNotif, setFollowUpNotif] = useState<Array<{ orderNumber: string; customerName: string; tableName: string }>>([]);
   const [unreadOrders, setUnreadOrders] = useState<Set<string>>(new Set());
@@ -352,27 +355,30 @@ export default function AdminPage() {
   // Fetch messages when an order is selected
   useEffect(() => {
     if (!selected) { setOrderMessages([]); return; }
-    fetch(`/api/orders/${selected.orderNumber}/messages`)
-      .then((r) => r.ok ? r.json() : [])
+    fetchJson<OrderMessage[]>(`/api/orders/${selected.orderNumber}/messages`)
       .then(setOrderMessages)
-      .catch(() => setOrderMessages([]));
+      .catch((e) => {
+        console.error(`Failed to load messages for order ${selected.orderNumber}:`, e);
+        setOrderMessages([]);
+      });
   }, [selected?.id]);
 
   async function sendReply() {
     if (!selected || !replyText.trim() || replySending) return;
     setReplySending(true);
+    setReplyError(null);
     try {
-      const res = await fetch(`/api/orders/${selected.orderNumber}/messages`, {
+      const msg = await fetchJson<OrderMessage>(`/api/orders/${selected.orderNumber}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'text', content: replyText.trim(), sender: currentUser?.name || 'Staff' }),
       });
-      if (res.ok) {
-        const msg = await res.json();
-        setOrderMessages((prev) => [...prev, msg]);
-        setReplyText('');
-      }
-    } catch {}
+      setOrderMessages((prev) => [...prev, msg]);
+      setReplyText('');
+    } catch (e) {
+      console.error('Failed to send reply:', e);
+      setReplyError(userMessage(e, 'The reply did not send. Try again.'));
+    }
     setReplySending(false);
   }
 
@@ -734,6 +740,9 @@ export default function AdminPage() {
                     Send
                   </button>
                 </div>
+                {replyError && (
+                  <p className="mt-2 text-sm text-red-600">{replyError}</p>
+                )}
               </div>
             </div>
           </div>

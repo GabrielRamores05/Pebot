@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 
 // POST /api/loyalty/vouchers/create - Create a promotional voucher with custom rules
 export async function POST(req: NextRequest) {
   const user = await requirePermission(req, 'loyalty');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const body = await req.json();
@@ -28,11 +29,11 @@ export async function POST(req: NextRequest) {
     const finalCustomerName = customerName?.trim() || 'PROMO';
 
     if (!discountType || !['FREE', 'PERCENTAGE', 'FIXED_AMOUNT'].includes(discountType)) {
-      return NextResponse.json({ error: 'discountType must be FREE, PERCENTAGE, or FIXED_AMOUNT' }, { status: 400 });
+      return badRequest('discountType must be FREE, PERCENTAGE, or FIXED_AMOUNT');
     }
 
     if (discountValue === undefined || discountValue < 0) {
-      return NextResponse.json({ error: 'discountValue must be non-negative' }, { status: 400 });
+      return badRequest('discountValue must be non-negative');
     }
 
     // Build reward name if not provided
@@ -86,15 +87,14 @@ export async function POST(req: NextRequest) {
       message: `Created voucher ${voucherCode}`,
     });
   } catch (e) {
-    console.error('[LOYALTY] Error creating voucher:', e);
-    return NextResponse.json({ error: 'Failed to create voucher' }, { status: 500 });
+    return serverError(e, 'Failed to create voucher');
   }
 }
 
 // GET /api/loyalty/vouchers/create - List all vouchers (optionally filtered by customer)
 export async function GET(req: NextRequest) {
   const user = await requirePermission(req, 'loyalty');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { searchParams } = new URL(req.url);
@@ -110,7 +110,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ vouchers });
   } catch (e) {
-    console.error('[LOYALTY] Error fetching vouchers:', e);
-    return NextResponse.json({ error: 'Failed to fetch vouchers' }, { status: 500 });
+    return serverError(e, 'Failed to fetch vouchers');
   }
 }

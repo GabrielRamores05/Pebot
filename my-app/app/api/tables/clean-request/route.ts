@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 /**
  * POST /api/tables/clean-request
@@ -14,10 +15,7 @@ export async function POST(req: NextRequest) {
     const tableName = body.tableName?.trim();
 
     if (!tableId && !tableName) {
-      return NextResponse.json(
-        { error: 'tableId or tableName is required' },
-        { status: 400 }
-      );
+      return badRequest('tableId or tableName is required');
     }
 
     const table = await prisma.restaurantTable.findFirst({
@@ -27,7 +25,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!table) {
-      return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+      return notFound('Table not found');
     }
 
     // If already marked as NEEDS_CLEANING, just acknowledge and emit event
@@ -58,8 +56,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, table: updated });
   } catch (e) {
-    console.error('❌ POST /api/tables/clean-request error:', e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 

@@ -4,6 +4,7 @@ import { emitEvent } from '@/lib/socket';
 import { calculateOrderWaitTime } from '@/lib/waitTime';
 import { normalizeMemberName } from '@/lib/loyalty-utils';
 import { logAction } from '@/lib/audit-log';
+import { runRecoverableStep } from '@/lib/recoverable';
 import { getSellableQuantity, recomputeProducts } from '@/lib/availability';
 import {
   awardLoyaltyForPaidOrder,
@@ -22,6 +23,7 @@ import {
   sequenceValue,
   ticketDatePart,
 } from '@/lib/ticket';
+import { badRequest, serverError } from '@/lib/api-response';
 
 class InsufficientStockError extends Error {
   items: { productId: number; name: string; requested: number; available: number }[];
@@ -75,8 +77,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(orders);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
+    return serverError(e, 'Failed to fetch orders');
   }
 }
 
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!customerName || !items || items.length === 0) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return badRequest('Missing required fields');
     }
 
     const orderTypeValue = orderType || 'DINE_IN';
@@ -386,30 +387,39 @@ export async function POST(req: NextRequest) {
     // those specific cards. Otherwise, for paid (terminal) orders, auto-award
     // one point per eligible coffee to the named customer. The two paths are
     // mutually exclusive so an order is never awarded twice.
-    try {
-      if (loyaltyAssignments && loyaltyAssignments.length > 0) {
-        await awardLoyaltyToSpecificCards({
-          loyaltyAssignments,
-          customerName,
-          orderId: order.id,
-        });
-      } else if (paymentConfirmed === true) {
-        await awardLoyaltyForPaidOrder({
-          id: order.id,
-          loyaltyPromo: order.loyaltyPromo,
-          loyaltyCustomerName: order.loyaltyCustomerName,
-          customerName: order.customerName,
-          orderNumber: order.orderNumber,
-          totalAmount: Number(order.totalAmount),
-          items: order.items,
-        });
-      }
-    } catch (err) {
-      console.error('[LOYALTY] Award failed:', err);
-    }
+    const loyaltyFailure = await runRecoverableStep(
+      'LOYALTY_AWARD',
+      { orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName },
+      async () => {
+        if (loyaltyAssignments && loyaltyAssignments.length > 0) {
+          await awardLoyaltyToSpecificCards({
+            loyaltyAssignments,
+            customerName,
+            orderId: order.id,
+          });
+        } else if (paymentConfirmed === true) {
+          await awardLoyaltyForPaidOrder({
+            id: order.id,
+            loyaltyPromo: order.loyaltyPromo,
+            loyaltyCustomerName: order.loyaltyCustomerName,
+            customerName: order.customerName,
+            orderNumber: order.orderNumber,
+            totalAmount: Number(order.totalAmount),
+            items: order.items,
+          });
+        }
+      },
+    );
 
     return NextResponse.json(
-      { ...order, estimatedTimes: perStation, estimatedWait: maxWait },
+      {
+        ...order,
+        estimatedTimes: perStation,
+        estimatedWait: maxWait,
+        ...(loyaltyFailure
+          ? { warnings: ['The order was placed, but loyalty points were not added. Add them by hand from the Loyalty page.'] }
+          : {}),
+      },
       { status: 201 },
     );
   } catch (e) {
@@ -420,7 +430,6 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
+    return serverError(e, 'Failed to create order');
   }
 }

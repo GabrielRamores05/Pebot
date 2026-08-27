@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serverError } from '@/lib/api-response';
 
 interface VoucherRecord {
   id: number;
@@ -84,7 +85,6 @@ export async function GET(req: NextRequest) {
       stats,
     });
   } catch (e) {
-    console.error('[VOUCHER HISTORY] Error:', e);
-    return NextResponse.json({ error: 'Failed to fetch voucher history' }, { status: 500 });
+    return serverError(e, 'Failed to fetch voucher history');
   }
 }

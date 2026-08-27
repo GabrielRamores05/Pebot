@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 /**
  * POST /api/tables/exit
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
   };
 
     if (!tableId) {
-      return NextResponse.json({ error: 'Valid tableId required' }, { status: 400 });
+      return badRequest('Valid tableId required');
     }
 
     // Default to 1 occupant if not specified, but allow explicit override
@@ -26,14 +27,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (!table) {
-      return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+      return notFound('Table not found');
     }
 
     // Validate table is occupied
     if (table.status !== 'OCCUPIED' || table.currentOccupants <= 0) {
-      return NextResponse.json({ 
-        error: 'This table is not currently occupied.' 
-      }, { status: 400 });
+      return badRequest('This table is not currently occupied.');
     }
 
     // Validate we can't exit more occupants than currently present
@@ -143,7 +142,6 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (e) {
-    console.error('❌ Exit endpoint error:', e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }

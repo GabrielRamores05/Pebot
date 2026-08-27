@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { useSocket } from '@/hooks/useSocket';
+import { formatPeso } from '@/lib/format';
 
 interface RevenueMetrics {
   totalRevenue: number;
@@ -30,10 +31,6 @@ const FILTERS = [
   { key: 'year', label: 'This Year' },
   { key: 'all', label: 'All Time' },
 ];
-
-function formatCurrency(value: number): string {
-  return `₱${value.toFixed(2)}`;
-}
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
@@ -139,7 +136,7 @@ export default function RevenueDashboard() {
           {/* Total Revenue */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
             <div className="text-slate-500 text-sm font-medium">Total Revenue</div>
-            <div className="text-3xl font-bold mt-2 text-slate-900">{formatCurrency(data.totalRevenue)}</div>
+            <div className="text-3xl font-bold mt-2 text-slate-900">{formatPeso(data.totalRevenue)}</div>
             {revenueGrowth !== 0 && (
               <div className={`text-sm mt-2 ${revenueGrowth > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                 {revenueGrowth > 0 ? '↑' : '↓'} {formatPercent(Math.abs(revenueGrowth))} vs previous
@@ -150,7 +147,7 @@ export default function RevenueDashboard() {
           {/* Average Order Value */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
             <div className="text-slate-500 text-sm font-medium">Avg Order Value</div>
-            <div className="text-3xl font-bold mt-2 text-slate-900">{formatCurrency(data.averageOrderValue)}</div>
+            <div className="text-3xl font-bold mt-2 text-slate-900">{formatPeso(data.averageOrderValue)}</div>
             <div className="text-sm text-slate-400 mt-2">{data.totalOrders} orders</div>
           </div>
 
@@ -168,7 +165,7 @@ export default function RevenueDashboard() {
           {/* Loyalty Impact */}
           <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
             <div className="text-slate-500 text-sm font-medium">Loyalty Discount Impact</div>
-            <div className="text-3xl font-bold mt-2 text-orange-600">{formatCurrency(data.loyaltyRevenueImpact)}</div>
+            <div className="text-3xl font-bold mt-2 text-orange-600">{formatPeso(data.loyaltyRevenueImpact)}</div>
             <div className="text-sm text-slate-400 mt-2">Discounts given</div>
           </div>
         </div>
@@ -185,7 +182,7 @@ export default function RevenueDashboard() {
                 <YAxis stroke="#6b7280" />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  formatter={(value) => formatCurrency(value as number)}
+                  formatter={(value) => formatPeso(value as number)}
                 />
                 <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="#10b981" name="Revenue" strokeWidth={2} />
@@ -206,7 +203,7 @@ export default function RevenueDashboard() {
                       <div className="text-sm text-slate-500">{pm.count} transactions</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-slate-900">{formatCurrency(pm.amount)}</div>
+                      <div className="font-bold text-slate-900">{formatPeso(pm.amount)}</div>
                       <div className="text-sm text-slate-500">
                         {((pm.amount / data.totalRevenue) * 100).toFixed(1)}%
                       </div>
@@ -241,7 +238,7 @@ export default function RevenueDashboard() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                  <Tooltip formatter={(value) => formatPeso(value as number)} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -260,7 +257,7 @@ export default function RevenueDashboard() {
                   <YAxis stroke="#6b7280" />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: 8 }}
-                    formatter={(value) => formatCurrency(value as number)}
+                    formatter={(value) => formatPeso(value as number)}
                   />
                   <Bar dataKey="revenue" fill="#f59e0b" name="Revenue" />
                 </BarChart>
@@ -280,7 +277,7 @@ export default function RevenueDashboard() {
                 <div key={cs.percentile} className="p-3 bg-slate-50 rounded">
                   <div className="font-medium text-sm text-slate-600">{cs.percentile}</div>
                   <div className="text-2xl font-bold mt-1 text-slate-900">{cs.count}</div>
-                  <div className="text-sm text-slate-500 mt-1">{formatCurrency(cs.revenue)} ({formatPercent(cs.revenue / data.totalRevenue)})</div>
+                  <div className="text-sm text-slate-500 mt-1">{formatPeso(cs.revenue)} ({formatPercent(cs.revenue / data.totalRevenue)})</div>
                 </div>
               ))}
             </div>

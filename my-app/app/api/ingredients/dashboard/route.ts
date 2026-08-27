@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
 import { calcInventoryValue, getStockStatus, formatStock } from '@/lib/ingredient-utils';
+import { serverError, unauthorized } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
   const user = await requirePermission(req, 'inventory');
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return unauthorized();
   }
 
   try {
@@ -94,7 +95,6 @@ export async function GET(req: NextRequest) {
       ingredients: ingredientList,
     });
   } catch (error) {
-    console.error('[INGREDIENT DASHBOARD] Error:', error);
-    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 });
+    return serverError(error, 'Failed to fetch dashboard data');
   }
 }

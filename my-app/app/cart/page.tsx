@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCartStore, lineKey, type CartItemSelection } from '@/store/cartStore';
 import { calculateLoyaltyDiscountForItems } from '@/lib/pos-utils';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface BrandingState {
   shopName: string;
@@ -15,6 +16,13 @@ interface Table {
   id: number;
   name: string;
   status: string;
+}
+
+interface BusinessSettings {
+  gcashAccountName?: string | null;
+  gcashQrImage?: string | null;
+  paymayaAccountName?: string | null;
+  paymayaQrImage?: string | null;
 }
 
 interface SelectedLoyaltyVoucher {
@@ -89,12 +97,15 @@ export default function CartPage() {
     setDraftSingle({});
     setDraftMulti([]);
 
-    // Always fetch fresh; cache only serves as a network-failure fallback.
+    // Always fetch fresh; cache only serves as a failure fallback, so a failed
+    // request must not look like "this item has no options".
     let groups: OptionGroupDTO[] | null = null;
     try {
-      const res = await fetch(`/api/products/${item.productId}/option-groups`, { cache: 'no-store' });
-      groups = res.ok ? await res.json() : [];
-    } catch { groups = null; }
+      groups = await fetchJson<OptionGroupDTO[]>(`/api/products/${item.productId}/option-groups`, { cache: 'no-store' });
+    } catch (e) {
+      console.error('Could not load options for this item; using the last known list:', e);
+      groups = null;
+    }
     if (!groups) groups = groupsCache[item.productId] ?? [];
     setGroupsCache((prev) => ({ ...prev, [item.productId]: groups ?? [] }));
     const list = groups ?? [];
@@ -150,7 +161,7 @@ export default function CartPage() {
 
   const [paymentScreenshot, setPaymentScreenshot] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [businessSettings, setBusinessSettings] = useState<any>(null);
+  const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
   const [uploading, setUploading] = useState(false);
   const [voucherDetails, setVoucherDetails] = useState<VoucherDetail[]>([]);
   const [voucherValidationErrors, setVoucherValidationErrors] = useState<string[]>([]);
@@ -158,15 +169,13 @@ export default function CartPage() {
 
 
   useEffect(() => {
-    fetch('/api/settings/branding')
-      .then((r) => r.json())
+    fetchJson<{ shopName?: string; logoUrl?: string | null }>('/api/settings/branding')
       .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
-      .catch(() => {});
+      .catch((e) => console.error('Failed to load branding, using defaults:', e));
   }, []);
 
   useEffect(() => {
-    fetch('/api/tables')
-      .then((r) => r.json())
+    fetchJson<Table[]>('/api/tables')
       .then((data) => {
         if (Array.isArray(data)) {
           setTables(data);
@@ -175,15 +184,14 @@ export default function CartPage() {
           setTables([]);
         }
       })
-      .catch(() => {});
+      .catch((e) => console.error('Failed to load tables:', e));
   }, []);
 
   // Fetch business settings for payment QR codes
   useEffect(() => {
-    fetch('/api/settings/business')
-      .then((r) => r.ok ? r.json() : null)
+    fetchJson<BusinessSettings>('/api/settings/business')
       .then((data) => setBusinessSettings(data))
-      .catch(() => {});
+      .catch((e) => console.error('Failed to load business settings:', e));
   }, []);
 
   // Auto-fill customer name from loyalty registration if available
@@ -199,7 +207,9 @@ export default function CartPage() {
       } else {
         setIsNameFromLoyalty(false);
       }
-    } catch {}
+    } catch (e) {
+      console.error('Could not read the saved loyalty name from this device:', e);
+    }
   }, [cartStore]);
 
   // Fetch voucher details when vouchers are loaded
@@ -241,6 +251,7 @@ export default function CartPage() {
             errors.push(`${code}: ${data.validationErrors?.join(', ') || 'Invalid'}`);
           }
         } catch (e) {
+          console.error(`Failed to validate voucher ${code}:`, e);
           errors.push(`${code}: Failed to validate`);
         }
       }
@@ -333,7 +344,9 @@ export default function CartPage() {
       if (stored) {
         setLoyaltyVouchers(JSON.parse(stored));
       }
-    } catch {}
+    } catch (e) {
+      console.error('Could not read the selected rewards from this device:', e);
+    }
   }, []);
 
   useEffect(() => {
@@ -345,7 +358,9 @@ export default function CartPage() {
         } else {
           setLoyaltyVouchers(null);
         }
-      } catch {}
+      } catch (e) {
+        console.error('Could not read the selected rewards from this device:', e);
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -493,6 +508,8 @@ export default function CartPage() {
       // If loyalty vouchers were selected, redeem all of them for this order
       if (loyaltyVouchers && loyaltyVouchers.codes && loyaltyVouchers.codes.length > 0) {
         if (!data.id) {
+          console.error('Order response had no id; vouchers were not redeemed:', data);
+          setError('Your order was placed, but your rewards were not applied. Show this to staff before you pay.');
           return;
         }
 
@@ -536,12 +553,16 @@ export default function CartPage() {
           notes: `Loyalty rewards applied${vouchersUsedText}`,
         });
         localStorage.setItem('cafe_orders', JSON.stringify(existing.slice(0, 20)));
-      } catch {}
+      } catch (e) {
+        // The order is placed; only the local "My Orders" shortcut is missing.
+        console.error('Could not save the order to this device\u2019s order list:', e);
+      }
 
       cartStore.clearCart();
       router.push(`/order/${data.orderNumber}`);
-    } catch {
-      setError('Network error. Please try again.');
+    } catch (e) {
+      console.error('Failed to place order:', e);
+      setError(userMessage(e, 'Network error. Please try again.'));
     } finally {
       setPlacing(false);
     }
@@ -612,7 +633,7 @@ export default function CartPage() {
               (paymentMethod === 'PAYMAYA' && businessSettings.paymayaQrImage)) && (
               <div className="mt-2 flex justify-center">
                 <img
-                  src={paymentMethod === 'GCASH' ? businessSettings.gcashQrImage : businessSettings.paymayaQrImage}
+                  src={(paymentMethod === 'GCASH' ? businessSettings.gcashQrImage : businessSettings.paymayaQrImage) ?? undefined}
                   alt={paymentMethod === 'GCASH' ? 'GCash QR' : 'PayMaya QR'}
                   className="max-w-32 max-h-32 rounded border border-gray-200 object-contain"
                 />
@@ -984,13 +1005,12 @@ export default function CartPage() {
                           try {
                             const formData = new FormData();
                             formData.append('file', file);
-                            const response = await fetch('/api/upload', { method: 'POST', body: formData });
-                            if (response.ok) {
-                              const data = await response.json();
-                              setPaymentScreenshot(data.url);
-                            }
-                          } catch {
-                            // keep silent for upload issue; order can still proceed
+                            const data = await fetchJson<{ url: string }>('/api/upload', { method: 'POST', body: formData });
+                            setPaymentScreenshot(data.url);
+                            setError('');
+                          } catch (e) {
+                            console.error('Payment screenshot upload failed:', e);
+                            setError(userMessage(e, 'Your payment screenshot did not upload. Try again, or show it to staff.'));
                           } finally {
                             setUploading(false);
                           }

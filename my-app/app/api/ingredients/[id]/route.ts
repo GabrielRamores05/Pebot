@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
+import { notFound, serverError, unauthorized } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 
 interface RouteParams {
@@ -17,20 +18,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!ingredient) {
-      return NextResponse.json({ error: 'Ingredient not found' }, { status: 404 });
+      return notFound('Ingredient not found');
     }
 
     return NextResponse.json(ingredient);
   } catch (error) {
-    console.error('Error fetching ingredient:', error);
-    return NextResponse.json({ error: 'Failed to fetch ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to fetch ingredient');
   }
 }
 
 // PUT /api/ingredients/[id] - Update ingredient
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(request, 'inventory');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { id } = await params;
@@ -70,15 +70,14 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(ingredient);
   } catch (error) {
-    console.error('Error updating ingredient:', error);
-    return NextResponse.json({ error: 'Failed to update ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to update ingredient');
   }
 }
 
 // DELETE /api/ingredients/[id] - Delete ingredient
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(request, 'inventory');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { id } = await params;
@@ -94,7 +93,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting ingredient:', error);
-    return NextResponse.json({ error: 'Failed to delete ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to delete ingredient');
   }
 }

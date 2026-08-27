@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 
 export async function GET() {
@@ -16,20 +17,19 @@ export async function GET() {
     });
     return NextResponse.json(categories);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 });
+    return serverError(e, 'Failed to fetch categories');
   }
 }
 
 export async function POST(req: NextRequest) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { name, icon, sortOrder } = await req.json() as { name: string; icon?: string; sortOrder?: number };
     const trimmedName = name?.trim();
     if (!trimmedName) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+      return badRequest('Name is required');
     }
 
     // Optional: you could also enforce uniqueness by name here, but Prisma will
@@ -50,13 +50,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ error: 'Failed to create category' }, { status: 500 });
+    return serverError(e, 'Failed to create category');
   }
 }
 
 export async function PATCH(req: NextRequest) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { id, name, icon, sortOrder } = await req.json() as { id: number; name?: string; icon?: string; sortOrder?: number };
@@ -67,21 +67,20 @@ export async function PATCH(req: NextRequest) {
     const category = await prisma.category.update({ where: { id }, data });
     return NextResponse.json(category);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to update category' }, { status: 500 });
+    return serverError(e, 'Failed to update category');
   }
 }
 
 export async function DELETE(req: NextRequest) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const body = await req.json();
     const id = parseInt(body.id);
     
     if (!id || isNaN(id)) {
-      return NextResponse.json({ error: 'Invalid category ID provided' }, { status: 400 });
+      return badRequest('Invalid category ID provided');
     }
     
     // Check if category exists

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { unauthorized, serverError } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 
 interface RevenueMetrics {
@@ -74,7 +75,7 @@ function getDateRange(filter: string, isPrevious: boolean = false) {
 
 export async function GET(req: NextRequest) {
   const user = await requirePermission(req, 'analytics');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const filter = req.nextUrl.searchParams.get('filter') || 'month';
@@ -231,7 +232,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (e) {
-    console.error('[REVENUE API] Error:', e);
-    return NextResponse.json({ error: 'Failed to fetch revenue data' }, { status: 500 });
+    return serverError(e, 'Failed to fetch revenue data');
   }
 }

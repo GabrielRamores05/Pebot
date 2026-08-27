@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, serverError } from '@/lib/api-response';
 
 // POST /api/loyalty/rewards/generate - Manually generate/sync vouchers for customer
 // Ensures vouchers exist for all earned thresholds
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
     const { customerName } = body as { customerName: string };
 
     if (!customerName) {
-      return NextResponse.json({ error: 'customerName is required' }, { status: 400 });
+      return badRequest('customerName is required');
     }
 
     // Get loyalty card (use findFirst since unique key is now composite)
@@ -107,7 +108,6 @@ export async function POST(req: NextRequest) {
       message: `Generated ${vouchersToCreate} new voucher(s)`,
     });
   } catch (e) {
-    console.error('[LOYALTY] Error generating vouchers:', e);
-    return NextResponse.json({ error: 'Failed to generate vouchers' }, { status: 500 });
+    return serverError(e, 'Failed to generate vouchers');
   }
 }

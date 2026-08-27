@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 
 function slugify(name: string): string {
@@ -33,14 +34,13 @@ export async function GET(_req: NextRequest) {
     });
     return NextResponse.json(tables);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 
 export async function PATCH(req: NextRequest) {
   const user = await requirePermission(req, 'tables');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const body = await req.json() as { id: number; status?: string; name?: string; capacity?: number; section?: string; positionX?: number; positionY?: number };
@@ -75,14 +75,14 @@ export async function PATCH(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const user = await requirePermission(req, 'tables');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { name, capacity } = await req.json() as { name: string; capacity: number };
 
     const trimmedName = name?.trim();
     if (!trimmedName) {
-      return NextResponse.json({ error: 'Table name is required' }, { status: 400 });
+      return badRequest('Table name is required');
     }
 
     const safeCapacity = typeof capacity === 'number' && capacity > 0 ? capacity : 4;
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     // Handle common Prisma unique constraint for table name
     const errorMsg = String(e);
     if (errorMsg.includes('Unique constraint') || errorMsg.includes('P2002')) {
-      return NextResponse.json({ error: 'A table with this name already exists. Please use a different name.' }, { status: 400 });
+      return badRequest('A table with this name already exists. Please use a different name.');
     }
 
     const errorMessage = e instanceof Error ? e.message : 'Unknown error';
@@ -128,12 +128,12 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const user = await requirePermission(req, 'tables');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { id, force } = await req.json() as { id: number; force?: boolean };
     const table = await prisma.restaurantTable.findUnique({ where: { id } });
-    if (!table) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!table) return notFound();
     
     // If force is true or table is occupied, just reset the table status before delete
     if (force || table.status === 'OCCUPIED') {
@@ -171,7 +171,7 @@ export async function PUT(req: NextRequest) {
     };
     
     const table = await prisma.restaurantTable.findUnique({ where: { id } });
-    if (!table) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!table) return notFound();
     
     // Handle clear action - remove all guests and reset table
     if (action === 'clear') {
@@ -183,7 +183,7 @@ export async function PUT(req: NextRequest) {
         ? await prisma.tableGuest.findMany({ where: { sessionId: activeSession.id, active: true } })
         : [];
       if (activeGuests.length > 0) {
-        return NextResponse.json({ error: 'Cannot clear table with active guests. Please dismiss guests first.' }, { status: 400 });
+        return badRequest('Cannot clear table with active guests. Please dismiss guests first.');
       }
       
       await prisma.$transaction([
@@ -294,7 +294,6 @@ export async function PUT(req: NextRequest) {
     emitEvent('table-update', updatedTable);
     return NextResponse.json(updatedTable);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }

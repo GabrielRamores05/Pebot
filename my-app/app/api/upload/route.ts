@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { badRequest, serverError } from '@/lib/api-response';
 
 const UPLOADS_DIR = join(process.cwd(), 'uploads');
 const MIME_EXTENSIONS: Record<string, string> = {
@@ -15,14 +16,14 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if (!file) return badRequest('No file provided');
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'File must be 5 MB or smaller' }, { status: 400 });
+      return badRequest('File must be 5 MB or smaller');
     }
 
     const extension = MIME_EXTENSIONS[file.type];
     if (!extension) {
-      return NextResponse.json({ error: 'Only JPEG, PNG, WebP, and GIF images are allowed' }, { status: 400 });
+      return badRequest('Only JPEG, PNG, WebP, and GIF images are allowed');
     }
 
     await mkdir(UPLOADS_DIR, { recursive: true });
@@ -33,7 +34,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: `/api/files/${filename}` });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    return serverError(e, 'Upload failed');
   }
 }

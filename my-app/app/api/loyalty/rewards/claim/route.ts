@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 // POST /api/loyalty/rewards/claim - claim multiple rewards for an order
 export async function POST(req: NextRequest) {
@@ -12,10 +13,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!customerName || !voucherCodes || voucherCodes.length === 0) {
-      return NextResponse.json(
-        { error: 'customerName and voucherCodes are required' },
-        { status: 400 }
-      );
+      return badRequest('customerName and voucherCodes are required');
     }
 
     // Verify all vouchers exist and belong to customer
@@ -27,19 +25,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (vouchers.length !== voucherCodes.length) {
-      return NextResponse.json(
-        { error: 'Some vouchers not found or do not belong to you' },
-        { status: 404 }
-      );
+      return notFound('Some vouchers not found or do not belong to you');
     }
 
     // Check all are ACTIVE
     const allActive = vouchers.every(v => v.status === 'ACTIVE');
     if (!allActive) {
-      return NextResponse.json(
-        { error: 'Some vouchers are not active' },
-        { status: 400 }
-      );
+      return badRequest('Some vouchers are not active');
     }
 
     // Delete all vouchers (they are consumed)
@@ -65,7 +57,6 @@ export async function POST(req: NextRequest) {
       message: `${voucherCodes.length} voucher(s) successfully redeemed and removed`,
     });
   } catch (e) {
-    console.error('[LOYALTY] Error claiming rewards:', e);
-    return NextResponse.json({ error: 'Failed to claim rewards' }, { status: 500 });
+    return serverError(e, 'Failed to claim rewards');
   }
 }

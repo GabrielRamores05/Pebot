@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
+import { notFound, serverError, unauthorized } from '@/lib/api-response';
 import { getAuthUser } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const { orderId, method, referenceNo, terminalId } = await req.json() as {
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     };
 
     const order = await prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    if (!order) return notFound('Order not found');
 
     const payment = await prisma.$transaction(async (tx) => {
       const p = await tx.paymentTransaction.create({
@@ -49,14 +50,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(payment, { status: 201 });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const payments = await prisma.paymentTransaction.findMany({
@@ -66,7 +66,6 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json(payments);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }

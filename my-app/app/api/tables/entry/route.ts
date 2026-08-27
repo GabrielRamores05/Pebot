@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 /**
  * POST /api/tables/entry
@@ -21,12 +22,12 @@ export async function POST(req: NextRequest) {
     };
 
     if (!tableId || !occupants || occupants < 1) {
-      return NextResponse.json({ error: 'Valid tableId and occupants (≥1) required' }, { status: 400 });
+      return badRequest('Valid tableId and occupants (≥1) required');
     }
 
     // Require customer name for new guests
     if (!customerName || !customerName.trim()) {
-      return NextResponse.json({ error: 'Please enter your name' }, { status: 400 });
+      return badRequest('Please enter your name');
     }
 
     const trimmedName = customerName.trim();
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!table) {
-      return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+      return notFound('Table not found');
     }
 
     const current = table.currentOccupants ?? 0;
@@ -138,7 +139,6 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (e) {
-    console.error('❌ Entry endpoint error:', e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
