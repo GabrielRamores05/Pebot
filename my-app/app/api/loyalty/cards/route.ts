@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { serverError } from '@/lib/api-response';
+import { guardStaff } from '@/lib/api-guards';
 
 // GET /api/loyalty/cards
 export async function GET(req: NextRequest) {
+  const { error } = await guardStaff(req);
+  if (error) return error;
+
   try {
     const cards = await prisma.loyaltyCard.findMany({
       include: {

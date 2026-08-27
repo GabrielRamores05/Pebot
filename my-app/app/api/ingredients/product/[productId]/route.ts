@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { guardPermission } from '@/lib/api-guards';
 import { emitEvent } from '@/lib/socket';
 import { recomputeProduct } from '@/lib/availability';
 import { serverError } from '@/lib/api-response';
@@ -9,7 +10,10 @@ interface RouteParams {
 }
 
 // GET /api/ingredients/product/[productId] - Get all ingredients for a product
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  const { error } = await guardPermission(request, 'products');
+  if (error) return error;
+
   try {
     const { productId } = await params;
     
@@ -27,7 +31,10 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 // PUT /api/ingredients/product/[productId] - Update ingredients for a product
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const { error } = await guardPermission(request, 'products');
+  if (error) return error;
+
   try {
     const { productId } = await params;
     const body = await request.json();
