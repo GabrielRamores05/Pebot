@@ -376,45 +376,38 @@ export default function CartPage() {
     removeLoyaltyVouchers();
   }
 
-  function openConfirmDialog() {
-    // Validate cart is not empty
-    if (cartStore.items.length === 0) return;
+  /**
+   * Whether the cart can be ordered: it has items and a usable customer name.
+   * Shows the problem and moves the customer to the name field when it cannot.
+   */
+  function readyToOrder(): boolean {
+    if (cartStore.items.length === 0) return false;
 
-    // Validate customer name
     const nameValidation = validateCustomerName(cartStore.customerName);
     if (!nameValidation.valid) {
       setError(nameValidation.error || 'Invalid customer name');
-      document.getElementById('customer-name-input')?.focus();
-      document.getElementById('customer-name-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
+      const nameInput = document.getElementById('customer-name-input');
+      nameInput?.focus();
+      nameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
     }
 
     if (!cartStore.customerName.trim()) {
       setError('Unable to process order. Please refresh and try again.');
-      return;
+      return false;
     }
+
+    return true;
+  }
+
+  function openConfirmDialog() {
+    if (!readyToOrder()) return;
 
     setShowConfirmDialog(true);
   }
 
   async function placeOrder() {
-    // Validate cart is not empty
-    if (cartStore.items.length === 0) return;
-    
-    // Validate customer name
-    const nameValidation = validateCustomerName(cartStore.customerName);
-    if (!nameValidation.valid) {
-      setError(nameValidation.error || 'Invalid customer name');
-      document.getElementById('customer-name-input')?.focus();
-      document.getElementById('customer-name-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    
-    // Loyalty customer name is auto-filled, so no validation needed
-    if (!cartStore.customerName.trim()) {
-      setError('Unable to process order. Please refresh and try again.');
-      return;
-    }
+    if (!readyToOrder()) return;
 
     setPlacing(true);
     setError('');

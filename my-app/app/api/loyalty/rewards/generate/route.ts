@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { badRequest, serverError } from '@/lib/api-response';
+import { rewardLabel, voucherCode } from '@/lib/loyalty-utils';
 
 // POST /api/loyalty/rewards/generate - Manually generate/sync vouchers for customer
 // Ensures vouchers exist for all earned thresholds
@@ -38,13 +39,7 @@ export async function POST(req: NextRequest) {
     const rewardType = settings?.rewardType || 'FREE';
     const rewardValue = settings?.rewardValue || 0;
     
-    // Build reward name based on type
-    let rewardName = 'Free Item';
-    if (rewardType === 'PERCENTAGE') {
-      rewardName = `${rewardValue}% Off`;
-    } else if (rewardType === 'FIXED_AMOUNT') {
-      rewardName = `₱${rewardValue} Off`;
-    }
+    const rewardName = rewardLabel(rewardType, rewardValue);
 
     // Calculate total earned vouchers from paid coffees
     const totalEarned = Math.floor(card.paidCoffeesCount / coffeesRequired);
@@ -75,13 +70,11 @@ export async function POST(req: NextRequest) {
     // Generate missing vouchers with new reward type info
     const generatedCodes: string[] = [];
     for (let i = 0; i < vouchersToCreate; i++) {
-      const timestamp = Date.now().toString(36);
-      const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const voucherCode = `CAFE-${timestamp}-${randomPart}`;
-      
+      const code = voucherCode('CAFE');
+
       await prisma.loyaltyVoucher.create({
         data: {
-          code: voucherCode,
+          code,
           customerName,
           discountType: rewardType,
           discountValue: rewardValue,
@@ -90,7 +83,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      generatedCodes.push(voucherCode);
+      generatedCodes.push(code);
     }
 
     return NextResponse.json({

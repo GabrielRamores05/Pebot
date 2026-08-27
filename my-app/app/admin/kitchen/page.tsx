@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSocket } from '@/hooks/useSocket';
-import { playNewOrderSound, playMessageSound } from '@/lib/sounds';
+import { useState } from 'react';
+import { useKitchenOrders } from '@/hooks/useKitchenOrders';
+import { minutesSince } from '@/lib/dates';
 import { selectionsLabelFromJson } from '@/lib/product-options';
 import { ticketCode } from '@/lib/ticket';
 import {
@@ -10,157 +10,44 @@ import {
   StationKey,
   StationOrder,
   StationOrderItem,
-  StationOrderMessage,
   groupByStation,
 } from '@/lib/kitchen-stations';
 
 type Order = StationOrder;
 type OrderItem = StationOrderItem;
-type OrderMessage = StationOrderMessage;
 
 export default function AdminKitchenPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
   const [activeStation, setActiveStation] = useState<StationKey | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'active' | 'completed'>('active');
   const [confirmAction, setConfirmAction] = useState<{ orderId: number; action: string; label: string } | null>(null);
-  const [updating, setUpdating] = useState<number | null>(null);
-  const [followUps, setFollowUps] = useState<Array<{ orderNumber: string; customerName: string; tableName: string }>>([]);
-  const [staffName, setStaffName] = useState<string | null>(null);
-  const [threadOrder, setThreadOrder] = useState<Order | null>(null);
-  const [replyText, setReplyText] = useState('');
-  const [replySending, setReplySending] = useState(false);
+  const {
+    staffName,
+    activeOrders,
+    completedOrders,
+    activeStationGroups: activeGroups,
+    followUps,
+    threadOrder,
+    setThreadOrder,
+    replyText,
+    setReplyText,
+    replySending,
+    sendReply,
+    updating,
+    updateStatus,
+  } = useKitchenOrders({ logLabel: 'Admin Kitchen' });
 
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data?.user) setStaffName(data.user.name ?? null); })
-      .catch(() => {});
-  }, []);
-
-  const fetchOrders = useCallback(async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const res = await fetch(`/api/orders?date=${today}`, { cache: 'no-store' });
-      if (!res.ok) throw new Error('Failed');
-      const data: Order[] = await res.json();
-      setOrders(data);
-    } catch (e) {
-      console.error('[Admin Kitchen] Error:', e);
-    }
-  }, []);
-
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
-
-  useEffect(() => {
-    const handle = () => { if (document.visibilityState === 'visible') fetchOrders(); };
-    document.addEventListener('visibilitychange', handle);
-    return () => document.removeEventListener('visibilitychange', handle);
-  }, [fetchOrders]);
-
-  useEffect(() => {
-    const interval = setInterval(fetchOrders, 30000);
-    return () => clearInterval(interval);
-  }, [fetchOrders]);
-
-  const socketEvents = useMemo(() => ({
-    'new-order': (data: unknown) => {
-      const order = data as Order;
-      playNewOrderSound();
-      setOrders((prev) => {
-        if (prev.some((o) => o.id === order.id)) return prev;
-        return [order, ...prev];
-      });
-    },
-    'order-status-update': (data: unknown) => {
-      const order = data as Order;
-      setOrders((prev) => {
-        const exists = prev.some((o) => o.id === order.id);
-        if (exists) return prev.map((o) => (o.id === order.id ? order : o));
-        return [order, ...prev];
-      });
-    },
-    'order-followup': (data: unknown) => {
-      const fu = data as { orderNumber: string; customerName: string; tableName: string };
-      playMessageSound();
-      setFollowUps((prev) => [...prev, fu]);
-      setTimeout(() => setFollowUps((prev) => prev.slice(1)), 8000);
-    },
-    'order-message': (data: unknown) => {
-      const msg = data as OrderMessage & { orderNumber: string };
-      playMessageSound();
-      setOrders((prev) => prev.map((o) => {
-        if (o.orderNumber !== msg.orderNumber) return o;
-        const exists = (o.messages || []).some((m) => m.id === msg.id);
-        return { ...o, messages: exists ? o.messages : [...(o.messages || []), msg] };
-      }));
-      setThreadOrder((prev) => {
-        if (prev && prev.orderNumber === msg.orderNumber) {
-          const exists = (prev.messages || []).some((m) => m.id === msg.id);
-          return { ...prev, messages: exists ? prev.messages : [...(prev.messages || []), msg] };
-        }
-        return prev;
-      });
-    },
-  }), []);
-
-  useSocket({ events: socketEvents });
-
-  async function sendReply() {
-    if (!threadOrder || !replyText.trim() || replySending) return;
-    setReplySending(true);
-    try {
-      const res = await fetch(`/api/orders/${threadOrder.orderNumber}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'text', content: replyText.trim() }),
-      });
-      if (res.ok) {
-        const msg = await res.json();
-        const append = (o: Order): Order => ({
-          ...o,
-          messages: (o.messages || []).some((m) => m.id === msg.id) ? o.messages : [...(o.messages || []), msg],
-        });
-        setOrders((prev) => prev.map((o) => (o.orderNumber === threadOrder.orderNumber ? append(o) : o)));
-        setThreadOrder((prev) => (prev ? append(prev) : prev));
-        setReplyText('');
-      }
-    } catch (e) {
-      console.error('[Admin Kitchen] Reply error:', e);
-    }
-    setReplySending(false);
-  }
-
-  async function updateStatus(orderId: number, newStatus: string) {
-    setUpdating(orderId);
-    try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const updated = await res.json();
-      setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
-    } catch (e) {
-      console.error('Error:', e);
-    }
-    setUpdating(null);
+  async function confirmStatusChange(orderId: number, newStatus: string) {
+    await updateStatus(orderId, newStatus);
     setConfirmAction(null);
   }
 
-  const activeOrders = orders.filter((o) => o.status === 'PENDING' || o.status === 'PREPARING');
-  const completedOrders = orders.filter((o) => o.status === 'COMPLETED').sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20);
-
   const displayOrders = statusFilter === 'active' ? activeOrders : completedOrders;
   const stationGroups = groupByStation(displayOrders);
-  const activeGroups = groupByStation(activeOrders);
 
   function timeSince(dateStr: string): { text: string; urgent: boolean } {
-    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    const mins = minutesSince(dateStr);
     if (mins < 1) return { text: 'just now', urgent: false };
-    if (mins < 10) return { text: `${mins}m`, urgent: false };
-    if (mins < 20) return { text: `${mins}m`, urgent: true };
-    return { text: `${mins}m`, urgent: true };
+    return { text: `${mins}m`, urgent: mins >= 10 };
   }
 
   function renderOrderCard(order: Order, items: OrderItem[], showActions: boolean) {
@@ -438,7 +325,7 @@ export default function AdminKitchenPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => updateStatus(confirmAction.orderId, confirmAction.action)}
+                  onClick={() => confirmStatusChange(confirmAction.orderId, confirmAction.action)}
                   disabled={updating !== null}
                   className="flex-1 bg-gray-900 text-white py-3 rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-50"
                 >

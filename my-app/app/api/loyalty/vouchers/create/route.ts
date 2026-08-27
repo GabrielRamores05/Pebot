@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
+import { rewardLabel, voucherCode } from '@/lib/loyalty-utils';
 
 // POST /api/loyalty/vouchers/create - Create a promotional voucher with custom rules
 export async function POST(req: NextRequest) {
@@ -36,22 +37,13 @@ export async function POST(req: NextRequest) {
       return badRequest('discountValue must be non-negative');
     }
 
-    // Build reward name if not provided
-    const finalRewardName = rewardName || (
-      discountType === 'FREE' ? 'Free Item' :
-      discountType === 'PERCENTAGE' ? `${discountValue}% Off` :
-      `₱${discountValue} Off`
-    );
-
-    // Generate unique voucher code
-    const timestamp = Date.now().toString(36);
-    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const voucherCode = `PROMO-${timestamp}-${randomPart}`;
+    const finalRewardName = rewardName || rewardLabel(discountType, discountValue);
+    const code = voucherCode('PROMO');
 
     // Create the voucher
     const voucher = await prisma.loyaltyVoucher.create({
       data: {
-        code: voucherCode,
+        code,
         customerName: finalCustomerName,
         discountType,
         discountValue,
@@ -84,7 +76,7 @@ export async function POST(req: NextRequest) {
         expiryDate: voucher.expiryDate,
         status: voucher.status,
       },
-      message: `Created voucher ${voucherCode}`,
+      message: `Created voucher ${code}`,
     });
   } catch (e) {
     return serverError(e, 'Failed to create voucher');

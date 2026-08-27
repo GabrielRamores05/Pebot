@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { normalizeMemberName } from '@/lib/loyalty-utils';
+import { normalizeMemberName, rewardLabel, voucherCode } from '@/lib/loyalty-utils';
 import { logAction } from '@/lib/audit-log';
 import { requirePermission } from '@/lib/auth';
 import { badRequest, conflict, notFound, serverError, unauthorized } from '@/lib/api-response';
@@ -157,11 +157,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
 
     if (!isMilestoneMode) {
       if (tempCount >= threshold) {
-        const rewardName = settings.rewardType === 'FREE' ? 'Free Item' : settings.rewardType === 'PERCENTAGE' ? `${settings.rewardValue}% Off` : `₱${settings.rewardValue} Off`;
+        const rewardName = rewardLabel(settings.rewardType, settings.rewardValue);
 
         const voucher = await prisma.loyaltyVoucher.create({
           data: {
-            code: `REWARD-${Date.now().toString(36)}-${Math.random().toString(36).substring(7).toUpperCase()}`,
+            code: voucherCode('REWARD'),
             customerName: normalizedCustomerName,
             cardId: card.id,
             discountType: settings.rewardType,
@@ -182,11 +182,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
     } else {
       for (const milestone of milestones.sort((a,b) => a.target - b.target)) {
         if (tempCount >= milestone.target && !claimedMilestones.includes(milestone.target)) {
-          const rewardName = milestone.rewardType === 'FREE' ? 'Free Item' : milestone.rewardType === 'PERCENTAGE' ? `${milestone.rewardValue}% Off` : `₱${milestone.rewardValue} Off`;
+          const rewardName = rewardLabel(milestone.rewardType, milestone.rewardValue);
 
           const voucher = await prisma.loyaltyVoucher.create({
             data: {
-              code: `MIL-T${milestone.target}-${Date.now().toString(36)}-${Math.random().toString(36).substring(7).toUpperCase()}`,
+              code: voucherCode(`MIL-T${milestone.target}`),
               customerName: normalizedCustomerName,
               cardId: card.id,
               discountType: milestone.rewardType,
