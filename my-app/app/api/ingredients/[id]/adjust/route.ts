@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth';
 import { validateAdjustment } from '@/lib/ingredient-utils';
 import { emitEvent } from '@/lib/socket';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -12,14 +13,14 @@ interface RouteParams {
 export async function POST(req: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(req, 'inventory');
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return unauthorized();
   }
 
   try {
     const { id } = await params;
     const ingredientId = parseInt(id);
     if (isNaN(ingredientId)) {
-      return NextResponse.json({ error: 'Invalid ingredient ID' }, { status: 400 });
+      return badRequest('Invalid ingredient ID');
     }
 
     const body = await req.json();
@@ -82,11 +83,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   } catch (error: any) {
     console.error('[INGREDIENT ADJUST] Error:', error);
     if (error.message === 'Ingredient not found') {
-      return NextResponse.json({ error: 'Ingredient not found' }, { status: 404 });
+      return notFound('Ingredient not found');
     }
     if (error.message.includes('Insufficient stock') || error.message.includes('cannot be zero') || error.message.includes('Invalid reason')) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ error: 'Failed to adjust ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to adjust ingredient');
   }
 }

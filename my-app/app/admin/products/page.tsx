@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import OptionGroupManager from '../OptionGroupManager';
 import html2canvas from 'html2canvas';
+import { VAT_RATE, basePrice, marginAmount, sellingPrice, vatAmount } from '@/lib/bir-pricing';
 
 interface Category {
   id: number;
@@ -158,6 +159,10 @@ export default function Page() {
     },
     0,
   );
+
+  // Price preview for the product form
+  const previewMargin = marginAmount(computedCapital || 0, productForm.marginType, productForm.marginValue || 0);
+  const previewBasePrice = basePrice(computedCapital || 0, productForm.marginType, productForm.marginValue || 0);
 
   // Fetch ingredients when editing a product
   const fetchProductIngredients = async (productId: number) => {
@@ -328,21 +333,7 @@ export default function Page() {
     const marginType = productForm.marginType || 'PERCENTAGE';
     const marginValue = parseFloat(productForm.marginValue) || 30;
     const vatExempt = productForm.vatExempt || false;
-    const vatRate = 12;
-    
-    // Calculate base price (cost + margin)
-    let basePrice: number;
-    if (marginType === 'PERCENTAGE') {
-      basePrice = capitalCost * (1 + marginValue / 100);
-    } else {
-      basePrice = capitalCost + marginValue;
-    }
-    
-    // Calculate final price with VAT
-    let finalPrice = basePrice;
-    if (!vatExempt) {
-      finalPrice = basePrice * (1 + vatRate / 100);
-    }
+    const finalPrice = sellingPrice(capitalCost, marginType, marginValue, vatExempt);
     
     setProductSaving(true);
     const body = {
@@ -868,36 +859,26 @@ export default function Page() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Margin ({productForm.marginType === 'PERCENTAGE' ? `${productForm.marginValue || 0}%` : '₱'}):</span>
-                    <span className="font-medium">₱{productForm.marginType === 'PERCENTAGE' 
-                      ? ((computedCapital || 0) * (productForm.marginValue || 0) / 100).toFixed(2) 
-                      : (productForm.marginValue || 0).toFixed(2)}</span>
+                    <span className="font-medium">₱{previewMargin.toFixed(2)}</span>
                   </div>
                   <div className="border-t border-emerald-200 pt-2 flex justify-between">
                     <span className="text-slate-600">Selling Price (before VAT):</span>
-                    <span className="font-semibold">₱{((productForm.marginType === 'PERCENTAGE' 
-                      ? (computedCapital || 0) * (1 + (productForm.marginValue || 0) / 100) 
-                      : (computedCapital || 0) + (productForm.marginValue || 0))).toFixed(2)}</span>
+                    <span className="font-semibold">₱{previewBasePrice.toFixed(2)}</span>
                   </div>
                   {productForm.vatExempt ? (
                     <div className="border-t border-emerald-300 pt-2 flex justify-between bg-emerald-100 -mx-4 px-4 -mb-4 pb-2 rounded-b-xl">
                       <span className="text-emerald-800 font-semibold">Final Price (VAT Exempt):</span>
-                      <span className="text-emerald-800 font-bold text-lg">₱{((productForm.marginType === 'PERCENTAGE' 
-                        ? (computedCapital || 0) * (1 + (productForm.marginValue || 0) / 100) 
-                        : (computedCapital || 0) + (productForm.marginValue || 0))).toFixed(2)}</span>
+                      <span className="text-emerald-800 font-bold text-lg">₱{previewBasePrice.toFixed(2)}</span>
                     </div>
                   ) : (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-slate-600">VAT (12%):</span>
-                        <span className="font-medium">₱{((productForm.marginType === 'PERCENTAGE' 
-                          ? (computedCapital || 0) * (1 + (productForm.marginValue || 0) / 100) 
-                          : (computedCapital || 0) + (productForm.marginValue || 0)) * 0.12).toFixed(2)}</span>
+                        <span className="text-slate-600">VAT ({VAT_RATE}%):</span>
+                        <span className="font-medium">₱{vatAmount(previewBasePrice, false).toFixed(2)}</span>
                       </div>
                       <div className="border-t border-emerald-300 pt-2 flex justify-between bg-emerald-100 -mx-4 px-4 -mb-4 pb-2 rounded-b-xl">
                         <span className="text-emerald-800 font-semibold">Final Price (incl. VAT):</span>
-                        <span className="text-emerald-800 font-bold text-lg">₱{((productForm.marginType === 'PERCENTAGE' 
-                          ? (computedCapital || 0) * (1 + (productForm.marginValue || 0) / 100) 
-                          : (computedCapital || 0) + (productForm.marginValue || 0)) * 1.12).toFixed(2)}</span>
+                        <span className="text-emerald-800 font-bold text-lg">₱{(previewBasePrice + vatAmount(previewBasePrice, false)).toFixed(2)}</span>
                       </div>
                     </>
                   )}

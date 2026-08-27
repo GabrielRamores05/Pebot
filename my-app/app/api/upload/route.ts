@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { badRequest, serverError } from '@/lib/api-response';
 
 const UPLOADS_DIR = join(process.cwd(), 'uploads');
 
@@ -8,7 +9,7 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if (!file) return badRequest('No file provided');
 
     await mkdir(UPLOADS_DIR, { recursive: true });
 
@@ -19,7 +20,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: `/api/files/${filename}` });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    return serverError(e, 'Upload failed');
   }
 }

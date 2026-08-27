@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/consultant/charts?type=...&days=30
 // Types: daily-sales, category-sales, product-revenue, inventory-status, loyalty-growth, order-status
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
@@ -218,10 +219,9 @@ export async function GET(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ error: 'Invalid chart type' }, { status: 400 });
+        return badRequest('Invalid chart type');
     }
   } catch (error) {
-    console.error('Chart error:', error);
-    return NextResponse.json({ error: 'Failed to generate chart data' }, { status: 500 });
+    return serverError(error, 'Failed to generate chart data');
   }
 }

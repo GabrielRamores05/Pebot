@@ -5,6 +5,7 @@ import { join } from 'path';
 import { getAuthUser, requireRole } from '@/lib/auth';
 import { getDatabasePath } from '@/lib/db-path';
 import { prisma } from '@/lib/prisma';
+import { apiError, badRequest, forbidden, unauthorized } from '@/lib/api-response';
 
 const SQLITE_MAGIC = Buffer.from('SQLite format 3\x00', 'latin1');
 
@@ -16,10 +17,10 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUser(req);
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
     if (!requireRole(user, ['ADMIN'])) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return forbidden();
     }
 
     // Parse the form data (ZIP file upload)
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get('backup') as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: 'No backup file provided' }, { status: 400 });
+      return badRequest('No backup file provided');
     }
 
     // Read and validate the archive
@@ -37,17 +38,17 @@ export async function POST(req: NextRequest) {
     try {
       zip = await JSZip.loadAsync(bytes);
     } catch {
-      return NextResponse.json({ error: 'Failed to restore backup. The selected file is not a valid CafeOS backup.' }, { status: 400 });
+      return badRequest('Failed to restore backup. The selected file is not a valid CafeOS backup.');
     }
 
     const dbEntry = zip.file('dev.db');
     if (!dbEntry) {
-      return NextResponse.json({ error: 'Failed to restore backup. The selected file is not a valid CafeOS backup.' }, { status: 400 });
+      return badRequest('Failed to restore backup. The selected file is not a valid CafeOS backup.');
     }
 
     const dbData = await dbEntry.async('nodebuffer');
     if (!looksLikeSqlite(dbData)) {
-      return NextResponse.json({ error: 'Failed to restore backup. The selected file is not a valid CafeOS backup.' }, { status: 400 });
+      return badRequest('Failed to restore backup. The selected file is not a valid CafeOS backup.');
     }
 
     // Resolve the active database path (respects DATABASE_URL set by main.js)
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     const stagedPath = join(tmpDir, `restore-${Date.now()}.db`);
 
     if (!existsSync(dbPath)) {
-      return NextResponse.json({ error: 'Current database file not found' }, { status: 500 });
+      return apiError('Current database file not found', 500);
     }
 
     // Write the new database to a staging path first

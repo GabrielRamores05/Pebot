@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { serverError, unauthorized } from '@/lib/api-response';
 
 interface TransactionWithIngredient {
   id: number;
@@ -21,7 +22,7 @@ interface TransactionWithIngredient {
 export async function GET(req: NextRequest) {
   const user = await requirePermission(req, 'inventory');
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return unauthorized();
   }
 
   try {
@@ -61,7 +62,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(enriched);
   } catch (error) {
-    console.error('[INGREDIENT TRANSACTIONS] Error:', error);
-    return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });
+    return serverError(error, 'Failed to fetch transactions');
   }
 }

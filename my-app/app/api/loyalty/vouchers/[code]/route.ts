@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { notFound, serverError } from '@/lib/api-response';
 
 // GET /api/loyalty/vouchers/:code
 // Check if a voucher exists and its status
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     });
     
     if (!voucher) {
-      return NextResponse.json({ error: 'Voucher not found' }, { status: 404 });
+      return notFound('Voucher not found');
     }
     
     return NextResponse.json({
@@ -23,8 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
       isActive: voucher.status === 'ACTIVE',
     });
   } catch (e) {
-    console.error('[LOYALTY] Error fetching voucher:', e);
-    return NextResponse.json({ error: 'Failed to fetch voucher' }, { status: 500 });
+    return serverError(e, 'Failed to fetch voucher');
   }
 }
 

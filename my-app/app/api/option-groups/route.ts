@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, conflict, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/option-groups — all groups with product counts (ordered)
 export async function GET(req: NextRequest) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   const groups = await prisma.optionGroup.findMany({
     include: {
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
 // POST /api/option-groups — create a group
 export async function POST(req: NextRequest) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   try {
     const body = await req.json();
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!name?.trim()) {
-      return NextResponse.json({ error: 'Group name is required' }, { status: 400 });
+      return badRequest('Group name is required');
     }
 
     const group = await prisma.optionGroup.create({
@@ -46,9 +47,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(group, { status: 201 });
   } catch (error: any) {
     if (error.code === 'P2002') {
-      return NextResponse.json({ error: 'A group with this name already exists' }, { status: 409 });
+      return conflict('A group with this name already exists');
     }
-    console.error('[OPTION-GROUPS] create failed:', error);
-    return NextResponse.json({ error: 'Failed to create option group' }, { status: 500 });
+    return serverError(error, 'Failed to create option group');
   }
 }

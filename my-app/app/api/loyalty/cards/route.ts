@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serverError } from '@/lib/api-response';
 
 // GET /api/loyalty/cards
 export async function GET(req: NextRequest) {
@@ -51,7 +52,6 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json(cardsWithMeta);
   } catch (e) {
-    console.error('[LOYALTY] Error fetching cards:', e);
-    return NextResponse.json({ error: 'Failed to fetch loyalty cards' }, { status: 500 });
+    return serverError(e, 'Failed to fetch loyalty cards');
   }
 }

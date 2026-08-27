@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 const STAFF_SELECT = {
   id: true, name: true, email: true, role: true, permissions: true, active: true,
@@ -14,12 +15,12 @@ const STAFF_SELECT = {
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const { id } = await params;
     const staffId = parseInt(id);
-    if (isNaN(staffId)) return NextResponse.json({ error: 'Invalid staff ID' }, { status: 400 });
+    if (isNaN(staffId)) return badRequest('Invalid staff ID');
 
     const body = await req.json();
     const {
@@ -30,11 +31,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     } = body;
 
     const currentStaff = await prisma.user.findUnique({ where: { id: staffId }, select: { email: true } });
-    if (!currentStaff) return NextResponse.json({ error: 'Staff member not found' }, { status: 404 });
+    if (!currentStaff) return notFound('Staff member not found');
 
     if (email && email !== currentStaff.email) {
       const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
+      if (existing) return badRequest('Email already in use');
     }
 
     const updateData: Record<string, unknown> = {};
@@ -63,24 +64,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       permissions: typeof updated.permissions === 'string' ? JSON.parse(updated.permissions) : updated.permissions,
     });
   } catch (e) {
-    console.error('[STAFF API] Error updating staff:', e);
-    return NextResponse.json({ error: 'Failed to update staff member' }, { status: 500 });
+    return serverError(e, 'Failed to update staff member');
   }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const { id } = await params;
     const staffId = parseInt(id);
-    if (isNaN(staffId)) return NextResponse.json({ error: 'Invalid staff ID' }, { status: 400 });
+    if (isNaN(staffId)) return badRequest('Invalid staff ID');
 
     await prisma.user.delete({ where: { id: staffId } });
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error('[STAFF API] Error deleting staff:', e);
-    return NextResponse.json({ error: 'Failed to delete staff member' }, { status: 500 });
+    return serverError(e, 'Failed to delete staff member');
   }
 }

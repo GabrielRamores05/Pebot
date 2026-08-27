@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/consultant/reports?type=sales&format=csv&days=30
 // Types: sales, profitability, inventory, loyalty
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
@@ -198,7 +199,7 @@ export async function GET(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ error: 'Invalid report type' }, { status: 400 });
+        return badRequest('Invalid report type');
     }
 
     if (format === 'csv') {
@@ -251,9 +252,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ error: 'Invalid format. Use csv, json, or pdf.' }, { status: 400 });
+    return badRequest('Invalid format. Use csv, json, or pdf.');
   } catch (error) {
-    console.error('Report error:', error);
-    return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 });
+    return serverError(error, 'Failed to generate report');
   }
 }

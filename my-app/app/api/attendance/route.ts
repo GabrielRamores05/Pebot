@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission, getAuthUser } from '@/lib/auth';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 // POST /api/attendance/clock-in — { userId }
 export async function POST(req: NextRequest) {
   const auth = await getAuthUser(req);
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
     const { userId, notes } = body;
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+    if (!userId) return badRequest('userId required');
 
     const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!user) return notFound('User not found');
 
     // Check for an active (unclocked) session
     const active = await prisma.attendance.findFirst({
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(record, { status: 201 });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to clock in' }, { status: 500 });
+    return serverError(e, 'Failed to clock in');
   }
 }
 
@@ -37,15 +38,15 @@ export async function POST(req: NextRequest) {
 // Also serves as general attendance update
 export async function PUT(req: NextRequest) {
   const auth = await getAuthUser(req);
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
     const { attendanceId, clockOut, breakStart, breakEnd, notes } = body;
-    if (!attendanceId) return NextResponse.json({ error: 'attendanceId required' }, { status: 400 });
+    if (!attendanceId) return badRequest('attendanceId required');
 
     const record = await prisma.attendance.findUnique({ where: { id: attendanceId } });
-    if (!record) return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+    if (!record) return notFound('Record not found');
 
     const updateData: Record<string, unknown> = {};
     if (notes !== undefined) updateData.notes = notes;
@@ -69,14 +70,14 @@ export async function PUT(req: NextRequest) {
     const updated = await prisma.attendance.update({ where: { id: attendanceId }, data: updateData });
     return NextResponse.json(updated);
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to update attendance' }, { status: 500 });
+    return serverError(e, 'Failed to update attendance');
   }
 }
 
 // GET /api/attendance?userId=X&from=Y&to=Z
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get('userId');

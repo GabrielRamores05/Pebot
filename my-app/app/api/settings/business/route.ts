@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { checkFeatureAccess } from '@/lib/auth';
 import { logAction } from '@/lib/audit-log';
+import { badRequest, serverError } from '@/lib/api-response';
+import { guardFeature } from '@/lib/api-guards';
 
 // GET /api/settings/business - Get business settings
 export async function GET(req: NextRequest) {
   // Check if user has access to settings feature
-  const { user, hasAccess } = await checkFeatureAccess(req, 'settings');
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Feature not available in your subscription tier' }, { status: 403 });
-  }
+  const { error } = await guardFeature(req, 'settings');
+  if (error) return error;
 
   try {
     let settings = await prisma.businessSettings.findFirst();
@@ -40,23 +34,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(settings);
   } catch (error) {
-    console.error('Error fetching business settings:', error);
-    return NextResponse.json({ error: 'Failed to fetch business settings' }, { status: 500 });
+    return serverError(error, 'Failed to fetch business settings');
   }
 }
 
 // PUT /api/settings/business - Update business settings
 export async function PUT(req: NextRequest) {
   // Check if user has access to settings feature
-  const { user, hasAccess } = await checkFeatureAccess(req, 'settings');
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Feature not available in your subscription tier' }, { status: 403 });
-  }
+  const { user, error } = await guardFeature(req, 'settings');
+  if (error) return error;
 
   try {
     const body = await req.json();
@@ -154,15 +140,8 @@ export async function PUT(req: NextRequest) {
 // POST /api/settings/business/generate-serial - Generate next receipt serial
 export async function POST(req: NextRequest) {
   // Check if user has access to settings feature
-  const { user, hasAccess } = await checkFeatureAccess(req, 'settings');
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Feature not available in your subscription tier' }, { status: 403 });
-  }
+  const { error } = await guardFeature(req, 'settings');
+  if (error) return error;
 
   try {
     const body = await req.json();
@@ -198,9 +177,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ serial, number: newNumber });
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    return badRequest('Invalid action');
   } catch (error) {
-    console.error('Error generating serial:', error);
-    return NextResponse.json({ error: 'Failed to generate serial' }, { status: 500 });
+    return serverError(error, 'Failed to generate serial');
   }
 }

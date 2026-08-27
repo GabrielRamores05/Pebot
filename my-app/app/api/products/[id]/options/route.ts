@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, conflict, serverError, unauthorized } from '@/lib/api-response';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   const { id } = await params;
   const groupId = Number(new URL(req.url).searchParams.get('groupId'));
   if (!Number.isInteger(groupId)) {
-    return NextResponse.json({ error: 'groupId query parameter is required' }, { status: 400 });
+    return badRequest('groupId query parameter is required');
   }
   const options = await prisma.productOption.findMany({
     where: { productId: Number(id), groupId },
@@ -24,12 +25,12 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 // POST /api/products/:id/options?groupId=X — create a per-product option
 export async function POST(req: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   const { id } = await params;
   const groupId = Number(new URL(req.url).searchParams.get('groupId'));
   if (!Number.isInteger(groupId)) {
-    return NextResponse.json({ error: 'groupId query parameter is required' }, { status: 400 });
+    return badRequest('groupId query parameter is required');
   }
 
   try {
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     };
 
     if (!name?.trim()) {
-      return NextResponse.json({ error: 'Option name is required' }, { status: 400 });
+      return badRequest('Option name is required');
     }
 
     // Ensure the group is attached to this product
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       where: { productId_groupId: { productId: Number(id), groupId } },
     });
     if (!attachment) {
-      return NextResponse.json({ error: 'This group is not attached to this product' }, { status: 400 });
+      return badRequest('This group is not attached to this product');
     }
 
     const option = await prisma.productOption.create({
@@ -66,8 +67,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json(option, { status: 201 });
   } catch (error: any) {
     if (error.code === 'P2002') {
-      return NextResponse.json({ error: 'This product already has an option with that name in this group' }, { status: 409 });
+      return conflict('This product already has an option with that name in this group');
     }
-    return NextResponse.json({ error: 'Failed to create option' }, { status: 500 });
+    return serverError(error, 'Failed to create option');
   }
 }

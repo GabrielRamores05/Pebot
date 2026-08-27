@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import QRCode from 'qrcode';
 import os from 'os';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 // Get the server's local IP address automatically
 function getLocalIP(): string {
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
     const tableId = searchParams.get('tableId');
 
     if (!tableId || isNaN(Number(tableId))) {
-      return NextResponse.json({ error: 'Valid tableId is required' }, { status: 400 });
+      return badRequest('Valid tableId is required');
     }
 
     const table = await prisma.restaurantTable.findUnique({
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!table) {
-      return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+      return notFound('Table not found');
     }
 
     // Build a menu URL that matches how you're actually reaching the app.
@@ -99,7 +100,6 @@ export async function GET(req: NextRequest) {
       qrDataUrl: dataUrl,
     });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }

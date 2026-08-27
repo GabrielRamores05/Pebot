@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, serverError } from '@/lib/api-response';
 
 // POST /api/loyalty/vouchers/redeem - Redeem a voucher with rule validation
 export async function POST(req: NextRequest) {
@@ -8,11 +9,11 @@ export async function POST(req: NextRequest) {
     const { code, orderId, orderTotal, items } = body;
 
     if (!code) {
-      return NextResponse.json({ error: 'Voucher code is required' }, { status: 400 });
+      return badRequest('Voucher code is required');
     }
 
     if (!orderId) {
-      return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
+      return badRequest('Order ID is required');
     }
 
     // Find the voucher
@@ -163,8 +164,7 @@ export async function POST(req: NextRequest) {
       message: `Voucher applied: ${voucher.rewardName}`,
     });
   } catch (e) {
-    console.error('[LOYALTY] Error redeeming voucher:', e);
-    return NextResponse.json({ error: 'Failed to redeem voucher' }, { status: 500 });
+    return serverError(e, 'Failed to redeem voucher');
   }
 }
 
@@ -175,7 +175,7 @@ export async function GET(req: NextRequest) {
     const code = searchParams.get('code');
 
     if (!code) {
-      return NextResponse.json({ error: 'Voucher code is required' }, { status: 400 });
+      return badRequest('Voucher code is required');
     }
 
     const voucher = await prisma.loyaltyVoucher.findUnique({
@@ -236,7 +236,6 @@ export async function GET(req: NextRequest) {
       validationErrors: isValid ? [] : validationErrors,
     });
   } catch (e) {
-    console.error('[LOYALTY] Error validating voucher:', e);
-    return NextResponse.json({ error: 'Failed to validate voucher' }, { status: 500 });
+    return serverError(e, 'Failed to validate voucher');
   }
 }

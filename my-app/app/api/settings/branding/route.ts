@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { guardAdmin } from '@/lib/api-guards';
 
 // GET /api/settings/branding — returns { shopName, logoUrl }
 export async function GET() {
@@ -21,10 +21,8 @@ export async function GET() {
 
 // POST /api/settings/branding — save { shopName?, logoUrl? }
 export async function POST(req: NextRequest) {
-  const me = await getAuthUser(req);
-  if (!me || me.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const { error } = await guardAdmin(req);
+  if (error) return error;
 
   const body = await req.json();
 

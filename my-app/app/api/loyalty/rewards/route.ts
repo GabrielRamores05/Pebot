@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, serverError } from '@/lib/api-response';
 
 // GET /api/loyalty/rewards?customerName=name - get available vouchers
 export async function GET(req: NextRequest) {
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
     const customerName = searchParams.get('customerName');
 
     if (!customerName) {
-      return NextResponse.json({ error: 'customerName is required' }, { status: 400 });
+      return badRequest('customerName is required');
     }
 
     // Get all vouchers for this customer (redeemed ones are deleted automatically)
@@ -24,7 +25,6 @@ export async function GET(req: NextRequest) {
       total: vouchers.length,
     });
   } catch (e) {
-    console.error('[LOYALTY] Error fetching rewards:', e);
-    return NextResponse.json({ error: 'Failed to fetch rewards' }, { status: 500 });
+    return serverError(e, 'Failed to fetch rewards');
   }
 }

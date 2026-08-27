@@ -4,11 +4,12 @@ import { requirePermission } from '@/lib/auth';
 import { convertToBase, calcPricePerUnit, calcWeightedAverage, validatePurchase, formatPeso } from '@/lib/ingredient-utils';
 import { emitEvent } from '@/lib/socket';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
+import { notFound, serverError, unauthorized } from '@/lib/api-response';
 
 export async function POST(req: NextRequest) {
   const user = await requirePermission(req, 'inventory');
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return unauthorized();
   }
 
   try {
@@ -106,8 +107,8 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[INGREDIENT PURCHASE] Error:', error);
     if (error.message === 'Ingredient not found') {
-      return NextResponse.json({ error: 'Ingredient not found' }, { status: 404 });
+      return notFound('Ingredient not found');
     }
-    return NextResponse.json({ error: 'Failed to record purchase' }, { status: 500 });
+    return serverError(error, 'Failed to record purchase');
   }
 }

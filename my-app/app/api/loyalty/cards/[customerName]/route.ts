@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeMemberName } from '@/lib/loyalty-utils';
 import { logAction } from '@/lib/audit-log';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, conflict, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/loyalty/cards/:customerName
 export async function GET(req: NextRequest, { params }: { params: Promise<{ customerName: string }> | { customerName: string } }) {
@@ -51,8 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cust
     }));
 
   } catch (e) {
-    console.error('[LOYALTY] Error fetching cards:', e);
-    return NextResponse.json({ error: 'Failed to fetch loyalty cards' }, { status: 500 });
+    return serverError(e, 'Failed to fetch loyalty cards');
   }
 }
 
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
     const resolvedParams = await Promise.resolve(params);
     const { customerName } = resolvedParams as { customerName: string };
     const auth = await requirePermission(req, 'loyalty');
-    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!auth) return unauthorized();
     const normalizedCustomerName = normalizeMemberName(customerName);
     const body = await req.json();
     const { quantity = 1, categoryId } = body;
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
       settings = await prisma.loyaltySetting.findFirst({ where: { enabled: true } });
     }
     if (!settings) {
-      return NextResponse.json({ error: 'Loyalty not enabled for this category' }, { status: 400 });
+      return badRequest('Loyalty not enabled for this category');
     }
 
     // The program we actually resolved (may differ from the requested scope
@@ -243,8 +243,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
       vouchersCreated: vouchersCreated.length
     });
   } catch (e) {
-    console.error('[LOYALTY] Error updating card:', e);
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
+    return serverError(e, 'Failed');
   }
 }
 
@@ -254,23 +253,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cu
     const resolvedParams = await Promise.resolve(params);
     const { customerName } = resolvedParams as { customerName: string };
     const auth = await requirePermission(req, 'loyalty');
-    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!auth) return unauthorized();
     const normalizedCustomerName = normalizeMemberName(customerName);
     const { newName } = await req.json();
 
-    if (!newName || typeof newName !== 'string') return NextResponse.json({ error: 'Name required' }, { status: 400 });
+    if (!newName || typeof newName !== 'string') return badRequest('Name required');
 
     const normalizedNewName = normalizeMemberName(newName);
     const allCustomerCards = await prisma.loyaltyCard.findMany({ select: { id: true, customerName: true } });
     const duplicateCard = allCustomerCards.find(card => normalizeMemberName(card.customerName) === normalizedNewName && normalizeMemberName(card.customerName) !== normalizedCustomerName);
 
     if (duplicateCard) {
-      return NextResponse.json({ error: 'Another member already uses this name.' }, { status: 409 });
+      return conflict('Another member already uses this name.');
     }
 
     const targetCards = allCustomerCards.filter(card => normalizeMemberName(card.customerName) === normalizedCustomerName);
     if (targetCards.length === 0) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+      return notFound('Member not found');
     }
 
     await Promise.all(targetCards.map(async (card) => {
@@ -299,7 +298,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cu
 
     return NextResponse.json({ success: true });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
+    return serverError(e, 'Failed');
   }
 }
 
@@ -309,7 +308,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ c
     const resolvedParams = await Promise.resolve(params);
     const { customerName } = resolvedParams as { customerName: string };
     const auth = await requirePermission(req, 'loyalty');
-    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!auth) return unauthorized();
     const normalizedCustomerName = normalizeMemberName(customerName);
 
     const cards = await prisma.loyaltyCard.findMany({});

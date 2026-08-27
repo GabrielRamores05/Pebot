@@ -1,6 +1,10 @@
 // Ingredient inventory utilities: unit conversion, cost calculation, formatting
 // All quantities are stored in base units (g, ml, pcs) per the Ingredient.baseUnit field.
 
+import { formatPeso } from '@/lib/format';
+
+export { formatPeso };
+
 export type TransactionType = 'PURCHASE' | 'USAGE' | 'ADJUSTMENT' | 'OPENING';
 
 export interface UnitConversion {
@@ -106,12 +110,6 @@ export function calcIngredientCost(quantityInBase: number, costPerUnit: number):
 /** Total inventory value for an ingredient: currentStock × costPerUnit. */
 export function calcInventoryValue(currentStock: number, costPerUnit: number): number {
   return Math.round(currentStock * costPerUnit * 100) / 100;
-}
-
-/** Format a number as Philippine Peso: ₱1,500.00 */
-export function formatPeso(amount: number | null | undefined): string {
-  const val = amount ?? 0;
-  return `₱${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /**

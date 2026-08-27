@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/performance-reviews?userId=X
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get('userId');
@@ -26,13 +27,13 @@ export async function GET(req: NextRequest) {
 // POST /api/performance-reviews — create a review
 export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
     const { userId, period, rating, strengths, improvements, goals, notes } = body;
     if (!userId || !period || !rating) {
-      return NextResponse.json({ error: 'userId, period, rating required' }, { status: 400 });
+      return badRequest('userId, period, rating required');
     }
     const review = await prisma.performanceReview.create({
       data: {
@@ -44,6 +45,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(review, { status: 201 });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to create review' }, { status: 500 });
+    return serverError(e, 'Failed to create review');
   }
 }

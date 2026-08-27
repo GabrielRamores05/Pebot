@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/consultant/chat — return available business context for AI
 export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const settings = await prisma.businessSettings.findFirst();
@@ -101,8 +102,7 @@ export async function GET(req: NextRequest) {
         : [],
     });
   } catch (error) {
-    console.error('Consultant GET error:', error);
-    return NextResponse.json({ error: 'Failed to fetch business context' }, { status: 500 });
+    return serverError(error, 'Failed to fetch business context');
   }
 }
 
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const body = await req.json();
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: 'Messages are required' }, { status: 400 });
+      return badRequest('Messages are required');
     }
 
     // Save messages to conversation if conversationId provided
@@ -217,7 +217,6 @@ export async function POST(req: NextRequest) {
       conversationId,
     });
   } catch (error) {
-    console.error('Consultant chat error:', error);
-    return NextResponse.json({ error: 'Failed to process chat request' }, { status: 500 });
+    return serverError(error, 'Failed to process chat request');
   }
 }

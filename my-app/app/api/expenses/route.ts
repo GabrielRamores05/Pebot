@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/expenses — list all expenses with filtering
 export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
@@ -30,8 +31,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(expenses);
   } catch (error) {
-    console.error('Error fetching expenses:', error);
-    return NextResponse.json({ error: 'Failed to fetch expenses' }, { status: 500 });
+    return serverError(error, 'Failed to fetch expenses');
   }
 }
 
@@ -40,14 +40,14 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const body = await req.json();
     const { categoryId, supplierId, amount, description, expenseDate } = body;
 
     if (!categoryId || !amount || amount <= 0) {
-      return NextResponse.json({ error: 'categoryId and valid amount are required' }, { status: 400 });
+      return badRequest('categoryId and valid amount are required');
     }
 
     const category = await prisma.expenseCategory.findUnique({
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+      return notFound('Category not found');
     }
 
     const expense = await prisma.expense.create({
@@ -72,8 +72,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(expense, { status: 201 });
   } catch (error) {
-    console.error('Error creating expense:', error);
-    return NextResponse.json({ error: 'Failed to create expense' }, { status: 500 });
+    return serverError(error, 'Failed to create expense');
   }
 }
 
@@ -82,13 +81,13 @@ export async function PUT(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) {
-      return NextResponse.json({ error: 'Expense ID required' }, { status: 400 });
+      return badRequest('Expense ID required');
     }
 
     const body = await req.json();
@@ -110,10 +109,9 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json(expense);
   } catch (error: any) {
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+      return notFound('Expense not found');
     }
-    console.error('Error updating expense:', error);
-    return NextResponse.json({ error: 'Failed to update expense' }, { status: 500 });
+    return serverError(error, 'Failed to update expense');
   }
 }
 
@@ -122,22 +120,21 @@ export async function DELETE(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'inventory');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) {
-      return NextResponse.json({ error: 'Expense ID required' }, { status: 400 });
+      return badRequest('Expense ID required');
     }
 
     await prisma.expense.delete({ where: { id: Number(id) } });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+      return notFound('Expense not found');
     }
-    console.error('Error deleting expense:', error);
-    return NextResponse.json({ error: 'Failed to delete expense' }, { status: 500 });
+    return serverError(error, 'Failed to delete expense');
   }
 }

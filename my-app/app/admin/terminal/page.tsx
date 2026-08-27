@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
+import { formatPeso } from '@/lib/format';
 
 interface InventoryData { quantity: number; lowStockThreshold: number; }
 interface Product { id: number; name: string; description?: string; price: number; imageUrl?: string; available: boolean; inventory?: InventoryData; vatExempt?: boolean; marginType?: string; marginValue?: number; capitalCost?: number; }
@@ -62,14 +63,6 @@ function escapeHtml(str: string): string {
     "'": '&#39;'
   }[c] || c));
 }
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(value) ? value : 0);
 
 function isImageUrl(value?: string) {
   return Boolean(value && (value.startsWith('/') || value.startsWith('http')));
@@ -799,18 +792,18 @@ export default function PosTerminalPage() {
           <div className="mb-2 rounded-[var(--radius-lg)] bg-[var(--pos-ink)] p-2.5 text-white shadow-[var(--shadow-modal)]">
             <div className="flex justify-between items-center mb-1">
               <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Total</span>
-              <span className="text-sm font-semibold tracking-[-0.04em] text-white" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{formatCurrency(total)}</span>
+              <span className="text-sm font-semibold tracking-[-0.04em] text-white" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{formatPeso(total)}</span>
             </div>
             {discountRate > 0 && (
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Discount ({discountRate}%)</span>
-                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatCurrency(discountAmount)}</span>
+                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatPeso(discountAmount)}</span>
               </div>
             )}
             <div className="flex justify-between items-center mb-1">
               <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Cash</span>
               <span className={`text-sm font-semibold tracking-[-0.04em] ${cashValue >= total && cashValue > 0 ? 'text-[var(--pos-accent-soft)]' : 'text-white'}`} style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-                {hasCashInput ? formatCurrency(cashValue) : '—'}
+                {hasCashInput ? formatPeso(cashValue) : '—'}
               </span>
             </div>
             <div className="flex justify-between items-center border-t border-white/10 pt-1.5">
@@ -832,7 +825,7 @@ export default function PosTerminalPage() {
               style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
             >
               {discountRate > 0
-                ? `Student/PWD −${discountRate}%  (−${formatCurrency(discountAmount)})`
+                ? `Student/PWD −${discountRate}%  (−${formatPeso(discountAmount)})`
                 : `Apply Student / PWD −${businessSettings?.studentPwdDiscountRate ?? 20}%`}
             </button>
           )}
@@ -1021,7 +1014,7 @@ export default function PosTerminalPage() {
                       )}
                       <div className="mt-0.5 flex items-center justify-between text-[9px] text-[var(--pos-ink-soft)]">
                         <span>Qty {item.quantity}</span>
-                        <span className="font-semibold text-[var(--pos-ink)]">{formatCurrency(item.price * item.quantity)}</span>
+                        <span className="font-semibold text-[var(--pos-ink)]">{formatPeso(item.price * item.quantity)}</span>
                       </div>
                     </div>
                     <button
@@ -1095,7 +1088,7 @@ export default function PosTerminalPage() {
 
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-[var(--pos-ink-soft)]">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
-            <span className="text-2xl font-semibold text-[var(--pos-ink)]" style={{ fontFamily: 'Georgia, serif' }}>{formatCurrency(total)}</span>
+            <span className="text-2xl font-semibold text-[var(--pos-ink)]" style={{ fontFamily: 'Georgia, serif' }}>{formatPeso(total)}</span>
           </div>
 
           {/* Payment Method */}

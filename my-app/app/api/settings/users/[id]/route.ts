@@ -1,30 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { badRequest } from '@/lib/api-response';
+import { guardAdmin } from '@/lib/api-guards';
 
 // PATCH /api/settings/users/[id] — update role, password, or active status
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const me = await getAuthUser(req);
-  if (!me || me.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const { user: me, error } = await guardAdmin(req);
+  if (error) return error;
 
   const { id } = await params;
   const userId = parseInt(id);
-  if (isNaN(userId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+  if (isNaN(userId)) return badRequest('Invalid id');
 
   const body = await req.json();
   const data: Record<string, unknown> = {};
 
   if (body.role !== undefined) {
     const allowed = ['ADMIN', 'STAFF', 'KITCHEN'];
-    if (!allowed.includes(body.role)) return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+    if (!allowed.includes(body.role)) return badRequest('Invalid role');
     if (userId === me.userId && body.role !== me.role) {
-      return NextResponse.json({ error: 'You cannot change your own role' }, { status: 400 });
+      return badRequest('You cannot change your own role');
     }
     data.role = body.role;
   }
@@ -35,7 +34,7 @@ export async function PATCH(
 
   if (body.password) {
     if (body.password.length < 4) {
-      return NextResponse.json({ error: 'Password must be at least 4 characters' }, { status: 400 });
+      return badRequest('Password must be at least 4 characters');
     }
     data.password = await bcrypt.hash(body.password, 10);
   }
@@ -56,17 +55,15 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const me = await getAuthUser(req);
-  if (!me || me.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const { user: me, error } = await guardAdmin(req);
+  if (error) return error;
 
   const { id } = await params;
   const userId = parseInt(id);
-  if (isNaN(userId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+  if (isNaN(userId)) return badRequest('Invalid id');
 
   if (userId === me.userId) {
-    return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
+    return badRequest('Cannot delete your own account');
   }
 
   await prisma.user.delete({ where: { id: userId } });

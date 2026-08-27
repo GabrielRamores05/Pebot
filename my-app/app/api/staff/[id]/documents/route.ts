@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/staff/[id]/documents
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   const { id } = await params;
   const docs = await prisma.staffDocument.findMany({
@@ -19,13 +20,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // POST /api/staff/[id]/documents — create a document record
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const { id } = await params;
     const body = await req.json();
     const { name, type, fileUrl, expiryDate, notes } = body;
-    if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
+    if (!name) return badRequest('name required');
 
     const doc = await prisma.staffDocument.create({
       data: {
@@ -36,6 +37,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     return NextResponse.json(doc, { status: 201 });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to create document' }, { status: 500 });
+    return serverError(e, 'Failed to create document');
   }
 }

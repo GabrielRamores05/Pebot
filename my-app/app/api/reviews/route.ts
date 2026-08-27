@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, forbidden, notFound, serverError } from '@/lib/api-response';
 
 // GET /api/reviews?productId=X OR /api/reviews (all reviews)
 // ?suggestions=true — only return reviews with tasteSuggestion
@@ -52,8 +53,7 @@ export async function GET(request: NextRequest) {
       totalReviews: allReviews.length,
     });
   } catch (error) {
-    console.error('Error fetching reviews:', error);
-    return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 });
+    return serverError(error, 'Failed to fetch reviews');
   }
 }
 
@@ -64,27 +64,18 @@ export async function POST(request: NextRequest) {
     const { productId, customerName, rating, comment, tasteSuggestion, imageUrl, orderNumber } = body;
 
     if (!productId || !customerName || !rating) {
-      return NextResponse.json(
-        { error: 'productId, customerName, and rating are required' },
-        { status: 400 }
-      );
+      return badRequest('productId, customerName, and rating are required');
     }
 
     // Ensure productId is a valid number
     const parsedProductId = parseInt(productId);
     if (isNaN(parsedProductId)) {
-      return NextResponse.json(
-        { error: 'Invalid productId' },
-        { status: 400 }
-      );
+      return badRequest('Invalid productId');
     }
 
     // Ensure rating is a number and in valid range (1-5)
     if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-      return NextResponse.json(
-        { error: 'Rating must be between 1 and 5' },
-        { status: 400 }
-      );
+      return badRequest('Rating must be between 1 and 5');
     }
 
     // Verify the customer actually ordered this product if orderNumber is provided
@@ -99,25 +90,16 @@ export async function POST(request: NextRequest) {
       });
 
       if (!order) {
-        return NextResponse.json(
-          { error: 'Order not found' },
-          { status: 404 }
-        );
+        return notFound('Order not found');
       }
 
       if (order.items.length === 0) {
-        return NextResponse.json(
-          { error: 'This order does not contain the specified product' },
-          { status: 400 }
-        );
+        return badRequest('This order does not contain the specified product');
       }
 
       // Verify the customer name matches the order
       if (order.customerName.toLowerCase() !== customerName.toLowerCase()) {
-        return NextResponse.json(
-          { error: 'Customer name does not match the order' },
-          { status: 403 }
-        );
+        return forbidden('Customer name does not match the order');
       }
     }
 
@@ -135,8 +117,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(review, { status: 201 });
   } catch (error) {
-    console.error('Error creating review:', error);
-    return NextResponse.json({ error: 'Failed to create review' }, { status: 500 });
+    return serverError(error, 'Failed to create review');
   }
 }
 
@@ -146,16 +127,15 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) {
-      return NextResponse.json({ error: 'Review ID required' }, { status: 400 });
+      return badRequest('Review ID required');
     }
 
     await prisma.review.delete({ where: { id: Number(id) } });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Review not found' }, { status: 404 });
+      return notFound('Review not found');
     }
-    console.error('Error deleting review:', error);
-    return NextResponse.json({ error: 'Failed to delete review' }, { status: 500 });
+    return serverError(error, 'Failed to delete review');
   }
 }

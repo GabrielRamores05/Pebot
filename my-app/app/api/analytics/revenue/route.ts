@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serverError } from '@/lib/api-response';
 
 interface RevenueMetrics {
   totalRevenue: number;
@@ -227,7 +228,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (e) {
-    console.error('[REVENUE API] Error:', e);
-    return NextResponse.json({ error: 'Failed to fetch revenue data' }, { status: 500 });
+    return serverError(e, 'Failed to fetch revenue data');
   }
 }

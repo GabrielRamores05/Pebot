@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 // POST /api/loyalty/vouchers/claim
 // Customer claims free coffee voucher (sequential system)
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
     const { customerName } = body as { customerName: string };
 
     if (!customerName) {
-      return NextResponse.json({ error: 'customerName is required' }, { status: 400 });
+      return badRequest('customerName is required');
     }
 
     // Get loyalty card with full details (findFirst since unique key is now composite)
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
 
 
     if (!card) {
-      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+      return notFound('Customer not found');
     }
 
     // Get settings
@@ -69,7 +70,6 @@ export async function POST(req: NextRequest) {
       message: `Successfully claimed your free coffee! Progress reset to 0. Use your voucher (${voucherCode}) on your next order.`,
     });
   } catch (e) {
-    console.error('[LOYALTY] Error claiming voucher:', e);
-    return NextResponse.json({ error: 'Failed to claim voucher' }, { status: 500 });
+    return serverError(e, 'Failed to claim voucher');
   }
 }

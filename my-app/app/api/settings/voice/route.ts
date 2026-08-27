@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { guardAdmin } from '@/lib/api-guards';
 
 const VOICE_KEY = 'voiceSettings';
 
@@ -17,10 +17,8 @@ export async function GET() {
 
 // POST /api/settings/voice — admin only
 export async function POST(req: NextRequest) {
-  const me = await getAuthUser(req);
-  if (!me || me.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const { error } = await guardAdmin(req);
+  if (error) return error;
 
   const body = await req.json();
 

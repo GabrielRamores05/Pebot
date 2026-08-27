@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
 import { calcProductionCapacity } from '@/lib/availability';
+import { serverError, unauthorized } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
   const user = await requirePermission(req, 'inventory');
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return unauthorized();
   }
 
   try {
@@ -19,7 +20,6 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json(entries);
   } catch (error) {
-    console.error('[PRODUCTION CAPACITY] Error:', error);
-    return NextResponse.json({ error: 'Failed to compute production capacity' }, { status: 500 });
+    return serverError(error, 'Failed to compute production capacity');
   }
 }
