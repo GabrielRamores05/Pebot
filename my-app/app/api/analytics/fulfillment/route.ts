@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/auth';
 
 interface OrderMetric {
   orderNumber: string;
@@ -43,6 +44,9 @@ function getDateRange(range: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const user = await requirePermission(req, 'analytics');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const range = req.nextUrl.searchParams.get('range') || 'today';
     const { startDate, endDate } = getDateRange(range);

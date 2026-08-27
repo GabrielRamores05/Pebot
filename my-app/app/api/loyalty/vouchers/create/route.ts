@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/auth';
 
 // POST /api/loyalty/vouchers/create - Create a promotional voucher with custom rules
 export async function POST(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await req.json();
     const { 
@@ -89,6 +93,9 @@ export async function POST(req: NextRequest) {
 
 // GET /api/loyalty/vouchers/create - List all vouchers (optionally filtered by customer)
 export async function GET(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { searchParams } = new URL(req.url);
     const customerName = searchParams.get('customerName');

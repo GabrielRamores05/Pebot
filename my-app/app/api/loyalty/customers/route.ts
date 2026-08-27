@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/auth';
 
 interface CustomerTier {
   customerName: string;
@@ -69,6 +70,9 @@ function getVisitFrequency(totalOrders: number, daysSinceFirstOrder: number): 'H
 }
 
 export async function GET(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     // Fetch all loyalty cards with related data
     const loyaltyCards = await prisma.loyaltyCard.findMany({

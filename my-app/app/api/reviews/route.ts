@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/auth';
 
 // GET /api/reviews?productId=X OR /api/reviews (all reviews)
 // ?suggestions=true — only return reviews with tasteSuggestion
@@ -142,6 +143,9 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/reviews?id=X — admin delete a review
 export async function DELETE(request: NextRequest) {
+  const user = await requirePermission(request, 'products');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

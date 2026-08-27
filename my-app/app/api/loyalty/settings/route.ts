@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requirePermission } from '@/lib/auth';
 
 // GET /api/loyalty/settings
 export async function GET(req: NextRequest) {
@@ -60,6 +61,9 @@ function formatSettings(settings: any) {
 
 // PATCH /api/loyalty/settings
 export async function PATCH(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await req.json();
     const { 
@@ -146,6 +150,9 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/loyalty/settings
 export async function DELETE(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

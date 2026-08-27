@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
+import { requirePermission } from '@/lib/auth';
 
 function slugify(name: string): string {
   return name
@@ -38,6 +39,9 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const user = await requirePermission(req, 'tables');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await req.json() as { id: number; status?: string; name?: string; capacity?: number; section?: string; positionX?: number; positionY?: number };
     const { id, status, name, capacity, section, positionX, positionY } = body;
@@ -70,6 +74,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await requirePermission(req, 'tables');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { name, capacity } = await req.json() as { name: string; capacity: number };
 
@@ -120,6 +127,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const user = await requirePermission(req, 'tables');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { id, force } = await req.json() as { id: number; force?: boolean };
     const table = await prisma.restaurantTable.findUnique({ where: { id } });

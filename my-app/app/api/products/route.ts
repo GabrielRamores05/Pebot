@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
+import { requirePermission } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -23,6 +24,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await req.json() as {
       name: string; description?: string; price?: number; categoryId: number; imageUrl?: string;
@@ -90,6 +94,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { id, ...data } = await req.json() as { id: number; [key: string]: unknown };
     let updateData = data;
@@ -126,6 +133,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await req.json();
     const id = parseInt(body.id);
