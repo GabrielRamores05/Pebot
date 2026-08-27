@@ -1,7 +1,7 @@
 // Ingredient inventory utilities: unit conversion, cost calculation, formatting
 // All quantities are stored in base units (g, ml, pcs) per the Ingredient.baseUnit field.
 
-import { formatPeso } from '@/lib/format';
+import { formatPeso } from './format';
 
 export { formatPeso };
 
