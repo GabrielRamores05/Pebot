@@ -15,7 +15,10 @@ export default defineConfig({
       include: ['lib/**/*.ts', 'store/**/*.ts'],
       exclude: ['lib/prisma-client/**'],
       thresholds: {
-        statements: 35,
+        statements: 95,
+        branches: 90,
+        functions: 95,
+        lines: 95,
       },
     },
   },
