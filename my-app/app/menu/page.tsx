@@ -987,6 +987,12 @@ function MenuPageInner() {
     }
   }, []);
 
+  useEffect(() => {
+    if (searchParams.get('loyalty') === '1') {
+      setShowLoyalty(true);
+    }
+  }, [searchParams]);
+
   function refreshCategories() {
     fetch('/api/categories')
       .then((r) => {
