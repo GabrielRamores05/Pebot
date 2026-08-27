@@ -5,6 +5,7 @@ import { normalizeMemberName } from '@/lib/loyalty-utils';
 import { logAction } from '@/lib/audit-log';
 import { awardLoyaltyForPaidOrder, refundLoyaltyForCancelledOrder } from '@/lib/loyalty-award';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 // GET /api/orders/[id] – fetch single order by orderNumber or id
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -19,11 +20,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
 
-    if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    if (!order) return notFound('Order not found');
     return NextResponse.json(order);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 
@@ -39,13 +39,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     };
 
     const orderId = Number(id);
-    if (isNaN(orderId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    if (isNaN(orderId)) return badRequest('Invalid id');
 
     const existing = await prisma.order.findUnique({
       where: { id: orderId },
       include: { table: true, items: true },
     });
-    if (!existing) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    if (!existing) return notFound('Order not found');
 
     // Payment confirmation is what awards loyalty points — not the status change
     // itself. The cashier sends this marker when they take the money; the kitchen
@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // Cancel guard: only PENDING orders can be cancelled
     if (status === 'CANCELLED' && existing.status !== 'PENDING') {
-      return NextResponse.json({ error: 'Only pending orders can be cancelled' }, { status: 400 });
+      return badRequest('Only pending orders can be cancelled');
     }
 
     const order = await prisma.$transaction(async (tx) => {
@@ -222,7 +222,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json(order);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }

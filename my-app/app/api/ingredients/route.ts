@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serverError } from '@/lib/api-response';
 
 // GET /api/ingredients - Get all ingredients
 export async function GET() {
@@ -9,8 +10,7 @@ export async function GET() {
     });
     return NextResponse.json(ingredients);
   } catch (error) {
-    console.error('Error fetching ingredients:', error);
-    return NextResponse.json({ error: 'Failed to fetch ingredients' }, { status: 500 });
+    return serverError(error, 'Failed to fetch ingredients');
   }
 }
 
@@ -43,7 +43,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(ingredient, { status: 201 });
   } catch (error) {
-    console.error('Error creating ingredient:', error);
-    return NextResponse.json({ error: 'Failed to create ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to create ingredient');
   }
 }

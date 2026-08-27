@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/schedules?from=YYYY-MM-DD&to=YYYY-MM-DD&userId=X
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   const { searchParams } = new URL(req.url);
   const from = searchParams.get('from');
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 // POST /api/schedules — create schedule entries
 export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
       userId: number; shiftId: number; dates: string[]; status?: string;
     };
     if (!userId || !shiftId || !dates?.length) {
-      return NextResponse.json({ error: 'userId, shiftId, dates required' }, { status: 400 });
+      return badRequest('userId, shiftId, dates required');
     }
 
     const results = [];
@@ -53,39 +54,39 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ count: results.length }, { status: 201 });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to create schedules' }, { status: 500 });
+    return serverError(e, 'Failed to create schedules');
   }
 }
 
 // PUT /api/schedules — update a schedule entry (pass id in body)
 export async function PUT(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
     const { id, ...data } = body;
-    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+    if (!id) return badRequest('id required');
     if (data.shiftId) data.shiftId = Number(data.shiftId);
     if (data.userId) data.userId = Number(data.userId);
     const schedule = await prisma.schedule.update({ where: { id }, data });
     return NextResponse.json(schedule);
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to update schedule' }, { status: 500 });
+    return serverError(e, 'Failed to update schedule');
   }
 }
 
 // DELETE /api/schedules — delete a schedule entry (pass id in body)
 export async function DELETE(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
-    if (!body?.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+    if (!body?.id) return badRequest('id required');
     await prisma.schedule.delete({ where: { id: body.id } });
     return NextResponse.json({ success: true });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to delete schedule' }, { status: 500 });
+    return serverError(e, 'Failed to delete schedule');
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
+import { notFound, serverError } from '@/lib/api-response';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -16,13 +17,12 @@ export async function GET(request: Request, { params }: RouteParams) {
     });
 
     if (!ingredient) {
-      return NextResponse.json({ error: 'Ingredient not found' }, { status: 404 });
+      return notFound('Ingredient not found');
     }
 
     return NextResponse.json(ingredient);
   } catch (error) {
-    console.error('Error fetching ingredient:', error);
-    return NextResponse.json({ error: 'Failed to fetch ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to fetch ingredient');
   }
 }
 
@@ -66,8 +66,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
     return NextResponse.json(ingredient);
   } catch (error) {
-    console.error('Error updating ingredient:', error);
-    return NextResponse.json({ error: 'Failed to update ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to update ingredient');
   }
 }
 
@@ -87,7 +86,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting ingredient:', error);
-    return NextResponse.json({ error: 'Failed to delete ingredient' }, { status: 500 });
+    return serverError(error, 'Failed to delete ingredient');
   }
 }

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
 import { computePhilippinePayroll } from '@/lib/philippine-payroll';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/payroll?userId=X&status=DRAFT
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get('userId');
@@ -28,17 +29,17 @@ export async function GET(req: NextRequest) {
 // Body: { userId, periodStart, periodEnd, overtimeRate?, deductions? }
 export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
     const { userId, periodStart, periodEnd, deductions, overtimeRate } = body;
     if (!userId || !periodStart || !periodEnd) {
-      return NextResponse.json({ error: 'userId, periodStart, periodEnd required' }, { status: 400 });
+      return badRequest('userId, periodStart, periodEnd required');
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return NextResponse.json({ error: 'Staff not found' }, { status: 404 });
+    if (!user) return notFound('Staff not found');
 
     // Fetch attendance for the period
     const attendance = await prisma.attendance.findMany({
@@ -85,22 +86,22 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(payroll, { status: 201 });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to generate payroll' }, { status: 500 });
+    return serverError(e, 'Failed to generate payroll');
   }
 }
 
 // PUT /api/payroll — update status (PROCESSED / PAID): { id, status }
 export async function PUT(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
     const { id, status } = body;
-    if (!id || !status) return NextResponse.json({ error: 'id and status required' }, { status: 400 });
+    if (!id || !status) return badRequest('id and status required');
     const updated = await prisma.payroll.update({ where: { id }, data: { status } });
     return NextResponse.json(updated);
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to update payroll' }, { status: 500 });
+    return serverError(e, 'Failed to update payroll');
   }
 }

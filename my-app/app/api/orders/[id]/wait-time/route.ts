@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calculateStationWaitTime } from '@/lib/waitTime';
+import { notFound, serverError } from '@/lib/api-response';
 
 // GET /api/orders/[id]/wait-time — estimated wait per station for this order
 export async function GET(
@@ -17,7 +18,7 @@ export async function GET(
     });
 
     if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      return notFound('Order not found');
     }
 
     // Collect unique stations in this order
@@ -54,7 +55,6 @@ export async function GET(
       queueNumber: order.queueNumber,
     });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to calculate wait time' }, { status: 500 });
+    return serverError(e, 'Failed to calculate wait time');
   }
 }

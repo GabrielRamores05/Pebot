@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serverError } from '@/lib/api-response';
 
 interface CustomerTier {
   customerName: string;
@@ -252,7 +253,6 @@ export async function GET(req: NextRequest) {
       stats,
     });
   } catch (e) {
-    console.error('[CUSTOMER LOYALTY] Error:', e);
-    return NextResponse.json({ error: 'Failed to fetch customer data' }, { status: 500 });
+    return serverError(e, 'Failed to fetch customer data');
   }
 }

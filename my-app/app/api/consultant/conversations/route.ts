@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/consultant/conversations — list all conversations for the user
 export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const conversations = await prisma.aIConversation.findMany({
@@ -18,8 +19,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(conversations);
   } catch (error) {
-    console.error('Error fetching conversations:', error);
-    return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 });
+    return serverError(error, 'Failed to fetch conversations');
   }
 }
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const body = await req.json();
@@ -43,8 +43,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(conversation, { status: 201 });
   } catch (error) {
-    console.error('Error creating conversation:', error);
-    return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 });
+    return serverError(error, 'Failed to create conversation');
   }
 }
 
@@ -53,13 +52,13 @@ export async function PATCH(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) {
-      return NextResponse.json({ error: 'Conversation ID required' }, { status: 400 });
+      return badRequest('Conversation ID required');
     }
 
     const body = await req.json();
@@ -72,7 +71,6 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(conversation);
   } catch (error) {
-    console.error('Error updating conversation:', error);
-    return NextResponse.json({ error: 'Failed to update conversation' }, { status: 500 });
+    return serverError(error, 'Failed to update conversation');
   }
 }

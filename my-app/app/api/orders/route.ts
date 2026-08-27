@@ -22,6 +22,7 @@ import {
   sequenceValue,
   ticketDatePart,
 } from '@/lib/ticket';
+import { badRequest, serverError } from '@/lib/api-response';
 
 class InsufficientStockError extends Error {
   items: { productId: number; name: string; requested: number; available: number }[];
@@ -75,8 +76,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(orders);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
+    return serverError(e, 'Failed to fetch orders');
   }
 }
 
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!customerName || !items || items.length === 0) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return badRequest('Missing required fields');
     }
 
     const orderTypeValue = orderType || 'DINE_IN';
@@ -420,7 +420,6 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
-    console.error(e);
-    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
+    return serverError(e, 'Failed to create order');
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { formatPeso } from '@/lib/format';
 
 interface StockTx {
   id: number;
@@ -82,13 +83,13 @@ export default function StockHistoryPage() {
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/50 p-5 shadow-sm">
           <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">Total Purchased</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
-            ₱{totalPurchased.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatPeso(totalPurchased)}
           </p>
         </div>
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/50 p-5 shadow-sm">
           <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">This Month&apos;s Purchases</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">
-            ₱{monthPurchased.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatPeso(monthPurchased)}
           </p>
         </div>
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/50 p-5 shadow-sm">
@@ -180,11 +181,11 @@ export default function StockHistoryPage() {
                     <td className="px-5 py-3.5 text-right">
                       {t.purchaseCost != null ? (
                         <span className="text-gray-900 font-medium text-sm">
-                          ₱{t.purchaseCost.toFixed(2)}
+                          {formatPeso(t.purchaseCost)}
                         </span>
                       ) : t.usageCost != null ? (
                         <span className="text-gray-400 text-sm italic" title="Estimated from average unit cost">
-                          ~₱{t.usageCost.toFixed(2)}
+                          ~{formatPeso(t.usageCost)}
                         </span>
                       ) : (
                         <span className="text-gray-300 text-sm">—</span>

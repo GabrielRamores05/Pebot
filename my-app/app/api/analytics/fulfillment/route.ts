@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { serverError } from '@/lib/api-response';
 
 interface OrderMetric {
   orderNumber: string;
@@ -184,7 +185,6 @@ export async function GET(req: NextRequest) {
       orders: orderMetrics.slice(0, 100), // Return last 100 orders
     });
   } catch (e) {
-    console.error('[FULFILLMENT API] Error:', e);
-    return NextResponse.json({ error: 'Failed to fetch fulfillment metrics' }, { status: 500 });
+    return serverError(e, 'Failed to fetch fulfillment metrics');
   }
 }

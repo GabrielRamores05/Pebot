@@ -3,15 +3,16 @@ import JSZip from 'jszip';
 import { readFileSync, existsSync } from 'fs';
 import { getDatabasePath } from '@/lib/db-path';
 import { getAuthUser, requireRole } from '@/lib/auth';
+import { forbidden, notFound, unauthorized } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser(req);
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
     if (!requireRole(user, ['ADMIN'])) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return forbidden();
     }
 
     // Path to the SQLite database (resolved from DATABASE_URL or fallback)
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
 
     // Check if database file exists
     if (!existsSync(dbPath)) {
-      return NextResponse.json({ error: 'Database file not found' }, { status: 404 });
+      return notFound('Database file not found');
     }
 
     // Generate timestamp for filename

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
+import { badRequest, serverError } from '@/lib/api-response';
+import { normalizeMarginType, sellingPrice } from '@/lib/bir-pricing';
 
 export async function GET() {
   try {
@@ -17,8 +19,7 @@ export async function GET() {
       vatExempt: p.vatExempt ?? false,
     })));
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 
@@ -33,36 +34,32 @@ export async function POST(req: NextRequest) {
 
     // Validate required fields
     if (!body.name || typeof body.name !== 'string') {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+      return badRequest('Name is required');
     }
     if (typeof body.categoryId !== 'number' || body.categoryId <= 0) {
-      return NextResponse.json({ error: 'Valid categoryId is required' }, { status: 400 });
+      return badRequest('Valid categoryId is required');
     }
     if (body.price !== undefined && typeof body.price !== 'number') {
-      return NextResponse.json({ error: 'Price must be a number' }, { status: 400 });
+      return badRequest('Price must be a number');
     }
     if (body.imageUrl !== undefined && typeof body.imageUrl !== 'string') {
-      return NextResponse.json({ error: 'imageUrl must be a string' }, { status: 400 });
+      return badRequest('imageUrl must be a string');
     }
     // Extract and validate BIR pricing fields
     const capitalCost = body.capitalCost ?? 0;
-    const validMarginTypes = ['PERCENTAGE', 'FIXED'];
-    const marginType = validMarginTypes.includes(body.marginType ?? '') ? body.marginType : 'PERCENTAGE';
+    const marginType = normalizeMarginType(body.marginType);
     const marginValue = typeof body.marginValue === 'number' && body.marginValue >= 0 ? body.marginValue : 30;
     const vatExempt = body.vatExempt ?? false;
 
     // Calculate price from BIR pricing if not explicitly provided
     let finalPrice = body.price;
     if (finalPrice === undefined && capitalCost > 0) {
-      const basePrice = marginType === 'PERCENTAGE'
-        ? capitalCost * (1 + marginValue / 100)
-        : capitalCost + marginValue;
-      finalPrice = vatExempt ? basePrice : basePrice * 1.12;
+      finalPrice = sellingPrice(capitalCost, marginType, marginValue, vatExempt);
     }
 
     // Validate that we have a price
     if (finalPrice === undefined) {
-      return NextResponse.json({ error: 'Price or capitalCost is required' }, { status: 400 });
+      return badRequest('Price or capitalCost is required');
     }
 
     const product = await prisma.product.create({
@@ -84,8 +81,7 @@ export async function POST(req: NextRequest) {
     await prisma.inventory.create({ data: { productId: product.id, quantity: 0 } });
     return NextResponse.json(product, { status: 201 });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 
@@ -101,17 +97,12 @@ export async function PATCH(req: NextRequest) {
     // If BIR pricing fields are being updated, recalculate price
     if (hasBirPricing && 'price' in data === false) {
       const capitalCost = typeof data.capitalCost === 'number' ? data.capitalCost : 0;
-      // Validate marginType
-      const validMarginTypes = ['PERCENTAGE', 'FIXED'];
-      const marginType = validMarginTypes.includes(data.marginType as string) ? data.marginType as string : 'PERCENTAGE';
+      const marginType = normalizeMarginType(data.marginType);
       const marginValue = typeof data.marginValue === 'number' ? data.marginValue : 30;
       const vatExempt = typeof data.vatExempt === 'boolean' ? data.vatExempt : false;
 
       if (capitalCost > 0) {
-        const basePrice = marginType === 'PERCENTAGE'
-          ? capitalCost * (1 + marginValue / 100)
-          : capitalCost + marginValue;
-        const calculatedPrice = vatExempt ? basePrice : basePrice * 1.12;
+        const calculatedPrice = sellingPrice(capitalCost, marginType, marginValue, vatExempt);
         updateData = { ...updateData, price: calculatedPrice, marginType };
       }
     }
@@ -120,8 +111,7 @@ export async function PATCH(req: NextRequest) {
     emitEvent('product-update', product);
     return NextResponse.json(product);
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return serverError(e);
   }
 }
 
@@ -131,7 +121,7 @@ export async function DELETE(req: NextRequest) {
     const id = parseInt(body.id);
     
     if (!id || isNaN(id)) {
-      return NextResponse.json({ error: 'Invalid product ID provided' }, { status: 400 });
+      return badRequest('Invalid product ID provided');
     }
     
     // Check if product exists

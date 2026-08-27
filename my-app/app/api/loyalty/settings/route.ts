@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 // GET /api/loyalty/settings
 export async function GET(req: NextRequest) {
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
       });
       
       if (!settings) {
-        return NextResponse.json({ error: 'Loyalty settings not found for this category' }, { status: 404 });
+        return notFound('Loyalty settings not found for this category');
       }
 
       return NextResponse.json(formatSettings(settings));
@@ -27,8 +28,7 @@ export async function GET(req: NextRequest) {
     // Or just return empty list
     return NextResponse.json(allSettings.map(formatSettings));
   } catch (e) {
-    console.error('[LOYALTY] Error fetching settings:', e);
-    return NextResponse.json({ error: 'Failed to fetch loyalty settings' }, { status: 500 });
+    return serverError(e, 'Failed to fetch loyalty settings');
   }
 }
 
@@ -79,7 +79,7 @@ export async function PATCH(req: NextRequest) {
 
     // Validation
     if (coffeesRequiredForFree !== undefined && coffeesRequiredForFree < 1) {
-      return NextResponse.json({ error: 'Threshold must be at least 1' }, { status: 400 });
+      return badRequest('Threshold must be at least 1');
     }
 
     let settings;
@@ -113,7 +113,7 @@ export async function PATCH(req: NextRequest) {
           });
 
           if (existing) {
-            return NextResponse.json({ error: 'A loyalty module already exists for this category' }, { status: 400 });
+            return badRequest('A loyalty module already exists for this category');
           }
         }
 
@@ -139,8 +139,7 @@ export async function PATCH(req: NextRequest) {
     
     return NextResponse.json(formatSettings(settings));
   } catch (e) {
-    console.error('[LOYALTY] Error updating settings:', e);
-    return NextResponse.json({ error: 'Failed to update loyalty settings' }, { status: 500 });
+    return serverError(e, 'Failed to update loyalty settings');
   }
 }
 
@@ -149,7 +148,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+    if (!id) return badRequest('ID required');
 
     await prisma.loyaltySetting.delete({
       where: { id: parseInt(id) }
@@ -157,6 +156,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (e) {
-    return NextResponse.json({ error: 'Failed to delete' }, { status: 500 });
+    return serverError(e, 'Failed to delete');
   }
 }

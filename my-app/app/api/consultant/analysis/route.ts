@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/consultant/analysis?type=...&days=30
 // Types: sales, profitability, inventory, loyalty, staff-performance
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
@@ -36,11 +37,10 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(await getStaffPerformanceAnalysis(dateFrom));
 
       default:
-        return NextResponse.json({ error: 'Invalid analysis type' }, { status: 400 });
+        return badRequest('Invalid analysis type');
     }
   } catch (error) {
-    console.error('Analysis error:', error);
-    return NextResponse.json({ error: 'Failed to generate analysis' }, { status: 500 });
+    return serverError(error, 'Failed to generate analysis');
   }
 }
 

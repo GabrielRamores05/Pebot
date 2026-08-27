@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { conflict, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -9,7 +10,7 @@ interface RouteParams {
 // PUT /api/option-groups/:id — update group fields
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   const { id } = await params;
   try {
@@ -33,12 +34,12 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json(group);
   } catch (error: any) {
     if (error.code === 'P2002') {
-      return NextResponse.json({ error: 'A group with this name already exists' }, { status: 409 });
+      return conflict('A group with this name already exists');
     }
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Option group not found' }, { status: 404 });
+      return notFound('Option group not found');
     }
-    return NextResponse.json({ error: 'Failed to update option group' }, { status: 500 });
+    return serverError(error, 'Failed to update option group');
   }
 }
 
@@ -46,7 +47,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 // all product attachments (cascades). Orders keep their stored selections JSON.
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   const { id } = await params;
   try {
@@ -54,8 +55,8 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Option group not found' }, { status: 404 });
+      return notFound('Option group not found');
     }
-    return NextResponse.json({ error: 'Failed to delete option group' }, { status: 500 });
+    return serverError(error, 'Failed to delete option group');
   }
 }

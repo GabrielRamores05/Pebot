@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { serverError, unauthorized } from '@/lib/api-response';
 
 // GET /api/audit-logs - fetch audit logs with filtering and pagination
 export async function GET(req: NextRequest) {
   try {
     const user = await requirePermission(req, 'settings');
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
@@ -52,7 +53,6 @@ export async function GET(req: NextRequest) {
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error('Error fetching audit logs:', error);
-    return NextResponse.json({ error: 'Failed to fetch audit logs' }, { status: 500 });
+    return serverError(error, 'Failed to fetch audit logs');
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
+import { apiError, conflict, notFound, serverError, unauthorized } from '@/lib/api-response';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -14,17 +15,17 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       where: { id: Number(id) },
       include: { ingredients: true, group: true },
     });
-    if (!option) return NextResponse.json({ error: 'Option not found' }, { status: 404 });
+    if (!option) return notFound('Option not found');
     return NextResponse.json(option);
   } catch {
-    return NextResponse.json({ error: 'Failed to fetch option' }, { status: 500 });
+    return apiError('Failed to fetch option', 500);
   }
 }
 
 // PUT /api/product-options/:id — update a per-product option
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   const { id } = await params;
   try {
@@ -48,19 +49,19 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json(option);
   } catch (error: any) {
     if (error.code === 'P2002') {
-      return NextResponse.json({ error: 'This product already has an option with that name in this group' }, { status: 409 });
+      return conflict('This product already has an option with that name in this group');
     }
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Option not found' }, { status: 404 });
+      return notFound('Option not found');
     }
-    return NextResponse.json({ error: 'Failed to update option' }, { status: 500 });
+    return serverError(error, 'Failed to update option');
   }
 }
 
 // DELETE /api/product-options/:id
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   const user = await requirePermission(req, 'products');
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) return unauthorized();
 
   const { id } = await params;
   try {
@@ -68,8 +69,8 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Option not found' }, { status: 404 });
+      return notFound('Option not found');
     }
-    return NextResponse.json({ error: 'Failed to delete option' }, { status: 500 });
+    return serverError(error, 'Failed to delete option');
   }
 }
