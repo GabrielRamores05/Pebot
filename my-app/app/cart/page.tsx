@@ -376,45 +376,38 @@ export default function CartPage() {
     removeLoyaltyVouchers();
   }
 
-  function openConfirmDialog() {
-    // Validate cart is not empty
-    if (cartStore.items.length === 0) return;
+  /**
+   * Whether the cart can be ordered: it has items and a usable customer name.
+   * Shows the problem and moves the customer to the name field when it cannot.
+   */
+  function readyToOrder(): boolean {
+    if (cartStore.items.length === 0) return false;
 
-    // Validate customer name
     const nameValidation = validateCustomerName(cartStore.customerName);
     if (!nameValidation.valid) {
       setError(nameValidation.error || 'Invalid customer name');
-      document.getElementById('customer-name-input')?.focus();
-      document.getElementById('customer-name-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
+      const nameInput = document.getElementById('customer-name-input');
+      nameInput?.focus();
+      nameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
     }
 
     if (!cartStore.customerName.trim()) {
       setError('Unable to process order. Please refresh and try again.');
-      return;
+      return false;
     }
+
+    return true;
+  }
+
+  function openConfirmDialog() {
+    if (!readyToOrder()) return;
 
     setShowConfirmDialog(true);
   }
 
   async function placeOrder() {
-    // Validate cart is not empty
-    if (cartStore.items.length === 0) return;
-    
-    // Validate customer name
-    const nameValidation = validateCustomerName(cartStore.customerName);
-    if (!nameValidation.valid) {
-      setError(nameValidation.error || 'Invalid customer name');
-      document.getElementById('customer-name-input')?.focus();
-      document.getElementById('customer-name-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    
-    // Loyalty customer name is auto-filled, so no validation needed
-    if (!cartStore.customerName.trim()) {
-      setError('Unable to process order. Please refresh and try again.');
-      return;
-    }
+    if (!readyToOrder()) return;
 
     setPlacing(true);
     setError('');
@@ -469,14 +462,9 @@ export default function CartPage() {
         }
       }
 
-      // Calculate loyalty discount if vouchers were validated
-      let loyaltyDiscount = 0;
-      let loyaltyVoucherCodes: string[] = [];
-      
-      if (voucherDetails && voucherDetails.length > 0) {
-        loyaltyVoucherCodes = voucherDetails.map(v => v.code);
-        loyaltyDiscount = calculateLoyaltyDiscount();
-      }
+      // Only the codes are sent: /api/orders derives the peso discount from
+      // the stored vouchers and redeems them with the order.
+      const loyaltyVoucherCodes = voucherDetails ? voucherDetails.map(v => v.code) : [];
 
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -490,7 +478,7 @@ export default function CartPage() {
             quantity: i.quantity,
             ...((i.selections?.length ?? 0) > 0 && { optionIds: i.selections!.map((s) => s.optionId) }),
           })),          paymentMethod,
-          paymentScreenshot: paymentScreenshot || undefined,          ...(loyaltyDiscount > 0 && { loyaltyDiscount }),
+          paymentScreenshot: paymentScreenshot || undefined,
           ...(loyaltyVoucherCodes.length > 0 && { loyaltyVoucherCodes }),
           // Send selection info
           loyaltySelection: selectedItemsForDiscount,
@@ -505,34 +493,8 @@ export default function CartPage() {
         return;
       }
 
-      // If loyalty vouchers were selected, redeem all of them for this order
-      if (loyaltyVouchers && loyaltyVouchers.codes && loyaltyVouchers.codes.length > 0) {
-        if (!data.id) {
-          console.error('Order response had no id; vouchers were not redeemed:', data);
-          setError('Your order was placed, but your rewards were not applied. Show this to staff before you pay.');
-          return;
-        }
-
-        const redeemResults = await Promise.all(
-          loyaltyVouchers.codes.map(async (code) => {
-            const res = await fetch(`/api/loyalty/vouchers/${encodeURIComponent(code)}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ orderId: data.id }),
-            });
-
-            const responseData = await res.json().catch(() => ({}));
-            if (!res.ok) {
-              return { success: false, code, error: responseData.error || `HTTP ${res.status}` };
-            }
-            return { success: true, code };
-          })
-        );
-
-        if (redeemResults.some((result) => !result.success)) {
-          setError('One or more loyalty vouchers could not be redeemed.');
-        }
-      }
+      // Vouchers were redeemed inside the order transaction, so a placed order
+      // and a spent reward can no longer disagree.
 
       // CRITICAL: Always clear vouchers from state and storage after order
       removeLoyaltyVouchers();

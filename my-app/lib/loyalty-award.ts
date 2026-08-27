@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
-import { normalizeMemberName } from '@/lib/loyalty-utils';
+import { normalizeMemberName, rewardLabel, voucherCode } from '@/lib/loyalty-utils';
 import { logAction } from '@/lib/audit-log';
 
 export interface PaidOrderForLoyalty {
@@ -240,16 +240,8 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
     if (!isMilestoneMode) {
       while (tempCount >= threshold) {
         if (heldRewards >= maxHeldRewards) break; // at cap: keep progress, stop issuing
-        const rewardName =
-          settings.rewardType === 'FREE'
-            ? 'Free Item'
-            : settings.rewardType === 'PERCENTAGE'
-              ? `${settings.rewardValue}% Off`
-              : `₱${settings.rewardValue} Off`;
-        const code = `REWARD-${scopeLabel}-${Date.now().toString(36)}-${Math.random()
-          .toString(36)
-          .substring(7)
-          .toUpperCase()}`;
+        const rewardName = rewardLabel(settings.rewardType, settings.rewardValue);
+        const code = voucherCode('REWARD', scopeLabel);
 
         await prisma.loyaltyVoucher.create({
           data: {
@@ -277,16 +269,8 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
             rewardBlockedByCap = true;
             continue;
           }
-          const rewardName =
-            milestone.rewardType === 'FREE'
-              ? 'Free Item'
-              : milestone.rewardType === 'PERCENTAGE'
-                ? `${milestone.rewardValue}% Off`
-                : `₱${milestone.rewardValue} Off`;
-          const code = `MIL-T${milestone.target}-${scopeLabel}-${Date.now().toString(36)}-${Math.random()
-            .toString(36)
-            .substring(7)
-            .toUpperCase()}`;
+          const rewardName = rewardLabel(milestone.rewardType, milestone.rewardValue);
+          const code = voucherCode(`MIL-T${milestone.target}`, scopeLabel);
 
           await prisma.loyaltyVoucher.create({
             data: {

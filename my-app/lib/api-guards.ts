@@ -22,3 +22,19 @@ export async function guardAdmin(req: NextRequest): Promise<Guard> {
   if (!user || user.role !== 'ADMIN') return { error: forbidden() };
   return { user };
 }
+
+/** Any signed-in staff member (ADMIN, STAFF or KITCHEN), or a 401 response. */
+export async function guardStaff(req: NextRequest): Promise<Guard> {
+  const user = await getAuthUser(req);
+  if (!user) return { error: unauthorized() };
+  return { user };
+}
+
+/** Caller holding a Staff Management permission flag (ADMIN always passes), or a 401/403 response. */
+export async function guardPermission(req: NextRequest, feature: string): Promise<Guard> {
+  const user = await getAuthUser(req);
+  if (!user) return { error: unauthorized() };
+  if (user.role === 'ADMIN') return { user };
+  if ((user.permissions ?? {})[feature] === true) return { user };
+  return { error: forbidden() };
+}
