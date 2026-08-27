@@ -53,7 +53,9 @@ function MyOrdersPanel({ onClose }: { onClose: () => void }) {
     try {
       const savedOrders = JSON.parse(localStorage.getItem('cafe_orders') || '[]');
       setOrders(savedOrders);
-    } catch {}
+    } catch (e) {
+      console.error('Could not read this device\u2019s saved orders:', e);
+    }
   }, []);
 
   // Fetch real-time status for all orders
@@ -1625,7 +1627,9 @@ function MenuPageInner() {
                           });
                         }
                       }
-                    } catch {}
+                    } catch (e) {
+                      console.error('Failed to save the guest mood to the table:', e);
+                    }
                   }
 
                   localStorage.setItem('customerMood', guestMoodEmoji);

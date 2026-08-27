@@ -49,14 +49,17 @@ export async function fetchVoiceSettings(): Promise<VoiceSettings> {
   }
   try {
     const res = await fetch('/api/settings/voice', { cache: 'no-store' });
-    if (res.ok) {
-      const data = await res.json();
-      const settings = { ...DEFAULT_VOICE_SETTINGS, ...data };
-      cachedSettings = settings;
-      cacheTimestamp = now;
-      return settings;
-    }
-  } catch {}
+    if (!res.ok) throw new Error(`/api/settings/voice returned ${res.status}`);
+    const data = await res.json();
+    const settings = { ...DEFAULT_VOICE_SETTINGS, ...data };
+    cachedSettings = settings;
+    cacheTimestamp = now;
+    return settings;
+  } catch (e) {
+    // Announcements still work with the defaults, so this is not worth
+    // interrupting anyone over — but it has to be diagnosable.
+    console.error('Failed to load voice settings, using the last known values:', e);
+  }
   return cachedSettings ?? { ...DEFAULT_VOICE_SETTINGS };
 }
 

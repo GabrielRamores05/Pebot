@@ -178,7 +178,9 @@ export default function PosTerminalPage() {
       try {
         const saved = JSON.parse(localStorage.getItem('terminal-col-widths') || '');
         if (saved?.calc && saved?.summary) return saved;
-      } catch {}
+      } catch (e) {
+        console.error('Could not read the saved column widths, using defaults:', e);
+      }
     }
     return { calc: 220, summary: 260 };
   });
@@ -199,7 +201,11 @@ export default function PosTerminalPage() {
     function onUp() {
       if (!dragCol.current) return;
       dragCol.current = null;
-      try { localStorage.setItem('terminal-col-widths', JSON.stringify(colW)); } catch {}
+      try {
+        localStorage.setItem('terminal-col-widths', JSON.stringify(colW));
+      } catch (e) {
+        console.error('Could not save the column widths on this device:', e);
+      }
     }
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
