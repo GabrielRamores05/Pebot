@@ -270,9 +270,13 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
       }
     } else {
       // Milestone mode
+      let rewardBlockedByCap = false;
       for (const milestone of milestones.sort((a, b) => a.target - b.target)) {
         if (tempCount >= milestone.target && !claimedMilestones.includes(milestone.target)) {
-          if (heldRewards >= maxHeldRewards) continue; // at cap: keep unclaimed, stop issuing
+          if (heldRewards >= maxHeldRewards) {
+            rewardBlockedByCap = true;
+            continue;
+          }
           const rewardName =
             milestone.rewardType === 'FREE'
               ? 'Free Item'
@@ -303,7 +307,7 @@ export async function awardLoyaltyForPaidOrder(order: PaidOrderForLoyalty): Prom
         }
       }
 
-      if (tempCount >= threshold) {
+      if (tempCount >= threshold && !rewardBlockedByCap) {
         tempCount = Math.max(0, tempCount - threshold);
         claimedMilestones = [];
       }
