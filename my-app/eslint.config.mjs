@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "server.js",
     "electron/**",
     "scripts/**",
+    // Generated Prisma client, committed for the packaged Electron build
+    "lib/prisma-client/**",
   ]),
 ]);
 

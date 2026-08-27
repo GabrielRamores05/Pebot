@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# pebot — the one command for this project.
+#
+# Two halves:
+#   pebot init | spec ...   spec-driven development, via GitHub Spec Kit (`specify`)
+#   pebot dev | db | ...    project ops, via the npm scripts in my-app/
+#
+# Install once (see docs/pebot-cli.md) and it works from any directory:
+# `pebot init` scaffolds into the folder you are standing in, and the ops
+# commands find the project root by walking up from the current directory.
+
+set -euo pipefail
+
+readonly INTEGRATIONS=(claude kilocode opencode)
+
+die() { printf 'pebot: %s\n' "$1" >&2; exit 1; }
+
+# Walk up from $PWD looking for the project root: the directory holding
+# my-app/package.json (ops commands) or .specify (spec commands).
+find_root() {
+  local dir="$PWD"
+  while [[ "$dir" != "/" ]]; do
+    if [[ -f "$dir/my-app/package.json" || -d "$dir/.specify" ]]; then
+      printf '%s\n' "$dir"; return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+require_specify() {
+  command -v specify >/dev/null 2>&1 || die \
+    "'specify' not found. Install it with: uv tool install specify-cli --from git+https://github.com/github/spec-kit.git"
+}
+
+app_dir() {
+  local root
+  root="$(find_root)" || die "not inside the Pebot repo (no my-app/package.json or .specify/ above $PWD)"
+  [[ -d "$root/my-app" ]] || die "found $root but no my-app/ inside it"
+  printf '%s\n' "$root/my-app"
+}
+
+run_npm() { ( cd "$(app_dir)" && exec npm run "$@" ); }
+
+cmd_init() {
+  require_specify
+  # --here: scaffold into the current directory, whichever one that is.
+  specify init --here --force --integration "${INTEGRATIONS[0]}" "$@"
+  local extra
+  for extra in "${INTEGRATIONS[@]:1}"; do
+    specify integration install "$extra" --force
+  done
+  specify integration use "${INTEGRATIONS[0]}"
+}
+
+cmd_db() {
+  case "${1:-}" in
+    generate) run_npm db:generate ;;
+    push)     run_npm db:push ;;
+    seed)     run_npm db:seed ;;
+    studio)   run_npm db:studio ;;
+    migrate)  ( cd "$(app_dir)" && exec npx prisma migrate "${2:-deploy}" ) ;;
+    *) die "unknown db command '${1:-}'. Try: generate, push, seed, studio, migrate" ;;
+  esac
+}
+
+# Runs all three gates even if an earlier one fails, so one run tells you
+# everything that is wrong instead of only the first thing.
+cmd_check() {
+  local app failed=()
+  app="$(app_dir)"
+  cd "$app"
+  npm run lint      || failed+=(lint)
+  npx tsc --noEmit  || failed+=(typecheck)
+  npm run test:unit || failed+=(tests)
+  if (( ${#failed[@]} )); then
+    printf '\npebot check: FAILED (%s)\n' "${failed[*]}" >&2
+    return 1
+  fi
+  printf '\npebot check: all gates passed\n'
+}
+
+cmd_doctor() {
+  printf 'node        %s\n' "$(node --version 2>/dev/null || echo MISSING)"
+  printf 'npm         %s\n' "$(npm --version 2>/dev/null || echo MISSING)"
+  printf 'specify     %s\n' "$(specify --version 2>/dev/null || echo 'MISSING (spec commands unavailable)')"
+  printf 'repo root   %s\n' "$(find_root || echo 'NOT FOUND (run from inside the repo)')"
+  local root; root="$(find_root || true)"
+  if [[ -n "$root" ]]; then
+    printf 'constitution %s\n' "$([[ -f "$root/.specify/memory/constitution.md" ]] && echo present || echo MISSING)"
+    printf 'node_modules %s\n' "$([[ -d "$root/my-app/node_modules" ]] && echo present || echo 'MISSING (run: npm install in my-app)')"
+    printf 'specs        %s\n' "$(find "$root/specs" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l | tr -d ' ') found"
+  fi
+  if command -v lsof >/dev/null 2>&1 && lsof -i :3000 >/dev/null 2>&1; then
+    printf 'port 3000   IN USE\n'
+  else
+    printf 'port 3000   free\n'
+  fi
+}
+
+usage() {
+  cat <<'EOF'
+pebot — CaféOS project command
+
+Spec-driven development (GitHub Spec Kit under the hood):
+  pebot init [specify flags]   scaffold/refresh SDD in the current directory,
+                               with the claude, kilocode and opencode integrations
+  pebot spec <args...>         pass anything straight through to `specify`
+                               e.g. pebot spec integration list
+
+Project ops (run from anywhere inside the repo):
+  pebot dev                    start the local dev server
+  pebot build                  next build
+  pebot build:electron         package the Windows desktop app
+  pebot db generate|push|seed|studio|migrate [name]
+  pebot check                  lint + typecheck + unit tests
+  pebot doctor                 environment sanity check
+
+The workflow itself is documented in AGENTS.md and .specify/memory/constitution.md;
+this CLI is only a convenience over them.
+EOF
+}
+
+case "${1:-}" in
+  init)            shift; cmd_init "$@" ;;
+  spec)            shift; require_specify; exec specify "$@" ;;
+  dev)             run_npm dev ;;
+  build)           run_npm build ;;
+  build:electron)  run_npm electron:build:win ;;
+  db)              shift; cmd_db "$@" ;;
+  check)           cmd_check ;;
+  doctor)          cmd_doctor ;;
+  -h|--help|help|"") usage ;;
+  *)               die "unknown command '$1'. Run 'pebot --help'." ;;
+esac
