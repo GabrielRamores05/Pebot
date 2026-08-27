@@ -25,6 +25,17 @@ import {
 } from '@/lib/ticket';
 import { badRequest, serverError } from '@/lib/api-response';
 import { guardStaff } from '@/lib/api-guards';
+import { loyaltyDiscountFor } from '@/lib/loyalty-redemption';
+import type { CartLineItem } from '@/lib/pos-utils';
+
+class LoyaltyVoucherError extends Error {
+  reasons: string[];
+  constructor(reasons: string[]) {
+    super(reasons.join(' '));
+    this.name = 'LoyaltyVoucherError';
+    this.reasons = reasons;
+  }
+}
 
 class InsufficientStockError extends Error {
   items: { productId: number; name: string; requested: number; available: number }[];
@@ -89,15 +100,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { customerName, loyaltyCustomerName, tableId, sessionId, items, notes, loyaltyDiscount, loyaltyVoucherCodes, paymentMethod, paymentScreenshot, paymentConfirmed, overrideStock, orderType, deliveryAddress,       loyaltyAssignments, discountRate, discountReason } = body as {
+    const { customerName, loyaltyCustomerName, tableId, sessionId, items, notes, loyaltyVoucherCodes, loyaltySelection, paymentMethod, paymentScreenshot, paymentConfirmed, overrideStock, orderType, deliveryAddress,       loyaltyAssignments, discountRate, discountReason } = body as {
       customerName: string;
       loyaltyCustomerName?: string | null;
       tableId?: number;
       sessionId?: number | null;
       items: { productId: number; quantity: number; notes?: string }[];
       notes?: string;
-      loyaltyDiscount?: number;
       loyaltyVoucherCodes?: string[];
+      loyaltySelection?: Record<string, number>;
       paymentMethod?: string;
       paymentScreenshot?: string;
       paymentConfirmed?: boolean;
@@ -133,8 +144,10 @@ export async function POST(req: NextRequest) {
 
     const productMap = new Map(products.map((p) => [p.id, p]));
 
-    let totalAmount = 0;
+    let itemsSubtotal = 0;
     const resolvedByItem: ResolvedSelection[][] = [];
+    // Priced from the database, for the loyalty calculation below.
+    const discountLineItems: CartLineItem[] = [];
     const orderItemsData: {
       productId: number;
       quantity: number;
@@ -154,7 +167,13 @@ export async function POST(req: NextRequest) {
 
       const unitPrice = product.price + selectionsPriceAdder(resolved);
       const subtotal = unitPrice * item.quantity;
-      totalAmount += subtotal;
+      itemsSubtotal += subtotal;
+      discountLineItems.push({
+        productId: item.productId,
+        price: unitPrice,
+        quantity: item.quantity,
+        categoryId: product.categoryId,
+      });
       orderItemsData.push({
         productId: item.productId,
         quantity: item.quantity,
@@ -175,25 +194,50 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Apply loyalty discount if provided
-    const isLoyaltyOrder = !!(loyaltyDiscount && loyaltyDiscount > 0);
-    if (isLoyaltyOrder) {
-      totalAmount = Math.max(0, totalAmount - loyaltyDiscount);
-    }
-
     // Apply a percentage discount (e.g., Student / PWD statutory discount)
     // configured in BIR Business Settings. The rate comes from the client but
     // the monetary amount is recomputed server-side from the order total.
     const appliedDiscountRate = discountRate && discountRate > 0 ? discountRate : 0;
     const appliedDiscountReason = appliedDiscountRate > 0 && discountReason ? discountReason : null;
-    let appliedDiscountAmount = 0;
-    if (appliedDiscountRate > 0) {
-      appliedDiscountAmount = Math.round(totalAmount * appliedDiscountRate / 100 * 100) / 100;
-      totalAmount = Math.max(0, totalAmount - appliedDiscountAmount);
-    }
 
-    // Create order & deduct inventory in a transaction
+    const voucherCodes = [...new Set((loyaltyVoucherCodes ?? []).filter((c) => typeof c === 'string' && c.trim()))];
+
+    // Create order, redeem rewards & deduct inventory in a transaction
     const order = await prisma.$transaction(async (tx) => {
+      // The loyalty discount is derived here — from the vouchers as stored and
+      // from prices resolved above — and never from a client-supplied amount.
+      // Read inside the transaction so a voucher cannot be spent twice by two
+      // terminals scanning the same card at once.
+      let loyaltyDiscount = 0;
+      const vouchers = voucherCodes.length > 0
+        ? await tx.loyaltyVoucher.findMany({ where: { code: { in: voucherCodes } } })
+        : [];
+
+      if (voucherCodes.length > 0) {
+        const missing = voucherCodes.filter((code) => !vouchers.some((v) => v.code === code));
+        if (missing.length > 0) {
+          throw new LoyaltyVoucherError(missing.map((code) => `Reward ${code} was not found.`));
+        }
+
+        const result = loyaltyDiscountFor(vouchers, {
+          items: discountLineItems,
+          selection: loyaltySelection,
+          now: new Date(),
+        });
+        if (result.rejections.length > 0) {
+          throw new LoyaltyVoucherError(result.rejections);
+        }
+        loyaltyDiscount = result.discount;
+      }
+
+      const isLoyaltyOrder = loyaltyDiscount > 0;
+      let totalAmount = Math.max(0, itemsSubtotal - loyaltyDiscount);
+      let appliedDiscountAmount = 0;
+      if (appliedDiscountRate > 0) {
+        appliedDiscountAmount = Math.round(totalAmount * appliedDiscountRate / 100 * 100) / 100;
+        totalAmount = Math.max(0, totalAmount - appliedDiscountAmount);
+      }
+
       // Daily sequential ticket: ORD-MMDDYY-A001 → A999 → B001…, restarting
       // at A001 each calendar day. Computed inside the transaction so two
       // terminals placing orders at the same moment can't draw one code.
@@ -236,6 +280,29 @@ export async function POST(req: NextRequest) {
           table: true,
         },
       });
+
+      // Spend the rewards that paid for the discount above, in this same
+      // transaction: a voucher can never stay reusable while its discount has
+      // already been given away. The status/usedCount guard makes the write
+      // lose the race rather than double-spend, and losing rolls the order back.
+      for (const voucher of vouchers) {
+        const usedCount = voucher.usedCount + 1;
+        const fullyUsed = usedCount >= voucher.maxRedemptions;
+        const spent = await tx.loyaltyVoucher.updateMany({
+          where: { code: voucher.code, status: 'ACTIVE', usedCount: voucher.usedCount },
+          data: {
+            usedCount,
+            status: fullyUsed ? 'REDEEMED' : 'ACTIVE',
+            redeemedDate: fullyUsed ? new Date() : null,
+            redeemedOrderId: newOrder.id,
+          },
+        });
+        if (spent.count !== 1) {
+          throw new LoyaltyVoucherError([
+            `Reward ${voucher.code} was just used somewhere else. Nothing has been charged — please try again.`,
+          ]);
+        }
+      }
 
       // Stock check — sellable quantity is derived from ingredient stock + the
       // product recipe (spec: ingredient stock is the shared pool; recipes
@@ -373,7 +440,7 @@ export async function POST(req: NextRequest) {
       action: 'ORDER_CREATE',
       resource: 'order',
       resourceId: order.id,
-      details: { orderNumber: order.orderNumber, customerName, totalAmount, itemCount: items.length },
+      details: { orderNumber: order.orderNumber, customerName, totalAmount: order.totalAmount, itemCount: items.length },
       req,
     });
 
@@ -427,6 +494,12 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (e) {
+    if (e instanceof LoyaltyVoucherError) {
+      return NextResponse.json(
+        { error: `${e.reasons.join(' ')} Your order was not placed — nothing has been charged.` },
+        { status: 409 },
+      );
+    }
     if (e instanceof InsufficientStockError) {
       const names = e.items.map((i) => i.name).join(', ');
       return NextResponse.json(

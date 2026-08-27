@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import { formatPeso } from '@/lib/format';
 import { calculateLoyaltyDiscountForItems } from '@/lib/pos-utils';
-import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface InventoryData { quantity: number; lowStockThreshold: number; }
 interface Product { id: number; name: string; description?: string; price: number; imageUrl?: string; available: boolean; inventory?: InventoryData; vatExempt?: boolean; marginType?: string; marginValue?: number; capitalCost?: number; }
@@ -227,6 +226,9 @@ export default function PosTerminalPage() {
   const [search, setSearch] = useState('');
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Non-fatal problems reported by the order API (e.g. loyalty points that were
+  // not added). The sale went through; the cashier still has to know.
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [loyaltySearch, setLoyaltySearch] = useState('');
   const [allLoyaltyResults, setAllLoyaltyResults] = useState<LoyaltyCard[]>([]);
   const [loyaltyResults, setLoyaltyResults] = useState<LoyaltyCard[]>([]);
@@ -512,6 +514,7 @@ export default function PosTerminalPage() {
 
   function clearCart() {
     setCart([]);
+    setWarnings([]);
     setCustomerName('Walk-In');
     setSelectedTable(null);
     setSelectedLoyaltyCard(null);
@@ -720,6 +723,7 @@ export default function PosTerminalPage() {
     }
     setPlacing(true);
     setError(null);
+    setWarnings([]);
     try {
       const loyaltyTargetName = cart
         .flatMap(item => item.loyaltyAssignments ?? [])
@@ -739,7 +743,8 @@ export default function PosTerminalPage() {
            overrideStock,
            discountRate: discountRate > 0 ? discountRate : undefined,
            discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
-           ...(loyaltyDiscount > 0 && { loyaltyDiscount }),
+           // The peso amount is not sent: /api/orders derives it from these
+           // codes and redeems them with the order.
            ...(loyaltyVoucherCodes.length > 0 && { loyaltyVoucherCodes }),
            items: cart.map(i => ({
             productId: i.productId,
@@ -753,26 +758,11 @@ export default function PosTerminalPage() {
        if (!res.ok) { setError(data.error || 'Failed to place order'); return; }
        const table = tables.find(t => t.id === selectedTable);
 
-       // Redeem loyalty vouchers automatically for this order
-       if (loyaltyVoucherCodes.length > 0 && data.id) {
-         const failedVoucherCodes: string[] = [];
-         await Promise.all(
-           loyaltyVoucherCodes.map(async (code) => {
-             try {
-               await fetchJson(`/api/loyalty/vouchers/${encodeURIComponent(code)}`, {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({ orderId: data.id }),
-               });
-             } catch (e) {
-               failedVoucherCodes.push(code);
-               console.error('[LOYALTY] Failed to redeem voucher:', code, userMessage(e, 'Request failed'));
-             }
-           })
-         );
-         if (failedVoucherCodes.length > 0) {
-           setError(`Order placed, but these vouchers could not be redeemed: ${failedVoucherCodes.join(', ')}. Please retry them.`);
-         }
+       // Vouchers are redeemed by /api/orders inside the order transaction,
+       // so there is nothing to redeem here. Anything that went wrong after
+       // the sale was committed comes back as a warning.
+       if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+         setWarnings(data.warnings);
        }
       
       // Calculate tax breakdown from BIR pricing for RECEIPT DISPLAY ONLY
@@ -1211,6 +1201,24 @@ export default function PosTerminalPage() {
         {/* Order Details */}
         <div className="space-y-3 border-t border-[var(--pos-border)] bg-[var(--pos-surface)] p-3">
           {error && <div className="rounded-[var(--radius-md)] border border-[var(--pos-danger)] bg-[var(--pos-danger-soft)] p-2 text-xs text-[var(--pos-danger)]">{error}</div>}
+
+          {warnings.length > 0 && (
+            <div className="rounded-[var(--radius-md)] border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
+              {warnings.map((warning) => (
+                <p key={warning} className="flex items-start gap-1.5">
+                  <span aria-hidden>⚠️</span>
+                  <span>{warning}</span>
+                </p>
+              ))}
+              <button
+                type="button"
+                onClick={() => setWarnings([])}
+                className="mt-1 font-semibold underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-[var(--pos-ink-soft)]">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
