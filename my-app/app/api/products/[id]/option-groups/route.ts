@@ -32,7 +32,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   const allOptions = await prisma.productOption.findMany({
     where: { productId, available: true },
     orderBy: { sortOrder: 'asc' },
-    select: { id: true, name: true, priceDelta: true, groupId: true },
+    include: {
+      ingredients: {
+        select: { ingredientId: true, deltaQty: true },
+      },
+    },
   });
 
   // Index options by groupId

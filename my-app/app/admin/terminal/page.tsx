@@ -4,14 +4,26 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import { formatPeso } from '@/lib/format';
+import { calculateLoyaltyDiscountForItems } from '@/lib/pos-utils';
 
 interface InventoryData { quantity: number; lowStockThreshold: number; }
 interface Product { id: number; name: string; description?: string; price: number; imageUrl?: string; available: boolean; inventory?: InventoryData; vatExempt?: boolean; marginType?: string; marginValue?: number; capitalCost?: number; }
 interface Category { id: number; name: string; icon?: string; products: Product[]; }
 interface CartLoyaltyAssignment { customerName: string; quantity: number; }
-interface CartItem { key?: string; productId: number; name: string; price: number; quantity: number; vatExempt?: boolean; loyaltyAssignments?: CartLoyaltyAssignment[]; optionIds?: number[]; selectionsLabel?: string; }
+interface CartItem { key?: string; productId: number; name: string; price: number; quantity: number; vatExempt?: boolean; loyaltyAssignments?: CartLoyaltyAssignment[]; optionIds?: number[]; selectionsLabel?: string; categoryId?: number; }
 interface Table { id: number; name: string; status: string; }
 interface LoyaltyCard { id: number; customerName: string; membershipCode?: string | null; memberSince?: string | null; coffeesCompleted: number; rewardsAvailable: number; lastRewardRedeemDate: string | null; }
+interface VoucherDetail {
+  code: string;
+  status: string;
+  rewardName: string;
+  discountType: string;
+  discountValue: number;
+  minPurchase: number;
+  targetType: string;
+  targetCategoryId: number | null;
+  categoryName: string;
+}
 
 interface OrderReceipt {
   orderNumber: string;
@@ -36,6 +48,7 @@ interface OrderReceipt {
   discountAmount?: number;
   discountReason?: string;
   discountRate?: number;
+  loyaltyDiscount?: number;
 }
 
 interface BusinessSettings {
@@ -155,7 +168,7 @@ export default function PosTerminalPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   // Option picker state: which product is being configured
   interface PickerGroup { id: number; group: { id: number; name: string; selectionType: 'single' | 'multi' }; options: { id: number; name: string; priceDelta: number }[] }
-  const [picker, setPicker] = useState<{ product: Product; groups: PickerGroup[] } | null>(null);
+  const [picker, setPicker] = useState<{ product: Product; groups: PickerGroup[]; categoryId?: number } | null>(null);
   const [pickerSingle, setPickerSingle] = useState<Record<number, number>>({});
   const [pickerMulti, setPickerMulti] = useState<number[]>([]);
 
@@ -214,6 +227,8 @@ export default function PosTerminalPage() {
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
   const [loyaltyLoading, setLoyaltyLoading] = useState(false);
   const [selectedLoyaltyCard, setSelectedLoyaltyCard] = useState<LoyaltyCard | null>(null);
+  const [loyaltyVouchers, setLoyaltyVouchers] = useState<VoucherDetail[]>([]);
+  const [loyaltyVoucherCodes, setLoyaltyVoucherCodes] = useState<string[]>([]);
   const [pendingLoyaltyItemId, setPendingLoyaltyItemId] = useState<number | null>(null);
   const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
@@ -344,7 +359,19 @@ export default function PosTerminalPage() {
 
   const cartSubtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const discountAmount = discountRate > 0 ? Math.round(cartSubtotal * discountRate / 100 * 100) / 100 : 0;
-  const total = Math.max(0, cartSubtotal - discountAmount);
+  const loyaltyDiscount = cart.length > 0 && loyaltyVouchers.length > 0
+    ? calculateLoyaltyDiscountForItems(
+        cart.map(i => ({ productId: i.productId, price: i.price, quantity: i.quantity, categoryId: i.categoryId })),
+        loyaltyVouchers.map(v => ({
+          code: v.code,
+          discountType: v.discountType,
+          discountValue: v.discountValue,
+          targetCategoryId: v.targetCategoryId,
+        })),
+        {}
+      )
+    : 0;
+  const total = Math.max(0, cartSubtotal - discountAmount - loyaltyDiscount);
   const cashValue = cashReceived > 0 ? cashReceived : Number.parseFloat(cashInput || '0') || 0;
   const changeValue = cashValue > 0 ? cashValue - total : 0;
   const hasCashInput = cashInput.trim() !== '' || cashReceived > 0;
@@ -435,17 +462,18 @@ export default function PosTerminalPage() {
     },
   });
 
-  function addToCart(product: Product, opts?: { optionIds?: number[]; selectionsLabel?: string; unitPrice?: number }) {
+  function addToCart(product: Product, opts?: { optionIds?: number[]; selectionsLabel?: string; unitPrice?: number; categoryId?: number }) {
     const key = opts?.optionIds?.length ? `${product.id}:${[...opts.optionIds].sort((a, b) => a - b).join(',')}` : String(product.id);
     const unitPrice = opts?.unitPrice ?? product.price;
     setCart(prev => {
       const existing = prev.find(i => (i.key ?? String(i.productId)) === key);
       if (existing) return prev.map(i => (i.key ?? String(i.productId)) === key ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { key, productId: product.id, name: product.name, price: unitPrice, quantity: 1, vatExempt: product.vatExempt ?? false, optionIds: opts?.optionIds, selectionsLabel: opts?.selectionsLabel }];
+      return [...prev, { key, productId: product.id, name: product.name, price: unitPrice, quantity: 1, vatExempt: product.vatExempt ?? false, optionIds: opts?.optionIds, selectionsLabel: opts?.selectionsLabel, categoryId: opts?.categoryId }];
     });
   }
 
   async function handleProductClick(product: Product) {
+    const category = categories.find(c => c.products.some(p => p.id === product.id));
     // Fast path: no customization groups attached → straight into the cart
     try {
       const res = await fetch(`/api/products/${product.id}/option-groups`);
@@ -454,7 +482,7 @@ export default function PosTerminalPage() {
         ? data.filter((g: PickerGroup) => (g.options?.length ?? 0) > 0)
         : [];
       if (groups.length === 0) {
-        addToCart(product);
+        addToCart(product, { categoryId: category?.id });
         return;
       }
       const defaults: Record<number, number> = {};
@@ -463,7 +491,7 @@ export default function PosTerminalPage() {
       }
       setPickerSingle(defaults);
       setPickerMulti([]);
-      setPicker({ product, groups });
+      setPicker({ product, groups, categoryId: category?.id });
     } catch {
       addToCart(product);
     }
@@ -480,6 +508,8 @@ export default function PosTerminalPage() {
     setCustomerName('Walk-In');
     setSelectedTable(null);
     setSelectedLoyaltyCard(null);
+    setLoyaltyVouchers([]);
+    setLoyaltyVoucherCodes([]);
     setPendingLoyaltyItemId(null);
     setDeliveryAddress('');
     setSearch('');
@@ -546,6 +576,7 @@ export default function PosTerminalPage() {
     setShowLoyaltyModal(false);
     setLoyaltyResults(allLoyaltyResults);
 
+    // Auto-fetch active vouchers for this customer so rewards are applied automatically
     if (pendingLoyaltyItemId !== null) {
       setCart(prev => prev.map(item => {
         if (item.productId !== pendingLoyaltyItemId) return item;
@@ -558,7 +589,37 @@ export default function PosTerminalPage() {
       }));
       setPendingLoyaltyItemId(null);
     }
+   }
+
+  async function fetchCustomerVouchers(name: string) {
+    try {
+      const res = await fetch(`/api/loyalty/cards/${encodeURIComponent(name)}`, { cache: 'no-store' });
+      if (!res.ok) {
+        setLoyaltyVouchers([]);
+        setLoyaltyVoucherCodes([]);
+        return;
+      }
+      const data = await res.json();
+      const cards = Array.isArray(data) ? data : [data];
+      const card = cards[0];
+      const rawVouchers: VoucherDetail[] = (card?.activeVouchers || []).filter((v: VoucherDetail) => v.status === 'ACTIVE');
+      setLoyaltyVouchers(rawVouchers);
+      setLoyaltyVoucherCodes(rawVouchers.map(v => v.code));
+    } catch {
+      setLoyaltyVouchers([]);
+      setLoyaltyVoucherCodes([]);
+    }
   }
+
+  // Auto-fetch and apply loyalty vouchers when a loyalty customer is selected
+  useEffect(() => {
+    if (selectedLoyaltyCard) {
+      fetchCustomerVouchers(selectedLoyaltyCard.customerName);
+    } else {
+      setLoyaltyVouchers([]);
+      setLoyaltyVoucherCodes([]);
+    }
+  }, [selectedLoyaltyCard]);
 
   function addLoyaltyAssignment(productId: number, customerName?: string) {
     setCart(prev => prev.map(item => {
@@ -660,18 +721,20 @@ export default function PosTerminalPage() {
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName: customerName.trim(),
-          loyaltyCustomerName: loyaltyTargetName || customerName.trim(),
-          paymentMethod,
-          tableId: selectedTable ?? undefined,
-          orderType,
-          deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress.trim() : undefined,
-          paymentConfirmed: true,
-          overrideStock,
-          discountRate: discountRate > 0 ? discountRate : undefined,
-          discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
-          items: cart.map(i => ({
+         body: JSON.stringify({
+           customerName: customerName.trim(),
+           loyaltyCustomerName: loyaltyTargetName || customerName.trim(),
+           paymentMethod,
+           tableId: selectedTable ?? undefined,
+           orderType,
+           deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress.trim() : undefined,
+           paymentConfirmed: true,
+           overrideStock,
+           discountRate: discountRate > 0 ? discountRate : undefined,
+           discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
+           ...(loyaltyDiscount > 0 && { loyaltyDiscount }),
+           ...(loyaltyVoucherCodes.length > 0 && { loyaltyVoucherCodes }),
+           items: cart.map(i => ({
             productId: i.productId,
             quantity: i.quantity,
             ...(i.optionIds?.length ? { optionIds: i.optionIds } : {}),
@@ -679,9 +742,26 @@ export default function PosTerminalPage() {
           })),
         }),
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Failed to place order'); return; }
-      const table = tables.find(t => t.id === selectedTable);
+       const data = await res.json();
+       if (!res.ok) { setError(data.error || 'Failed to place order'); return; }
+       const table = tables.find(t => t.id === selectedTable);
+
+       // Redeem loyalty vouchers automatically for this order
+       if (loyaltyVoucherCodes.length > 0 && data.id) {
+         await Promise.all(
+           loyaltyVoucherCodes.map(async (code) => {
+             try {
+               await fetch(`/api/loyalty/vouchers/${encodeURIComponent(code)}`, {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ orderId: data.id }),
+               });
+             } catch (e) {
+               console.error('[LOYALTY] Failed to redeem voucher:', code, e);
+             }
+           })
+         );
+       }
       
       // Calculate tax breakdown from BIR pricing for RECEIPT DISPLAY ONLY
       // Product price = basePrice + VAT, so VAT = price * VAT_RATE/VAT_INCLUSIVE_DIVISOR
@@ -717,15 +797,19 @@ export default function PosTerminalPage() {
         vatTaxableTotal,
         vatExemptTotal,
         vatAmount,
-        discountAmount: discountRate > 0 ? discountAmount : 0,
-        discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
-        discountRate: discountRate > 0 ? discountRate : undefined,
+         discountAmount: discountRate > 0 ? discountAmount : 0,
+         discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
+         discountRate: discountRate > 0 ? discountRate : undefined,
+         loyaltyDiscount: loyaltyDiscount > 0 ? loyaltyDiscount : undefined,
         cashReceived: paymentMethod === 'CASH' ? cashReceived : undefined,
         change: paymentMethod === 'CASH' ? cashReceived - total : undefined,
       });
       clearCart();
       setCustomerName('Walk-In');
       setSelectedTable(null);
+      setSelectedLoyaltyCard(null);
+      setLoyaltyVouchers([]);
+      setLoyaltyVoucherCodes([]);
       setPaymentMethod('CASH');
       setOrderType('DINE_IN');
       setDeliveryAddress('');
@@ -812,6 +896,12 @@ export default function PosTerminalPage() {
                 {calculateChange() !== null ? `₱${calculateChange()}` : '—'}
               </span>
             </div>
+            {loyaltyDiscount > 0 && (
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Loyalty</span>
+                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatPeso(loyaltyDiscount)}</span>
+              </div>
+            )}
           </div>
 
           {typeof businessSettings?.studentPwdDiscountRate === 'number' && (
@@ -896,13 +986,37 @@ export default function PosTerminalPage() {
         {/* Customer Input */}
         <div className="p-2 border-b border-gray-100">
           <label className="text-gray-500 text-[10px] font-semibold block mb-1">Customer</label>
-          <input
-            type="text"
-            value={customerName}
-            onChange={e => setCustomerName(e.target.value)}
-            placeholder="Walk-in"
-            className="w-full rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-2.5 py-2 text-xs text-[var(--pos-ink)] shadow-sm outline-none transition placeholder:text-[var(--pos-ink-soft)]/60 focus:border-[var(--pos-accent)] focus:ring-2 focus:ring-[var(--pos-accent)]/20"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={customerName}
+              onChange={e => setCustomerName(e.target.value)}
+              placeholder="Walk-in"
+              className="flex-1 rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-2.5 py-2 text-xs text-[var(--pos-ink)] shadow-sm outline-none transition placeholder:text-[var(--pos-ink-soft)]/60 focus:border-[var(--pos-accent)] focus:ring-2 focus:ring-[var(--pos-accent)]/20"
+            />
+            {businessSettings?.loyaltyEnabled && (
+              <button
+                type="button"
+                onClick={openLoyaltyPicker}
+                className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-xs font-semibold text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]"
+                title="Select loyalty member"
+              >
+                💳
+              </button>
+            )}
+          </div>
+          {selectedLoyaltyCard && (
+            <div className="mt-1.5 flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--pos-accent-soft)] px-2 py-1">
+              <span className="text-[9px] font-semibold text-[var(--pos-accent)]">
+                {selectedLoyaltyCard.customerName}
+              </span>
+              {loyaltyVoucherCodes.length > 0 && (
+                <span className="text-[8px] font-bold text-green-700">
+                  🎁 {loyaltyVoucherCodes.length} auto-applied
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {businessSettings?.loyaltyEnabled && showLoyaltyModal && (
@@ -1364,6 +1478,12 @@ export default function PosTerminalPage() {
                     <span className="text-gray-800">−₱{(receipt.discountAmount ?? 0).toFixed(2)}</span>
                   </div>
                 )}
+                {(receipt.loyaltyDiscount ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Loyalty Reward:</span>
+                    <span className="text-gray-800">−₱{(receipt.loyaltyDiscount ?? 0).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Grand Total */}
@@ -1505,8 +1625,9 @@ export default function PosTerminalPage() {
                           <div class="totals">
                             <div class="row"><span>Subtotal:</span><span>₱${receipt.subtotal.toFixed(2)}</span></div>
                              <div class="row"><span>VAT (${vatRate}%):</span><span>₱${receipt.vatAmount.toFixed(2)}</span></div>
-                             ${(receipt.discountAmount ?? 0) > 0 ? `<div class="row"><span>${escapeHtml(receipt.discountReason || 'Discount')}${receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span><span>−₱${(receipt.discountAmount ?? 0).toFixed(2)}</span></div>` : ''}
-                             <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
+                              ${(receipt.discountAmount ?? 0) > 0 ? `<div class="row"><span>${escapeHtml(receipt.discountReason || 'Discount')}${receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span><span>−₱${(receipt.discountAmount ?? 0).toFixed(2)}</span></div>` : ''}
+                              ${(receipt.loyaltyDiscount ?? 0) > 0 ? `<div class="row"><span>Loyalty Reward:</span><span>−₱${(receipt.loyaltyDiscount ?? 0).toFixed(2)}</span></div>` : ''}
+                              <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
                             ${receipt.paymentMethod === 'CASH' && receipt.cashReceived !== undefined ? `
                               <div class="row"><span>Cash:</span><span>₱${receipt.cashReceived.toFixed(2)}</span></div>
                               ${receipt.change !== undefined && receipt.change > 0 ? `<div class="row"><span>Change:</span><span>₱${receipt.change.toFixed(2)}</span></div>` : ''}
@@ -1586,8 +1707,9 @@ export default function PosTerminalPage() {
                           <div class="totals">
                             <div class="row"><span>Subtotal:</span><span>₱${receipt.subtotal.toFixed(2)}</span></div>
                              <div class="row"><span>VAT (${vatRate}%):</span><span>₱${receipt.vatAmount.toFixed(2)}</span></div>
-                             ${(receipt.discountAmount ?? 0) > 0 ? `<div class="row"><span>${escapeHtml(receipt.discountReason || 'Discount')}${receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span><span>−₱${(receipt.discountAmount ?? 0).toFixed(2)}</span></div>` : ''}
-                             <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
+                              ${(receipt.discountAmount ?? 0) > 0 ? `<div class="row"><span>${escapeHtml(receipt.discountReason || 'Discount')}${receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span><span>−₱${(receipt.discountAmount ?? 0).toFixed(2)}</span></div>` : ''}
+                              ${(receipt.loyaltyDiscount ?? 0) > 0 ? `<div class="row"><span>Loyalty Reward:</span><span>−₱${(receipt.loyaltyDiscount ?? 0).toFixed(2)}</span></div>` : ''}
+                              <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
                             ${receipt.paymentMethod === 'CASH' && receipt.cashReceived !== undefined ? `
                               <div class="row"><span>Cash:</span><span>₱${receipt.cashReceived.toFixed(2)}</span></div>
                               ${receipt.change !== undefined && receipt.change > 0 ? `<div class="row"><span>Change:</span><span>₱${receipt.change.toFixed(2)}</span></div>` : ''}
@@ -1709,6 +1831,7 @@ export default function PosTerminalPage() {
                       optionIds: chosen.map((x) => x.optionId),
                       selectionsLabel: label,
                       unitPrice: unitTotal,
+                      categoryId: picker.categoryId,
                     });
                     setPicker(null);
                   }}
