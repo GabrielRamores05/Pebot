@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface Station {
   id: number;
@@ -52,22 +53,21 @@ export default function StationsPage() {
   // Delete confirm
   const [deleting, setDeleting] = useState<Station | null>(null);
 
-  function notif(msg: string) {
+  const notif = useCallback((msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3000);
-  }
+  }, []);
 
   const fetchStations = useCallback(async () => {
     try {
-      const res = await fetch('/api/stations');
-      const data = await res.json();
-      setStations(data);
+      setStations(await fetchJson<Station[]>('/api/stations'));
     } catch (e) {
       console.error('Failed to load stations:', e);
+      notif(`⚠️ ${userMessage(e, 'Could not load the stations. Try again.')}`);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [notif]);
 
   useEffect(() => { fetchStations(); }, [fetchStations]);
 
@@ -77,19 +77,20 @@ export default function StationsPage() {
 
     setSaving(station.id);
     try {
-      const res = await fetch('/api/stations', {
+      await fetchJson('/api/stations', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: station.id, staffCount: newCount }),
       });
-      if (res.ok) {
-        setStations((prev) =>
-          prev.map((s) => s.id === station.id ? { ...s, staffCount: newCount } : s)
-        );
-        const meta = getMeta(station.stationType, station.emoji);
-        notif(`${meta.icon} ${meta.label} → ${newCount} staff`);
-      }
-    } catch {}
+      setStations((prev) =>
+        prev.map((s) => s.id === station.id ? { ...s, staffCount: newCount } : s)
+      );
+      const meta = getMeta(station.stationType, station.emoji);
+      notif(`${meta.icon} ${meta.label} → ${newCount} staff`);
+    } catch (e) {
+      console.error('Failed to update staff count:', e);
+      notif(`⚠️ ${userMessage(e, 'Could not change the staff count. Try again.')}`);
+    }
     setSaving(null);
   }
 
@@ -100,25 +101,20 @@ export default function StationsPage() {
 
     setSaving(-1);
     try {
-      const res = await fetch('/api/stations', {
+      const created = await fetchJson<Station>('/api/stations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stationType: name, staffCount: Math.max(0, newStaff), emoji: newEmoji }),
       });
-      if (res.ok) {
-        const created = await res.json();
-        setStations((prev) => [...prev, created]);
-        setShowAdd(false);
-        setNewName('');
-        setNewStaff(1);
-        setNewEmoji('📦');
-        notif(`✅ Station "${name}" created`);
-      } else {
-        const err = await res.json();
-        setAddError(err.error || 'Failed to create');
-      }
-    } catch {
-      setAddError('Network error');
+      setStations((prev) => [...prev, created]);
+      setShowAdd(false);
+      setNewName('');
+      setNewStaff(1);
+      setNewEmoji('📦');
+      notif(`✅ Station "${name}" created`);
+    } catch (e) {
+      console.error('Failed to create station:', e);
+      setAddError(userMessage(e, 'Failed to create'));
     }
     setSaving(null);
   }
@@ -130,17 +126,17 @@ export default function StationsPage() {
 
     setSaving(editing.id);
     try {
-      const res = await fetch('/api/stations', {
+      const updated = await fetchJson<Station>('/api/stations', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: editing.id, stationType: name }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setStations((prev) => prev.map((s) => s.id === updated.id ? updated : s));
-        notif(`✏️ Renamed to "${name}"`);
-      }
-    } catch {}
+      setStations((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+      notif(`✏️ Renamed to "${name}"`);
+    } catch (e) {
+      console.error('Failed to rename station:', e);
+      notif(`⚠️ ${userMessage(e, 'Could not rename the station. Try again.')}`);
+    }
     setEditing(null);
     setSaving(null);
   }
@@ -148,16 +144,17 @@ export default function StationsPage() {
   async function deleteStation(station: Station) {
     setSaving(station.id);
     try {
-      const res = await fetch('/api/stations', {
+      await fetchJson('/api/stations', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: station.id }),
       });
-      if (res.ok) {
-        setStations((prev) => prev.filter((s) => s.id !== station.id));
-        notif(`🗑️ Station "${station.stationType}" deleted`);
-      }
-    } catch {}
+      setStations((prev) => prev.filter((s) => s.id !== station.id));
+      notif(`🗑️ Station "${station.stationType}" deleted`);
+    } catch (e) {
+      console.error('Failed to delete station:', e);
+      notif(`⚠️ ${userMessage(e, 'Could not delete the station. Try again.')}`);
+    }
     setSaving(null);
   }
 
@@ -166,17 +163,17 @@ export default function StationsPage() {
     
     setSaving(editingEmoji.id);
     try {
-      const res = await fetch('/api/stations', {
+      const updated = await fetchJson<Station>('/api/stations', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: editingEmoji.id, emoji: newEmoji }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setStations((prev) => prev.map((s) => s.id === updated.id ? updated : s));
-        notif(`😊 Icon updated to "${newEmoji}"`);
-      }
-    } catch {}
+      setStations((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+      notif(`😊 Icon updated to "${newEmoji}"`);
+    } catch (e) {
+      console.error('Failed to update station icon:', e);
+      notif(`⚠️ ${userMessage(e, 'Could not update the icon. Try again.')}`);
+    }
     setEditingEmoji(null);
     setSaving(null);
   }

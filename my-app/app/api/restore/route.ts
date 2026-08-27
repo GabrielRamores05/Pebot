@@ -77,7 +77,11 @@ export async function POST(req: NextRequest) {
       await prisma.$connect();
       if (!swapped) {
         // Swap failed; clean up the staging file
-        try { unlinkSync(stagedPath); } catch { /* best effort */ }
+        try {
+          unlinkSync(stagedPath);
+        } catch (cleanupErr) {
+          console.error('[RESTORE] Failed to remove staged database file:', stagedPath, cleanupErr);
+        }
       }
     }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 // Option groups manager: groups -> attach products -> per-product options
 // with ingredient delta rows (grams/ml per option).
@@ -67,7 +68,8 @@ export default function OptionGroupManager() {
       const res = await fetch('/api/option-groups');
       const data = await res.json();
       setGroups(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e) {
+      console.error('Failed to load option groups:', e);
       setGroups([]);
     } finally {
       setLoading(false);
@@ -79,7 +81,8 @@ export default function OptionGroupManager() {
       const res = await fetch('/api/ingredients');
       const data = await res.json();
       setIngredients(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e) {
+      console.error('Failed to load ingredients:', e);
       setIngredients([]);
     }
   }, []);
@@ -91,7 +94,8 @@ export default function OptionGroupManager() {
       const res = await fetch('/api/products');
       const data = await res.json();
       setProducts(Array.isArray(data) ? data.map((p: any) => ({ id: p.id, name: p.name, price: p.price })) : []);
-    } catch {
+    } catch (e) {
+      console.error('Failed to load products:', e);
       setProducts([]);
     }
   }, []);
@@ -353,13 +357,17 @@ export default function OptionGroupManager() {
                   attachedSet.add(p.id);
                   optsMap[p.id] = match.options ?? [];
                 }
-              } catch {}
+              } catch (e) {
+                console.error(`Failed to load option groups for product ${p.id}:`, e);
+              }
             })
           );
           if (cancelled) return;
           setAttached(attachedSet);
           setProductOptions(optsMap);
-        } catch {} finally {
+        } catch (e) {
+          console.error(`Failed to load the products for option group ${group.id}:`, e);
+        } finally {
           if (!cancelled) setDetailLoading(false);
         }
       })();
@@ -367,20 +375,26 @@ export default function OptionGroupManager() {
     }, [group.id]);
 
     async function toggleProduct(productId: number) {
-      if (attached.has(productId)) {
-        await fetch(`/api/products/${productId}/option-groups?groupId=${group.id}`, { method: 'DELETE' });
-        attached.delete(productId);
-        const newOpts = { ...productOptions };
-        delete newOpts[productId];
-        setProductOptions(newOpts);
-      } else {
-        await fetch(`/api/products/${productId}/option-groups`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ groupId: group.id }),
-        });
-        attached.add(productId);
-        setProductOptions((prev) => ({ ...prev, [productId]: [] }));
+      try {
+        if (attached.has(productId)) {
+          await fetchJson(`/api/products/${productId}/option-groups?groupId=${group.id}`, { method: 'DELETE' });
+          attached.delete(productId);
+          const newOpts = { ...productOptions };
+          delete newOpts[productId];
+          setProductOptions(newOpts);
+        } else {
+          await fetchJson(`/api/products/${productId}/option-groups`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ groupId: group.id }),
+          });
+          attached.add(productId);
+          setProductOptions((prev) => ({ ...prev, [productId]: [] }));
+        }
+      } catch (e) {
+        console.error(`Failed to change option group ${group.id} on product ${productId}:`, e);
+        alert(userMessage(e, 'That change was not saved. Try again.'));
+        return;
       }
       setAttached(new Set(attached));
       fetchGroups();
@@ -393,7 +407,9 @@ export default function OptionGroupManager() {
         const groups = await res.json();
         const match = Array.isArray(groups) ? groups.find((g: any) => g.group.id === group.id) : null;
         setProductOptions((prev) => ({ ...prev, [productId]: match?.options ?? [] }));
-      } catch {}
+      } catch (e) {
+        console.error(`Failed to refresh the options for product ${productId}:`, e);
+      }
     }
 
     if (detailLoading) {

@@ -21,20 +21,6 @@ export async function signToken(payload: JWTPayload): Promise<string> {
     .sign(secret);
 }
 
-export function verifyToken(token: string): JWTPayload | null {
-  // jose jwtVerify is async — use this sync wrapper only in non-edge contexts via verifyTokenAsync
-  // For middleware use verifyTokenAsync
-  try {
-    // Decode without verify as fallback (middleware uses verifyTokenAsync)
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const decoded = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return decoded as JWTPayload;
-  } catch {
-    return null;
-  }
-}
-
 export async function verifyTokenAsync(token: string): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, secret);

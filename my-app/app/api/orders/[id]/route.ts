@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
 import { normalizeMemberName } from '@/lib/loyalty-utils';
 import { logAction } from '@/lib/audit-log';
+import { runRecoverableStep } from '@/lib/recoverable';
 import { awardLoyaltyForPaidOrder, refundLoyaltyForCancelledOrder } from '@/lib/loyalty-award';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
 
@@ -171,20 +172,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
 
     // Award loyalty points only when the cashier confirms payment
+    let loyaltyFailure: string | null = null;
     if (isPaymentConfirmation) {
-      try {
-        await awardLoyaltyForPaidOrder({
-          id: order.id,
-          loyaltyPromo: order.loyaltyPromo,
-          loyaltyCustomerName: order.loyaltyCustomerName,
-          customerName: order.customerName,
-          orderNumber: order.orderNumber,
-          totalAmount: Number(order.totalAmount),
-          items: order.items,
-        });
-      } catch (err) {
-        console.error('[LOYALTY] Failed to update cards on payment:', err);
-      }
+      loyaltyFailure = await runRecoverableStep(
+        'LOYALTY_AWARD',
+        { orderId: order.id, orderNumber: order.orderNumber, customerName: order.customerName },
+        () =>
+          awardLoyaltyForPaidOrder({
+            id: order.id,
+            loyaltyPromo: order.loyaltyPromo,
+            loyaltyCustomerName: order.loyaltyCustomerName,
+            customerName: order.customerName,
+            orderNumber: order.orderNumber,
+            totalAmount: Number(order.totalAmount),
+            items: order.items,
+          }),
+      );
     }
 
     // Broadcast events
@@ -220,7 +223,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       emitEvent('table-update', { tableId: existing.tableId });
     }
 
-    return NextResponse.json(order);
+    return NextResponse.json({
+      ...order,
+      ...(loyaltyFailure
+        ? { warnings: ['Payment was recorded, but loyalty points were not added. Add them by hand from the Loyalty page.'] }
+        : {}),
+    });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

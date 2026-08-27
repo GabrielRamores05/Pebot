@@ -10,7 +10,10 @@ export async function GET() {
   if (!row) return NextResponse.json({});
   try {
     return NextResponse.json(JSON.parse(row.value));
-  } catch {
+  } catch (e) {
+    // Stored value is corrupt — fall back to defaults, but leave a trace so it
+    // can be repaired instead of silently never applying.
+    console.error(`[SETTINGS] Corrupt "${VOICE_KEY}" value, falling back to defaults:`, e);
     return NextResponse.json({});
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '@/hooks/useSocket';
+import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 type TableStatus = 'AVAILABLE' | 'OCCUPIED' | 'NEEDS_CLEANING';
 
@@ -122,6 +123,7 @@ export default function TablesPage() {
   const [qrTable, setQrTable] = useState<Table | null>(null);
   const [qrData, setQrData] = useState<{ qrDataUrl: string; menuUrl: string } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   const [sectionFilter, setSectionFilter] = useState<'ALL' | TableSection>('ALL');
   const [tick, setTick] = useState(0); // Force re-render for timer updates
@@ -164,8 +166,8 @@ export default function TablesPage() {
       if (parsed.criticalMinutes && !Number.isNaN(parsed.criticalMinutes)) {
         setCriticalMinutes(parsed.criticalMinutes);
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      console.error('Could not read the saved occupancy thresholds, using defaults:', e);
     }
   }, []);
 
@@ -178,8 +180,8 @@ export default function TablesPage() {
     };
     try {
       localStorage.setItem('tableOccupancyThresholds', JSON.stringify(payload));
-    } catch {
-      // ignore
+    } catch (e) {
+      console.error('Could not save the occupancy thresholds on this device:', e);
     }
   }, [warningMinutes, criticalMinutes]);
 
@@ -390,13 +392,14 @@ export default function TablesPage() {
     setQrTable(table);
     setQrData(null);
     setQrLoading(true);
+    setQrError(null);
     try {
-      const res = await fetch(`/api/tables/qr?tableId=${table.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setQrData({ qrDataUrl: data.qrDataUrl, menuUrl: data.menuUrl });
-      }
-    } catch {} finally {
+      const data = await fetchJson<{ qrDataUrl: string; menuUrl: string }>(`/api/tables/qr?tableId=${table.id}`);
+      setQrData({ qrDataUrl: data.qrDataUrl, menuUrl: data.menuUrl });
+    } catch (e) {
+      console.error(`Failed to generate the QR code for table ${table.id}:`, e);
+      setQrError(userMessage(e, 'The QR code could not be generated. Try again.'));
+    } finally {
       setQrLoading(false);
     }
   }
@@ -795,6 +798,8 @@ export default function TablesPage() {
 
             {qrLoading ? (
               <div className="py-12 text-gray-400">Generating QR code...</div>
+            ) : qrError ? (
+              <div className="py-12 text-red-600 text-sm">{qrError}</div>
             ) : qrData ? (
               <>
                 <div className="bg-white rounded-3xl p-5 inline-block mb-4 shadow-lg">

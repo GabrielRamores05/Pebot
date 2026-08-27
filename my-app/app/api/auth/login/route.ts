@@ -29,7 +29,9 @@ export async function POST(req: NextRequest) {
           ? JSON.parse(user.permissions) 
           : user.permissions;
       } catch (e) {
-        console.error('Error parsing permissions:', e);
+        // Signing in with no permissions is safe, but the stored value is broken
+        // and someone has to know which account to repair.
+        console.error(`[LOGIN] Corrupt permissions for user ${user.id} (${user.email}), signing in with none:`, e);
       }
     }
     console.log('[LOGIN] User:', user.email, 'Permissions from DB:', JSON.stringify(permissions));
