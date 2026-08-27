@@ -1,9 +1,19 @@
 import { SignJWT, jwtVerify } from 'jose';
+import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserSubscription, hasFeatureAccess } from '@/lib/subscription';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cafeos-secret';
+const configuredSecret = process.env.JWT_SECRET?.trim() || null;
+const JWT_SECRET = configuredSecret ?? (
+  process.env.NODE_ENV === 'production'
+    ? (() => { throw new Error('JWT_SECRET must be set in production'); })()
+    : (() => {
+        const generatedSecret = randomBytes(32).toString('hex');
+        console.warn('[AUTH] JWT_SECRET is not set; generated a development-only secret. Tokens will not survive a restart.');
+        return generatedSecret;
+      })()
+);
 const secret = new TextEncoder().encode(JWT_SECRET);
 
 export interface JWTPayload {

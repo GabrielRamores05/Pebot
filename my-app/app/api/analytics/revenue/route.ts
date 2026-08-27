@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { serverError } from '@/lib/api-response';
+import { unauthorized, serverError } from '@/lib/api-response';
+import { requirePermission } from '@/lib/auth';
 
 interface RevenueMetrics {
   totalRevenue: number;
@@ -73,6 +74,9 @@ function getDateRange(filter: string, isPrevious: boolean = false) {
 }
 
 export async function GET(req: NextRequest) {
+  const user = await requirePermission(req, 'analytics');
+  if (!user) return unauthorized();
+
   try {
     const filter = req.nextUrl.searchParams.get('filter') || 'month';
     const isPrevious = req.nextUrl.searchParams.get('period') === 'previous';

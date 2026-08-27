@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { badRequest, notFound, serverError } from '@/lib/api-response';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
+import { requirePermission } from '@/lib/auth';
 
 // GET /api/loyalty/settings
 export async function GET(req: NextRequest) {
@@ -60,6 +61,9 @@ function formatSettings(settings: any) {
 
 // PATCH /api/loyalty/settings
 export async function PATCH(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return unauthorized();
+
   try {
     const body = await req.json();
     const { 
@@ -145,6 +149,9 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/loyalty/settings
 export async function DELETE(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return unauthorized();
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

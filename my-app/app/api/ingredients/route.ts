@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { serverError } from '@/lib/api-response';
+import { serverError, unauthorized } from '@/lib/api-response';
+import { requirePermission } from '@/lib/auth';
 
 // GET /api/ingredients - Get all ingredients
 export async function GET() {
@@ -15,7 +16,10 @@ export async function GET() {
 }
 
 // POST /api/ingredients - Create new ingredient
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const user = await requirePermission(request, 'inventory');
+  if (!user) return unauthorized();
+
   try {
     const body = await request.json();
     const { name, category, baseUnit, purchaseUnit, currentStock, minStock, costPerUnit, supplierId, supplier } = body;

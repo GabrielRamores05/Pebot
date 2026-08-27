@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { serverError } from '@/lib/api-response';
+import { forbidden, serverError, unauthorized } from '@/lib/api-response';
+import { getAuthUser, requireRole } from '@/lib/auth';
 
 // Get log file path - same as electron main process
 function getLogFilePath() {
@@ -16,7 +17,11 @@ function getLogFilePath() {
   return join(userData, 'cafeos', 'cafeos.log');
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const user = await getAuthUser(req);
+  if (!user) return unauthorized();
+  if (!requireRole(user, ['ADMIN'])) return forbidden();
+
   try {
     const logPath = getLogFilePath();
     
@@ -33,7 +38,11 @@ export async function GET() {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
+  const user = await getAuthUser(req);
+  if (!user) return unauthorized();
+  if (!requireRole(user, ['ADMIN'])) return forbidden();
+
   try {
     const logPath = getLogFilePath();
     

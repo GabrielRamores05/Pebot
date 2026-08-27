@@ -17,6 +17,7 @@ const path = require('path');
 const next = require('next');
 const { Server } = require('socket.io');
 const mdns = require('mdns-js');
+const os = require('os');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
@@ -26,6 +27,32 @@ const redirectPort = 80;
 const dir = process.env.APP_DIR && process.env.APP_DIR.trim() ? path.resolve(process.env.APP_DIR) : path.resolve(__dirname);
 
 console.log(`[Server] Starting in ${process.env.NODE_ENV} mode, dir: ${dir}`);
+
+function isAllowedSocketOrigin(origin) {
+  if (!origin) return true;
+
+  try {
+    const { hostname: originHostname } = new URL(origin);
+    if (
+      originHostname === 'localhost' ||
+      originHostname === '127.0.0.1' ||
+      originHostname.endsWith('.local')
+    ) {
+      return true;
+    }
+
+    return Object.values(os.networkInterfaces())
+      .flat()
+      .some((networkInterface) =>
+        networkInterface &&
+        networkInterface.family === 'IPv4' &&
+        !networkInterface.internal &&
+        networkInterface.address === originHostname
+      );
+  } catch {
+    return false;
+  }
+}
 
 const app = next({ dev, hostname, port, dir, turbopack: false });
 const handle = app.getRequestHandler();
@@ -68,7 +95,13 @@ app.prepare().then(() => {
   // ── Socket.IO ──────────────────────────────────────────────────────────────
   const io = new Server(httpServer, {
     cors: {
-      origin: '*',
+      origin: (origin, callback) => {
+        if (isAllowedSocketOrigin(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Origin not allowed'));
+        }
+      },
       methods: ['GET', 'POST'],
     },
     path: '/api/socket',
@@ -99,7 +132,6 @@ app.prepare().then(() => {
   httpServer
     .once('error', (err) => { console.error(err); process.exit(1); })
     .listen(port, hostname, () => {
-      const os = require('os');
       const interfaces = os.networkInterfaces();
       const lanIp = Object.values(interfaces)
         .flat()

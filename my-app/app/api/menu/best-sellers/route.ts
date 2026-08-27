@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma';
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get('limit') || '5');
+    const parsedLimit = Number.parseInt(searchParams.get('limit') || '5', 10);
+    const limit = Number.isNaN(parsedLimit) ? 5 : Math.min(50, Math.max(1, parsedLimit));
 
     const result = await prisma.$queryRaw<
       Array<{ productId: number; count: number }>

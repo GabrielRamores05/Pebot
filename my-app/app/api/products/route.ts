@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
-import { badRequest, serverError } from '@/lib/api-response';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
 import { normalizeMarginType, sellingPrice } from '@/lib/bir-pricing';
+import { requirePermission } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -24,6 +25,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const body = await req.json() as {
       name: string; description?: string; price?: number; categoryId: number; imageUrl?: string;
@@ -86,6 +90,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const { id, ...data } = await req.json() as { id: number; [key: string]: unknown };
     let updateData = data;
@@ -116,6 +123,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const body = await req.json();
     const id = parseInt(body.id);

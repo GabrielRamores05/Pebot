@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { badRequest, serverError } from '@/lib/api-response';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
+import { requirePermission } from '@/lib/auth';
 
 // POST /api/loyalty/vouchers/create - Create a promotional voucher with custom rules
 export async function POST(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return unauthorized();
+
   try {
     const body = await req.json();
     const { 
@@ -89,6 +93,9 @@ export async function POST(req: NextRequest) {
 
 // GET /api/loyalty/vouchers/create - List all vouchers (optionally filtered by customer)
 export async function GET(req: NextRequest) {
+  const user = await requirePermission(req, 'loyalty');
+  if (!user) return unauthorized();
+
   try {
     const { searchParams } = new URL(req.url);
     const customerName = searchParams.get('customerName');

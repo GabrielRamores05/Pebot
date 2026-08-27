@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { badRequest, serverError } from '@/lib/api-response';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
+import { requirePermission } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -21,6 +22,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const { name, icon, sortOrder } = await req.json() as { name: string; icon?: string; sortOrder?: number };
     const trimmedName = name?.trim();
@@ -51,6 +55,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const { id, name, icon, sortOrder } = await req.json() as { id: number; name?: string; icon?: string; sortOrder?: number };
     const data: Record<string, unknown> = {};
@@ -65,6 +72,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const body = await req.json();
     const id = parseInt(body.id);

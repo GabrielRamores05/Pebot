@@ -12,6 +12,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const PORT = 3000;
 const isDev = !app.isPackaged;
@@ -47,6 +48,17 @@ const ICON_PATH = isDev
 const ICON_32_PATH = isDev
   ? path.join(__dirname, '..', 'public', 'icons', 'icon-32.png')
   : path.join(process.resourcesPath, 'icon-32.png');
+
+function getInstallJwtSecret() {
+  const secretPath = path.join(app.getPath('userData'), 'jwt-secret');
+  if (fs.existsSync(secretPath)) {
+    return fs.readFileSync(secretPath, 'utf8').trim();
+  }
+
+  const secret = crypto.randomBytes(32).toString('hex');
+  fs.writeFileSync(secretPath, `${secret}\n`, { mode: 0o600 });
+  return secret;
+}
 
 // ─── Database setup ───────────────────────────────────────────────────────────
 function setupDatabase() {
@@ -320,7 +332,7 @@ function startServer() {
         APP_DIR: APP_DIR,
         NEXT_TURBOPACK: '0',
         // Ensure these are set even without .env file in packaged app
-        JWT_SECRET: process.env.JWT_SECRET || 'cafeos-super-secret-jwt-key-change-in-production-2024',
+        JWT_SECRET: process.env.JWT_SECRET || getInstallJwtSecret(),
         NEXT_PUBLIC_WS_URL: `http://localhost:${PORT}`,
       },
       stdio: 'pipe',

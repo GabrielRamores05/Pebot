@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
-import { notFound, serverError } from '@/lib/api-response';
+import { notFound, serverError, unauthorized } from '@/lib/api-response';
+import { getAuthUser } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
+  const user = await getAuthUser(req);
+  if (!user) return unauthorized();
+
   try {
     const { orderId, method, referenceNo, terminalId } = await req.json() as {
       orderId: number;
@@ -50,7 +54,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const user = await getAuthUser(req);
+  if (!user) return unauthorized();
+
   try {
     const payments = await prisma.paymentTransaction.findMany({
       include: { order: true },

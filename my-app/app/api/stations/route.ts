@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { badRequest, conflict, serverError } from '@/lib/api-response';
+import { badRequest, conflict, serverError, unauthorized } from '@/lib/api-response';
+import { requirePermission } from '@/lib/auth';
 
 const DEFAULT_STATIONS = ['coffee', 'kitchen', 'bar', 'pastry', 'general'];
 
@@ -29,6 +30,9 @@ export async function GET() {
 
 // POST /api/stations — create a new station
 export async function POST(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const { stationType, staffCount, emoji } = (await req.json()) as { stationType: string; staffCount?: number; emoji?: string };
 
@@ -58,6 +62,9 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/stations — update staff count or rename a station
 export async function PATCH(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const { id, staffCount, stationType, emoji } = (await req.json()) as {
       id: number;
@@ -95,6 +102,9 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/stations — remove a station
 export async function DELETE(req: NextRequest) {
+  const user = await requirePermission(req, 'products');
+  if (!user) return unauthorized();
+
   try {
     const { id } = (await req.json()) as { id: number };
 

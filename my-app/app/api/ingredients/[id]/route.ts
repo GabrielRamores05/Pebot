@@ -1,15 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/lib/socket';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
-import { notFound, serverError } from '@/lib/api-response';
+import { notFound, serverError, unauthorized } from '@/lib/api-response';
+import { requirePermission } from '@/lib/auth';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 // GET /api/ingredients/[id] - Get single ingredient
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const ingredient = await prisma.ingredient.findUnique({
@@ -27,7 +28,10 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 // PUT /api/ingredients/[id] - Update ingredient
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const user = await requirePermission(request, 'inventory');
+  if (!user) return unauthorized();
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -71,7 +75,10 @@ export async function PUT(request: Request, { params }: RouteParams) {
 }
 
 // DELETE /api/ingredients/[id] - Delete ingredient
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const user = await requirePermission(request, 'inventory');
+  if (!user) return unauthorized();
+
   try {
     const { id } = await params;
     
