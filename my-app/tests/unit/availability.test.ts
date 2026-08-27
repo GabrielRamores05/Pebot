@@ -1,8 +1,8 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import {
   calcSellableQuantity,
   calcStatus,
+  computeProductCapitalCost,
 } from '../../lib/availability';
 import type { RecipeItemInfo } from '../../lib/availability';
 
@@ -25,11 +25,11 @@ test('sellable = floor(min over required ingredients)', () => {
     r({ ingredientId: 2, name: 'Milk', baseUnit: 'ml', quantity: 150, required: true, currentStock: 1500 }),
   ];
   const res = calcSellableQuantity(recipe);
-  assert.equal(res.sellable, 10);
-  assert.equal(res.limitingIngredientId, 2); // milk is the limiter
-  assert.equal(res.breakdown.length, 2);
-  assert.equal(res.breakdown[0].servings, 55);
-  assert.equal(res.breakdown[1].servings, 10);
+  expect(res.sellable).toBe(10);
+  expect(res.limitingIngredientId).toBe(2); // milk is the limiter
+  expect(res.breakdown).toHaveLength(2);
+  expect(res.breakdown[0].servings).toBe(55);
+  expect(res.breakdown[1].servings).toBe(10);
 });
 
 test('optional ingredients do NOT gate sellable quantity', () => {
@@ -39,10 +39,10 @@ test('optional ingredients do NOT gate sellable quantity', () => {
     r({ ingredientId: 3, name: 'Sugar', quantity: 10, required: false, currentStock: 0 }),
   ];
   const res = calcSellableQuantity(recipe);
-  assert.equal(res.sellable, 55);
-  assert.equal(res.limitingIngredientId, 1);
+  expect(res.sellable).toBe(55);
+  expect(res.limitingIngredientId).toBe(1);
   // optional ingredient still reported in breakdown
-  assert.equal(res.breakdown.find(b => b.ingredientId === 3)?.servings, 0);
+  expect(res.breakdown.find(b => b.ingredientId === 3)?.servings).toBe(0);
 });
 
 test('no required ingredients => unlimited (recipe-less product)', () => {
@@ -50,8 +50,8 @@ test('no required ingredients => unlimited (recipe-less product)', () => {
     r({ ingredientId: 3, name: 'Sugar', quantity: 10, required: false, currentStock: 5 }),
   ];
   const res = calcSellableQuantity(recipe);
-  assert.equal(res.sellable, Infinity);
-  assert.equal(res.limitingIngredientId, null);
+  expect(res.sellable).toBe(Infinity);
+  expect(res.limitingIngredientId).toBeNull();
 });
 
 test('a required ingredient at 0 stock => out of stock', () => {
@@ -60,20 +60,30 @@ test('a required ingredient at 0 stock => out of stock', () => {
     r({ ingredientId: 2, name: 'Milk', quantity: 150, required: true, currentStock: 1500 }),
   ];
   const res = calcSellableQuantity(recipe);
-  assert.equal(res.sellable, 0);
-  assert.equal(res.limitingIngredientId, 1);
+  expect(res.sellable).toBe(0);
+  expect(res.limitingIngredientId).toBe(1);
 });
 
 test('calcStatus thresholds', () => {
-  assert.equal(calcStatus(0, 10), 'OUT_OF_STOCK');
-  assert.equal(calcStatus(5, 10), 'LOW_STOCK');
-  assert.equal(calcStatus(10, 10), 'LOW_STOCK'); // at threshold boundary
-  assert.equal(calcStatus(11, 10), 'IN_STOCK');
-  assert.equal(calcStatus(100, 10), 'IN_STOCK');
+  expect(calcStatus(0, 10)).toBe('OUT_OF_STOCK');
+  expect(calcStatus(5, 10)).toBe('LOW_STOCK');
+  expect(calcStatus(10, 10)).toBe('LOW_STOCK'); // at threshold boundary
+  expect(calcStatus(11, 10)).toBe('IN_STOCK');
+  expect(calcStatus(100, 10)).toBe('IN_STOCK');
 });
 
 test('sellable respects floor division (fractional stock)', () => {
   const recipe = [r({ ingredientId: 1, quantity: 18, required: true, currentStock: 95 })];
   const res = calcSellableQuantity(recipe);
-  assert.equal(res.sellable, 5); // 95 / 18 = 5.27 => 5
+  expect(res.sellable).toBe(5); // 95 / 18 = 5.27 => 5
+});
+
+test('capital cost includes every recipe line and tolerates missing costs', () => {
+  const recipe = [
+    r({ quantity: 18, costPerUnit: 0.75 }),
+    r({ ingredientId: 2, quantity: 150, costPerUnit: 0.08 }),
+    r({ ingredientId: 3, quantity: 10 }),
+  ];
+
+  expect(computeProductCapitalCost(recipe)).toBe(25.5);
 });
