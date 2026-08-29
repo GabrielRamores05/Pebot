@@ -81,3 +81,17 @@ export async function updateExpense(
 export async function deleteExpense(id: number, _locationId: number = 1) {
   return prisma.expense.delete({ where: { id } });
 }
+
+// ----- PaymentTransaction – no locationId, but included via Order -----
+
+export async function findPaymentTransactions(_locationId: number = 1, take: number = 100) {
+  return prisma.paymentTransaction.findMany({
+    include: { order: true },
+    orderBy: { createdAt: 'desc' },
+    take,
+  });
+}
+
+export async function findExpenseCategoryUnique(id: number) {
+  return prisma.expenseCategory.findUnique({ where: { id } });
+}

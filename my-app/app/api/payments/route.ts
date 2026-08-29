@@ -1,55 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { emitEvent } from '@/lib/socket';
+import { createPayment, listPayments } from '@/modules/finance/service';
 import { notFound, serverError, unauthorized } from '@/lib/api-response';
 import { getAuthUser } from '@/lib/auth';
+import { ValidationError } from 'zod-validation-error';
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return unauthorized();
 
   try {
-    const { orderId, method, referenceNo, terminalId } = await req.json() as {
-      orderId: number;
-      method: 'CASH' | 'CARD' | 'EWALLET';
-      referenceNo?: string;
-      terminalId?: string;
-    };
-
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) return notFound('Order not found');
-
-    const payment = await prisma.$transaction(async (tx) => {
-      const p = await tx.paymentTransaction.create({
-        data: {
-          orderId,
-          amount: order.totalAmount,
-          method,
-          status: 'COMPLETED',
-          referenceNo,
-          terminalId,
-          processedAt: new Date(),
-        },
-      });
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: 'COMPLETED' },
-      });
-
-      return p;
-    });
-
-    const updatedOrder = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: { include: { product: true } }, table: true, payment: true },
-    });
-
-    emitEvent('order-status-update', updatedOrder);
-    emitEvent('analytics-update', { type: 'payment-completed', order: updatedOrder });
-
+    const body = await req.json();
+    const payment = await createPayment(body);
     return NextResponse.json(payment, { status: 201 });
   } catch (e) {
+    if (e instanceof ValidationError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    const status = (e as { status?: number })?.status ?? 500;
+    if (status === 404) return notFound(String(e));
     return serverError(e);
   }
 }
@@ -59,11 +27,7 @@ export async function GET(req: NextRequest) {
   if (!user) return unauthorized();
 
   try {
-    const payments = await prisma.paymentTransaction.findMany({
-      include: { order: true },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    const payments = await listPayments();
     return NextResponse.json(payments);
   } catch (e) {
     return serverError(e);

@@ -111,6 +111,10 @@ export async function listActiveLeaveTypes(locationId: number = 1) {
   return prisma.leaveType.findMany({ where: { isActive: true, locationId }, orderBy: { name: 'asc' } });
 }
 
+export async function findLeaveTypeById(id: number, locationId: number = 1) {
+  return prisma.leaveType.findFirst({ where: { id, locationId } });
+}
+
 export async function createLeaveType(
   data: { name: string; daysPerYear?: number; isActive?: boolean },
   locationId: number = 1,

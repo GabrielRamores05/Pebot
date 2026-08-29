@@ -1,140 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/modules/finance/service';
 import { requirePermission } from '@/lib/auth';
 import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
+import { ValidationError } from 'zod-validation-error';
 
-// GET /api/expenses — list all expenses with filtering
 export async function GET(req: NextRequest) {
-  try {
-    const user = await requirePermission(req, 'inventory');
-    if (!user) {
-      return unauthorized();
-    }
+  const user = await requirePermission(req, 'inventory');
+  if (!user) return unauthorized();
 
+  try {
     const { searchParams } = new URL(req.url);
+    const params: Record<string, unknown> = {};
     const categoryId = searchParams.get('categoryId');
     const supplierId = searchParams.get('supplierId');
-
-    const where: Record<string, unknown> = {};
-    if (categoryId) where.categoryId = parseInt(categoryId);
-    if (supplierId) where.supplierId = parseInt(supplierId);
-
-    const expenses = await prisma.expense.findMany({
-      where,
-      include: {
-        category: true,
-        supplier: true,
-        user: { select: { name: true, email: true, role: true } },
-      },
-      orderBy: { expenseDate: 'desc' },
-    });
-
+    if (categoryId) params.categoryId = parseInt(categoryId);
+    if (supplierId) params.supplierId = parseInt(supplierId);
+    const expenses = await listExpenses(params);
     return NextResponse.json(expenses);
-  } catch (error) {
-    return serverError(error, 'Failed to fetch expenses');
+  } catch (e) {
+    return serverError(e, 'Failed to fetch expenses');
   }
 }
 
-// POST /api/expenses — create a new expense
 export async function POST(req: NextRequest) {
+  const user = await requirePermission(req, 'inventory');
+  if (!user) return unauthorized();
+
   try {
-    const user = await requirePermission(req, 'inventory');
-    if (!user) {
-      return unauthorized();
-    }
-
     const body = await req.json();
-    const { categoryId, supplierId, amount, description, expenseDate } = body;
-
-    if (!categoryId || !amount || amount <= 0) {
-      return badRequest('categoryId and valid amount are required');
-    }
-
-    const category = await prisma.expenseCategory.findUnique({
-      where: { id: parseInt(categoryId) },
-    });
-
-    if (!category) {
-      return notFound('Category not found');
-    }
-
-    const expense = await prisma.expense.create({
-      data: {
-        categoryId: parseInt(categoryId),
-        supplierId: supplierId ? parseInt(supplierId) : null,
-        userId: user.userId,
-        amount: parseFloat(amount),
-        description: description || null,
-        expenseDate: expenseDate ? new Date(expenseDate) : new Date(),
-      },
-      include: { category: true, supplier: true },
-    });
-
+    const expense = await createExpense(body, user.userId);
     return NextResponse.json(expense, { status: 201 });
-  } catch (error) {
-    return serverError(error, 'Failed to create expense');
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      return badRequest(e.message);
+    }
+    const status = (e as { status?: number })?.status ?? 500;
+    if (status === 404) return notFound(String(e));
+    return serverError(e, 'Failed to create expense');
   }
 }
 
-// PUT /api/expenses?id=X — update an expense
 export async function PUT(req: NextRequest) {
-  try {
-    const user = await requirePermission(req, 'inventory');
-    if (!user) {
-      return unauthorized();
-    }
+  const user = await requirePermission(req, 'inventory');
+  if (!user) return unauthorized();
 
+  try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-    if (!id) {
-      return badRequest('Expense ID required');
-    }
+    if (!id) return badRequest('Expense ID required');
 
     const body = await req.json();
-    const { categoryId, supplierId, amount, description, expenseDate } = body;
-
-    const data: Record<string, unknown> = {};
-    if (categoryId) data.categoryId = parseInt(categoryId);
-    if (supplierId !== undefined) data.supplierId = supplierId ? parseInt(supplierId) : null;
-    if (amount !== undefined) data.amount = parseFloat(amount);
-    if (description !== undefined) data.description = description || null;
-    if (expenseDate !== undefined) data.expenseDate = new Date(expenseDate);
-
-    const expense = await prisma.expense.update({
-      where: { id: Number(id) },
-      data,
-      include: { category: true, supplier: true },
-    });
-
+    const expense = await updateExpense({ id: Number(id), ...body });
     return NextResponse.json(expense);
-  } catch (error: any) {
-    if (error.code === 'P2025') {
-      return notFound('Expense not found');
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      return badRequest(e.message);
     }
-    return serverError(error, 'Failed to update expense');
+    const status = (e as { status?: number })?.status ?? 500;
+    if (status === 404) return notFound(String(e));
+    return serverError(e, 'Failed to update expense');
   }
 }
 
-// DELETE /api/expenses?id=X — delete an expense
 export async function DELETE(req: NextRequest) {
-  try {
-    const user = await requirePermission(req, 'inventory');
-    if (!user) {
-      return unauthorized();
-    }
+  const user = await requirePermission(req, 'inventory');
+  if (!user) return unauthorized();
 
+  try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-    if (!id) {
-      return badRequest('Expense ID required');
-    }
+    if (!id) return badRequest('Expense ID required');
 
-    await prisma.expense.delete({ where: { id: Number(id) } });
+    await deleteExpense({ id: Number(id) });
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
-      return notFound('Expense not found');
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      return badRequest(e.message);
     }
-    return serverError(error, 'Failed to delete expense');
+    const status = (e as { status?: number })?.status ?? 500;
+    if (status === 404) return notFound(String(e));
+    return serverError(e, 'Failed to delete expense');
   }
 }

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { emitEvent } from '@/lib/socket';
-import { notFound, serverError } from '@/lib/api-response';
+import { followUp } from '@/modules/orders/service';
+import { serverError } from '@/lib/api-response';
 
 // POST /api/orders/[id]/follow-up — customer follows up on their order
 export async function POST(
@@ -10,31 +9,15 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-
-    const order = await prisma.order.findFirst({
-      where: isNaN(Number(id)) ? { orderNumber: id } : { id: Number(id) },
-      include: { table: true },
-    });
-
-    if (!order) {
-      return notFound('Order not found');
+    const result = await followUp(id);
+    return NextResponse.json(result);
+  } catch (e: any) {
+    if (e.status === 400) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
     }
-
-    if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
-      return NextResponse.json({ error: 'Order is already ' + order.status.toLowerCase() }, { status: 400 });
+    if (e.status === 404) {
+      return NextResponse.json({ error: e.message }, { status: 404 });
     }
-
-    const tableName = order.table?.name || 'No table';
-
-    emitEvent('order-followup', {
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      customerName: order.customerName,
-      tableName,
-    });
-
-    return NextResponse.json({ ok: true });
-  } catch (e) {
     return serverError(e, 'Failed to send follow-up');
   }
 }

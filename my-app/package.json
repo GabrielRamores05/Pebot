@@ -133,6 +133,8 @@
     "recharts": "^3.7.0",
     "socket.io": "4.8.3",
     "socket.io-client": "4.8.3",
+    "zod": "^4.5.2",
+    "zod-validation-error": "^5.0.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

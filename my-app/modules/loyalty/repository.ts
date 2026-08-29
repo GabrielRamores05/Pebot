@@ -445,3 +445,109 @@ export async function revertRedeemedVouchersForOrder(orderId: number) {
 export async function findCategoryByIdForLoyalty(id: number, locationId: number = 1) {
   return prisma.category.findFirst({ where: { id, locationId } });
 }
+
+// ---------------------------------------------------------------------------
+// Additional helpers for route handlers
+// ---------------------------------------------------------------------------
+
+export async function findLoyaltyCardsAll() {
+  return prisma.loyaltyCard.findMany({
+    include: { vouchers: { where: { status: 'ACTIVE' } }, category: true },
+  });
+}
+
+export async function findLoyaltyCardsAllNames() {
+  return prisma.loyaltyCard.findMany({ select: { id: true, customerName: true, paidCoffeesCount: true, claimedMilestones: true } });
+}
+
+export async function findLoyaltySettingsAll() {
+  return prisma.loyaltySetting.findMany();
+}
+
+export async function findLoyaltySettingById(id: number, _locationId: number = 1) {
+  return prisma.loyaltySetting.findUnique({ where: { id }, include: { category: true } } as any);
+}
+
+export async function deleteLoyaltyVouchersByCardIds(cardIds: number[], _locationId: number = 1) {
+  return prisma.loyaltyVoucher.deleteMany({ where: { cardId: { in: cardIds } } });
+}
+
+export async function findLoyaltyVouchersByCustomerNames(customerNames: string[], _locationId: number = 1) {
+  return prisma.loyaltyVoucher.findMany({
+    where: { customerName: { in: customerNames } },
+  });
+}
+
+export async function findLoyaltyCardByNameAndCategory(customerName: string, categoryId: number | null, _locationId: number = 1): Promise<any> {
+  if (categoryId !== null) {
+    return prisma.loyaltyCard.findFirst({ where: { customerName: { equals: customerName, mode: 'insensitive' } }, include: { vouchers: true, category: true } } as any);
+  }
+  return prisma.loyaltyCard.findFirst({ where: { customerName: { equals: customerName, mode: 'insensitive' }, categoryId: null }, include: { vouchers: true, category: true } } as any);
+}
+
+export async function findLoyaltySettingFirstGlobal(_locationId: number = 1) {
+  return prisma.loyaltySetting.findFirst({ where: { categoryId: null } });
+}
+
+export async function deleteLoyaltyCard(id: number) {
+  return prisma.loyaltyCard.delete({ where: { id } });
+}
+
+export async function findLoyaltyVouchersLimited(customerName: string | null, take: number = 100) {
+  if (customerName) {
+    return prisma.loyaltyVoucher.findMany({
+      where: { customerName: { equals: customerName, mode: 'insensitive' } } as any,
+      orderBy: { issuedDate: 'desc' },
+      take,
+    });
+  }
+  return prisma.loyaltyVoucher.findMany({ orderBy: { issuedDate: 'desc' }, take });
+}
+
+export async function createLoyaltyCardDetailed(
+  data: { customerName: string; categoryId?: number | null; claimedMilestones?: string; paidCoffeesCount?: number },
+  locationId: number = 1,
+) {
+  return prisma.loyaltyCard.create({
+    data: {
+      customerName: data.customerName,
+      categoryId: data.categoryId ?? null,
+      claimedMilestones: data.claimedMilestones ?? '[]',
+      paidCoffeesCount: data.paidCoffeesCount ?? 0,
+      locationId,
+    },
+    include: { vouchers: true, category: true },
+  });
+}
+
+export async function findLoyaltyCardsByCustomerNameAll(customerName: string) {
+  return prisma.loyaltyCard.findMany({
+    where: { customerName: { equals: customerName, mode: 'insensitive' } } as any,
+    include: { vouchers: { where: { status: 'ACTIVE' } }, category: true },
+  });
+}
+
+export async function findLoyaltyVouchersByCustomerNameSimple(customerName: string) {
+  return prisma.loyaltyVoucher.findMany({
+    where: { customerName: { equals: customerName, mode: 'insensitive' } } as any,
+    orderBy: { issuedDate: 'desc' },
+  });
+}
+
+export async function findLoyaltyCategoriesWithOrders() {
+  return prisma.loyaltyCard.findMany({
+    include: { vouchers: true },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+export async function findVouchersWithCard() {
+  return prisma.loyaltyVoucher.findMany({
+    include: { loyaltyCard: { select: { customerName: true } } },
+    orderBy: { issuedDate: 'desc' },
+  });
+}
+
+export async function findOrdersForNumberMap() {
+  return prisma.order.findMany({ select: { id: true, orderNumber: true } });
+}

@@ -24,6 +24,10 @@ export async function findTableById(id: number, locationId: number = 1) {
   return prisma.restaurantTable.findFirst({ where: { id, locationId } });
 }
 
+export async function findTableUnique(id: number) {
+  return prisma.restaurantTable.findUnique({ where: { id } });
+}
+
 export async function findTableBySlug(slug: string, locationId: number = 1) {
   return prisma.restaurantTable.findFirst({ where: { slug, locationId } });
 }

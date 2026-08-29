@@ -1,102 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { clockIn, clockOut, listAttendance } from '@/modules/hr/service';
 import { requirePermission, getAuthUser } from '@/lib/auth';
 import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
+import { ValidationError } from 'zod-validation-error';
 
-// POST /api/attendance/clock-in — { userId }
 export async function POST(req: NextRequest) {
   const auth = await getAuthUser(req);
   if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
-    const { userId, notes } = body;
-    if (!userId) return badRequest('userId required');
-
-    const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
-    if (!user) return notFound('User not found');
-
-    // Check for an active (unclocked) session
-    const active = await prisma.attendance.findFirst({
-      where: { userId: Number(userId), clockOut: null },
-      orderBy: { clockIn: 'desc' },
-    });
-    if (active) {
-      return NextResponse.json({ error: 'Already clocked in. Clock out first.', activeId: active.id }, { status: 409 });
-    }
-
-    const record = await prisma.attendance.create({
-      data: { userId, clockIn: new Date(), notes: notes || null },
-    });
+    const record = await clockIn(body, auth.userId);
     return NextResponse.json(record, { status: 201 });
   } catch (e) {
+    if (e instanceof ValidationError) {
+      return badRequest(e.message);
+    }
+    const status = (e as { status?: number })?.status ?? 500;
+    if (status === 404) return notFound(String(e));
+    if (status === 409) return NextResponse.json({ error: String(e) }, { status: 409 });
     return serverError(e, 'Failed to clock in');
   }
 }
 
-// PUT /api/attendance/clock-in — clock out: { attendanceId, breakStart, breakEnd }
-// Also serves as general attendance update
 export async function PUT(req: NextRequest) {
   const auth = await getAuthUser(req);
   if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
-    const { attendanceId, clockOut, breakStart, breakEnd, notes } = body;
-    if (!attendanceId) return badRequest('attendanceId required');
-
-    const record = await prisma.attendance.findUnique({ where: { id: attendanceId } });
-    if (!record) return notFound('Record not found');
-
-    const updateData: Record<string, unknown> = {};
-    if (notes !== undefined) updateData.notes = notes;
-
-    // Clock out
-    const outTime = clockOut ? new Date(clockOut) : new Date();
-    if (!record.clockOut) {
-      updateData.clockOut = outTime;
-      // Calculate total hours
-      const breakMins = (breakStart && breakEnd)
-        ? (new Date(breakEnd).getTime() - new Date(breakStart).getTime()) / 60000
-        : (record.breakStart && record.breakEnd)
-          ? (record.breakEnd.getTime() - record.breakStart.getTime()) / 60000
-          : 0;
-      const totalMs = outTime.getTime() - record.clockIn.getTime() - breakMins * 60000;
-      updateData.totalHours = Math.round((totalMs / 3600000) * 100) / 100;
-    }
-    if (breakStart) updateData.breakStart = new Date(breakStart);
-    if (breakEnd) updateData.breakEnd = new Date(breakEnd);
-
-    const updated = await prisma.attendance.update({ where: { id: attendanceId }, data: updateData });
+    const updated = await clockOut(body, auth.userId);
     return NextResponse.json(updated);
   } catch (e) {
+    if (e instanceof ValidationError) {
+      return badRequest(e.message);
+    }
+    const status = (e as { status?: number })?.status ?? 500;
+    if (status === 404) return notFound(String(e));
     return serverError(e, 'Failed to update attendance');
   }
 }
 
-// GET /api/attendance?userId=X&from=Y&to=Z
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
   if (!auth) return unauthorized();
 
-  const { searchParams } = new URL(req.url);
-  const userId = searchParams.get('userId');
-  const from = searchParams.get('from');
-  const to = searchParams.get('to');
-
-  const where: Record<string, unknown> = {};
-  if (userId) where.userId = Number(userId);
-  if (from || to) {
-    where.clockIn = {};
-    if (from) (where.clockIn as Record<string, Date>).gte = new Date(from);
-    if (to) (where.clockIn as Record<string, Date>).lte = new Date(to + 'T23:59:59');
+  try {
+    const { searchParams } = new URL(req.url);
+    const params: Record<string, unknown> = {};
+    const userId = searchParams.get('userId');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    if (userId) params.userId = Number(userId);
+    if (from) params.from = from;
+    if (to) params.to = to;
+    const records = await listAttendance(params);
+    return NextResponse.json(records);
+  } catch (e) {
+    return serverError(e);
   }
-
-  const records = await prisma.attendance.findMany({
-    where,
-    include: { user: { select: { id: true, name: true, position: true } } },
-    orderBy: { clockIn: 'desc' },
-    take: 500,
-  });
-  return NextResponse.json(records);
 }

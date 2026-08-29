@@ -288,3 +288,40 @@ export async function getProductsUsingIngredient(ingredientId: number, _location
 export async function recomputeProductsForIngredients(productIds: number[], _locationId: number = 1) {
   return recomputeProducts(prisma, productIds);
 }
+
+// ---------------------------------------------------------------------------
+// Product Inventory – location-scoped
+// ---------------------------------------------------------------------------
+
+export async function findInventoryWithProductDetails(locationId: number = 1) {
+  return prisma.inventory.findMany({
+    where: { product: { locationId } },
+    include: {
+      product: {
+        include: {
+          category: true,
+          _count: { select: { ingredients: { where: { required: true } } } },
+        },
+      },
+    },
+    orderBy: { product: { name: 'asc' } },
+  });
+}
+
+export async function countRequiredProductIngredients(productId: number, _locationId: number = 1) {
+  return prisma.productIngredient.count({
+    where: { productId, required: true },
+  });
+}
+
+export async function updateInventory(
+  productId: number,
+  data: Record<string, unknown>,
+  _locationId: number = 1,
+) {
+  return prisma.inventory.update({
+    where: { productId },
+    data: data as any,
+    include: { product: true },
+  });
+}

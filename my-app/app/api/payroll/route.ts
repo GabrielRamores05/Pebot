@@ -1,107 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { listPayrolls, createPayroll, updatePayrollStatus } from '@/modules/finance/service';
 import { requirePermission } from '@/lib/auth';
-import { computePhilippinePayroll } from '@/lib/philippine-payroll';
-import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
+import { badRequest, serverError, unauthorized } from '@/lib/api-response';
+import { ValidationError } from 'zod-validation-error';
 
-// GET /api/payroll?userId=X&status=DRAFT
 export async function GET(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
   if (!auth) return unauthorized();
 
-  const { searchParams } = new URL(req.url);
-  const userId = searchParams.get('userId');
-  const status = searchParams.get('status');
-
-  const where: Record<string, unknown> = {};
-  if (userId) where.userId = Number(userId);
-  if (status) where.status = status;
-
-  const records = await prisma.payroll.findMany({
-    where,
-    include: { user: { select: { id: true, name: true, position: true, paymentType: true, hourlyRate: true, monthlySalary: true } } },
-    orderBy: { periodEnd: 'desc' },
-  });
-  return NextResponse.json(records);
+  try {
+    const { searchParams } = new URL(req.url);
+    const params: Record<string, unknown> = {};
+    const userId = searchParams.get('userId');
+    const status = searchParams.get('status');
+    if (userId) params.userId = Number(userId);
+    if (status) params.status = status;
+    const records = await listPayrolls(params);
+    return NextResponse.json(records);
+  } catch (e) {
+    return serverError(e);
+  }
 }
 
-// POST /api/payroll — generate a payroll run for a period
-// Body: { userId, periodStart, periodEnd, overtimeRate?, deductions? }
 export async function POST(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
   if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
-    const { userId, periodStart, periodEnd, deductions, overtimeRate } = body;
-    if (!userId || !periodStart || !periodEnd) {
-      return badRequest('userId, periodStart, periodEnd required');
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return notFound('Staff not found');
-
-    // Fetch attendance for the period
-    const attendance = await prisma.attendance.findMany({
-      where: { userId, clockOut: { not: null }, clockIn: { gte: new Date(periodStart), lte: new Date(periodEnd + 'T23:59:59') } },
-    });
-
-    let regularHours = 0;
-    let overtimeHours = 0;
-    const stdWeekly = 40; // 40h standard week
-    for (const a of attendance) {
-      const h = a.totalHours ?? 0;
-      regularHours += Math.min(h, 8); // cap daily regular at 8h, overflow = overtime
-      overtimeHours += Math.max(0, h - 8);
-    }
-
-    let grossPay = 0;
-    let base = 0; // monthly basis for statutory contributions
-    if (user.paymentType === 'SALARIED' && user.monthlySalary) {
-      grossPay = user.monthlySalary;
-      base = user.monthlySalary;
-    } else if (user.hourlyRate) {
-      const rate = user.hourlyRate;
-      // Philippine overtime: +25% on an ordinary day (1.25x). Rest-day/holiday
-      // premiums (1.30x) require per-day scheduling and are noted as a future
-      // refinement; this is the ordinary-day baseline.
-      const otRate = overtimeRate ?? rate * 1.25;
-      grossPay = regularHours * rate + overtimeHours * otRate;
-      base = grossPay; // period gross assumed to cover ~one month
-    }
-
-    const otherDeductions = deductions ?? 0;
-    const result = computePhilippinePayroll({ grossPay, base, otherDeductions, overtimeHours });
-
-    const payroll = await prisma.payroll.create({
-      data: {
-        userId, periodStart: new Date(periodStart), periodEnd: new Date(periodEnd),
-        regularHours, overtimeHours, grossPay: result.grossPay,
-        deductions: result.statutoryEmployeeTotal + result.withholdingTax + otherDeductions,
-        netPay: result.netPay,
-        breakdown: JSON.stringify(result),
-        status: 'DRAFT', processedById: auth.userId,
-      },
-      include: { user: { select: { id: true, name: true, position: true } } },
-    });
+    const payroll = await createPayroll(body, auth.userId);
     return NextResponse.json(payroll, { status: 201 });
   } catch (e) {
+    if (e instanceof ValidationError) {
+      return badRequest(e.message);
+    }
+    const status = (e as { status?: number })?.status ?? 500;
+    if (status === 404) return NextResponse.json({ error: String(e) }, { status: 404 });
     return serverError(e, 'Failed to generate payroll');
   }
 }
 
-// PUT /api/payroll — update status (PROCESSED / PAID): { id, status }
 export async function PUT(req: NextRequest) {
   const auth = await requirePermission(req, 'staff');
   if (!auth) return unauthorized();
 
   try {
     const body = await req.json();
-    const { id, status } = body;
-    if (!id || !status) return badRequest('id and status required');
-    const updated = await prisma.payroll.update({ where: { id }, data: { status } });
+    const updated = await updatePayrollStatus(body);
     return NextResponse.json(updated);
   } catch (e) {
+    if (e instanceof ValidationError) {
+      return badRequest(e.message);
+    }
     return serverError(e, 'Failed to update payroll');
   }
 }
