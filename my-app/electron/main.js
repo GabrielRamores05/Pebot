@@ -743,7 +743,7 @@ app.whenReady().then(async () => {
     resizable: false,
     alwaysOnTop: true,
     backgroundColor: '#92400e',
-    webPreferences: { nodeIntegration: false },
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
   });
 
   splash.loadURL(`data:text/html,<!DOCTYPE html>

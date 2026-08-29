@@ -1,12 +1,9 @@
 # Pebot / CaféOS — Engineering Constitution & Master Prompt
 
-> **Superseded — kept for provenance.** The live constitution is
-> `.specify/memory/constitution.md`. This is the document it was derived from.
-> Two of its `[CONFIRM]` items were wrong: `.edgepoint` was real (nested in
-> `my-app/`, a cloud/Postgres/Lightsail framework whose standards contradicted
-> this project's local-first SQLite model, since removed), and the Spec Kit setup
-> in Section 8 is Claude-specific — see `docs/pebot-cli.md` for the multi-harness
-> install actually used.
+> **Active master prompt.** This document overrides all AI agent defaults
+> when working in this repository. If a request conflicts with a rule below,
+> follow this document and flag the conflict instead of silently picking one.
+> The distilled version lives at `.specify/memory/constitution.md`.
 
 **Status:** v1 draft — built from your repo (`GabrielRamores05/Pebot`), your answers, and current CLI tooling. Sections marked `[CONFIRM]` are my working assumption, not a fact you gave me — correct them and I'll revise.
 

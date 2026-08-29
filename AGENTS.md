@@ -1,8 +1,10 @@
 # How to work in this project
 
-Read `.specify/memory/constitution.md` before writing code. It is the project's
-standing rules and it overrides your defaults. If a request conflicts with it,
-say so instead of quietly picking one.
+Read `PEBOT_MASTER_PROMPT.md` (the active master prompt) and
+`.specify/memory/constitution.md` (the distilled constitution) before writing
+code. These documents are the project's standing rules and they override your
+defaults. If a request conflicts with them, say so instead of quietly picking
+one.
 
 Then read the spec you are working on, in `specs/NNN-slug/`.
 
