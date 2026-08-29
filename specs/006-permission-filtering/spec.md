@@ -23,9 +23,7 @@ allows, and data that staff-only should see is not handed out for free.
   products, orders, kitchen).
 - **Counter staff** — can work the Live Orders / POS terminal and the tables they
   are allowed to see; cannot open Staff, Settings, or analytics for other branches.
-- **Kitchen staff** — can see the kitchen screen and prepare the orders in it;
-  (TO CLARIFY: can kitchen staff also reach the Live Orders screen or tables
-  screen?).
+- **Kitchen staff** — can see the kitchen screen and prepare the orders in it; cannot reach Live Orders, tables, or Staff Management (kitchen-only, least privilege).
 - **Customers** — can only see their own order status page and their own table's
   menu; must never see another customer's order, names, or messages.
 - **Anyone off the street with the link** — must NOT be able to see the kitchen
@@ -33,12 +31,10 @@ allows, and data that staff-only should see is not handed out for free.
 
 ## What it does
 
-- Requires a staff sign-in before the kitchen screen shows any order data. *(TO
-  CLARIFY: which kitchen screens — the public `/kitchen` only, or
-  `/admin/kitchen` too?)*
+- Requires a staff sign-in before **both** `/kitchen` and `/admin/kitchen` show any order data. Unauthenticated users are redirected to `/login?next=/kitchen` (or `?next=/admin/kitchen`) and cannot see orders.
 - Hides or blocks screens a role is not allowed to use — for example, a STAFF user
   opening Staff Management or Settings is turned away instead of shown the page.
-- (TO_CLARIFY: what each non-admin role can do — see the options below.)
+- STAFF can use Live Orders, tables (terminal), and products where granted; KITCHEN can use kitchen only; ADMIN has all. (Lock plan.md:11-13 matrix.)
 - Keeps a customer's order page readable by the customer who placed it, without
   letting one customer see another's order.
 

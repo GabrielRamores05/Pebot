@@ -1,2 +1,5 @@
 /dist-electron/
 /Pebot_Executable/
+/.next/
+node_modules/
+.env

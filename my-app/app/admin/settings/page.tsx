@@ -529,7 +529,7 @@ export default function SettingsPage() {
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                 placeholder="20"
               />
-              <p className="text-gray-500 text-xs mt-1">Statutory discount applied via the terminal's Student/PWD button (e.g., 20 for 20%).</p>
+              <p className="text-gray-500 text-xs mt-1">Statutory discount applied via the terminal&apos;s Student/PWD button (e.g., 20 for 20%).</p>
             </div>
 
             {/* Receipt Prefix */}
@@ -825,7 +825,7 @@ export default function SettingsPage() {
                   <div>
                     <span className="text-sm font-medium text-gray-700">Include BIR pricing data</span>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Allow the AI to access capital costs, margins, and VAT data. Only available when "Allow AI to access business data" is enabled.
+                      Allow the AI to access capital costs, margins, and VAT data. Only available when &quot;Allow AI to access business data&quot; is enabled.
                     </p>
                   </div>
                 </label>

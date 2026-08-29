@@ -1,9 +1,9 @@
 # Plan — Manual DB Backup/Restore
 
-*Derived from `spec.md` plus `.edgepoint/standard/` and the recipes. Nobody asked
-the builder to author this and nobody should. It exists so that a build survives
-this session ending, or the builder switching to a different AI tool halfway
-through.*
+*Derived from `spec.md` plus the project constitution and locked technical
+decisions. Nobody asked the builder to author this and nobody should. It exists
+so that a build survives this session ending, or the builder switching to a
+different AI tool halfway through.*
 
 *Written during `/clarify`, once the spec is settled.*
 
@@ -13,12 +13,13 @@ through.*
 - **`access.md`** (standard) — the "Who uses it" section is a single actor: **Admin**. Enforced as admin-only at both the UI (buttons hidden for non-admins) and the route handler (`getAuthUser` + `requireRole(ADMIN)`).
 - **`errors.md`** — the restore failure paths return plain-sentence user errors exactly as the spec states ("Failed to restore backup. The selected file is not a valid CafeOS backup.") and log full details server-side.
 
-No recipe covers SQLite-file backup/restore (the standard assumes Postgres). That gap is escalated in `escalations.md` and logged to `.edgepoint/feedback/`.
+No recipe covers SQLite-file backup/restore (the Postgres-oriented patterns don't
+apply). That gap is documented in `escalations.md`.
 
 ## Data
 
 - **`prisma/dev.db`** (SQLite, the live database) — the single artifact backed up and restored.
-- **No schema changes** in this spec. No new tables or columns.
+- **No schema changes** in this spec. No new tables or columns. *Superseded by Phase 2 (2026-08-28): schema now includes `Location`, `AuditEvent` (was `AuditLog`), and `locationId` on 29 business tables (migration `20260829000000_add_location_and_audit_event`). Restore now implements constitution §VII: checksum `X-Backup-Checksum` (SHA-256), pre-restore snapshot, and `restoreInFlight` guard (`app/api/restore/route.ts:14`).*
 - **Access:** only an authenticated user with role `ADMIN` may read the database file (backup) or replace it (restore). The route handlers enforce this with the existing JWT session (`lib/auth.ts`). The UI also hides the buttons unless `user.role === 'ADMIN'`.
 
 ## Screens
@@ -34,5 +35,8 @@ No recipe covers SQLite-file backup/restore (the standard assumes Postgres). Tha
 
 ## Not covered by the standard
 
-- The standard assumes Postgres in containers with RLS; this app runs on the host with SQLite (`file:./dev.db`). Backup/restore is therefore a filesystem operation in Next.js route handlers, not a `pg_dump`/migration concern. Full escalation in `escalations.md`; short note in `.edgepoint/feedback/env-stack-mismatch.md`.
+- The standard patterns assume Postgres in containers with RLS; this app runs on the
+  host with SQLite (`file:./dev.db`). Backup/restore is therefore a filesystem
+  operation in Next.js route handlers, not a `pg_dump`/migration concern. See
+  `escalations.md` for details.
 - The standard requires e2e tests run via `./edge test` (Playwright in the container). Docker is not running, so acceptance tests are written in `tasks.md` but cannot be executed here. Escalated alongside the environment gap.

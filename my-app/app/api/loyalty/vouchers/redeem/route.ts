@@ -198,7 +198,7 @@ export async function GET(req: NextRequest) {
 
     // Check various conditions
     let isValid = true;
-    let validationErrors: string[] = [];
+    const validationErrors: string[] = [];
 
     if (voucher.status === 'REDEEMED') {
       isValid = false;

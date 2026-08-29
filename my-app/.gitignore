@@ -33,7 +33,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 /server.log
-/lib/prisma-client/*.tmp*
+
+# generated prisma client (regenerated via `npm run db:generate`)
+/lib/prisma-client/
 
 # env files (can opt-in for committing if needed)
 .env*

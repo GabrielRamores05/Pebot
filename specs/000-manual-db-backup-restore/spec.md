@@ -54,6 +54,7 @@ The admin needs to be able to back up the current database state locally before 
 - 30-second red-warning modal with countdown before restore executes (builder's explicit choice, decision A).
 - No cloud upload, no Google Drive integration — per Standard, this is outside scope.
 - Only admin role can access backup/restore controls.
+- Post-Phase-2, restore verifies SHA-256 if `X-Backup-Checksum` sent, snapshots current DB, and blocks concurrent restores (429) per constitution §VII.
 
 ## Needs a developer
 

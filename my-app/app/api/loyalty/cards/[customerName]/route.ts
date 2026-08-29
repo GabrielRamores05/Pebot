@@ -153,7 +153,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cus
     let claimedMilestones = JSON.parse(card.claimedMilestones || '[]') as number[];
     const vouchersCreated = [];
 
-    let tempCount = currentCount + quantity;
+    const tempCount = currentCount + quantity;
 
     if (!isMilestoneMode) {
       if (tempCount >= threshold) {

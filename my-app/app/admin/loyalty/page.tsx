@@ -174,7 +174,7 @@ export default function AdminLoyaltyManagementPage() {
   async function saveSettings() {
     if (!editingSettings) return;
 
-    let updatedSettings = { ...editingSettings };
+    const updatedSettings = { ...editingSettings };
     if (editingSettings.isMilestoneMode && editingSettings.milestones.length > 0) {
       const maxTarget = Math.max(...editingSettings.milestones.map(m => m.target));
       updatedSettings.coffeesRequiredForFree = maxTarget;
@@ -1109,7 +1109,7 @@ export default function AdminLoyaltyManagementPage() {
                         />
                       </div>
                       <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
-                        <p className="text-xs text-amber-700">Adding points will increase the customer's coffee count. If they reach the reward threshold, a voucher will be generated automatically.</p>
+                        <p className="text-xs text-amber-700">Adding points will increase the customer&apos;s coffee count. If they reach the reward threshold, a voucher will be generated automatically.</p>
                       </div>
                     </div>
                     <div className="p-6 border-t border-gray-100 flex gap-3">

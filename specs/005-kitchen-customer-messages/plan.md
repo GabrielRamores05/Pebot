@@ -1,9 +1,9 @@
 # Plan — kitchen-customer-messages
 
-*Derived from `spec.md` plus `.edgepoint/standard/` and the recipes. Nobody asked
-the builder to author this and nobody should. It exists so that a build survives
-this session ending, or the builder switching to a different AI tool halfway
-through.*
+*Derived from `spec.md` plus the project constitution and locked technical
+decisions. Nobody asked the builder to author this and nobody should. It exists
+so that a build survives this session ending, or the builder switching to a
+different AI tool halfway through.*
 
 *Written during `/clarify`, once the spec is settled.*
 

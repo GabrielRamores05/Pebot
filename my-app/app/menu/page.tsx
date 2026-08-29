@@ -1142,7 +1142,7 @@ function MenuPageInner() {
   useEffect(() => {
     const interval = setInterval(refreshCategories, 30000);
     return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // Also update immediately via socket when admin toggles table status
   useSocket({
@@ -1470,7 +1470,7 @@ function MenuPageInner() {
             <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full animate-modal-in"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-2xl font-semibold text-gray-900 mb-1 text-center">Who's ordering?</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-1 text-center">Who&apos;s ordering?</h2>
               <p className="text-gray-500 text-center mb-5">Tell us your name and mood for this table.</p>
 
               <div className="space-y-4 mb-4">

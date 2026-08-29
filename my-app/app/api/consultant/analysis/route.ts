@@ -223,7 +223,7 @@ async function getLoyaltyAnalysis(dateFrom: Date) {
 }
 
 async function getStaffPerformanceAnalysis(dateFrom: Date) {
-  const auditLogs = await prisma.auditLog.findMany({
+  const auditLogs = await prisma.auditEvent.findMany({
     where: {
       createdAt: { gte: dateFrom },
       userId: { not: null },

@@ -20,7 +20,7 @@
 - [x] Write `tests/acceptance/order-type-persistence.spec.ts` (one test per
       acceptance criterion).
 - [x] Run `tsc --noEmit` and eslint; run `npm run build`.
-- [x] Run `edgepoint check` and checkpoint the finished build.
+- [x] Run verification: `npm run test:unit`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 
 ## Acceptance criteria → tests
 

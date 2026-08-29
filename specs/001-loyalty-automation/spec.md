@@ -48,11 +48,17 @@ hand and nobody is given points before they've paid.
 
 - A customer earns points only for orders they have actually paid for.
 - Points are earned per item bought, not per order — buying 3 coffees in one order
-  earns 3 coffees toward the card.
+  earns 3 coffees toward the card. Each line item on the order (each row in the
+  order's item list) counts as one item, regardless of how many options or
+  add-ons it includes. A single Latte with Size Large and Extra Shot counts as
+  one point.
 - The reward threshold and reward type (free item, percentage, fixed amount) are
   whatever the shop has already configured — this feature does not change the
   rules, it only makes earning automatic.
-- Points land on the card belonging to the customer name on the order.
+- Points land on the loyalty card matching the `loyaltyCustomerName` on the order.
+  If no loyalty card exists for that name, a new card is created automatically
+  with a zero balance. The order is never refused because a loyalty card is
+  missing.
 
 ## How we'll know it works
 

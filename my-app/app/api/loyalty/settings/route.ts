@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const categoryId = req.nextUrl.searchParams.get('categoryId');
     
     if (categoryId) {
-      let settings = await prisma.loyaltySetting.findUnique({
+      const settings = await prisma.loyaltySetting.findUnique({
         where: { categoryId: parseInt(categoryId) },
         include: { category: true }
       });

@@ -235,7 +235,7 @@ export default function ExitPage() {
         ) : message ? (
           <>
             <div className="text-6xl mb-4">✅</div>
-            <h1 className="text-2xl font-bold text-white mb-2">You're All Set!</h1>
+            <h1 className="text-2xl font-bold text-white mb-2">You&apos;re All Set!</h1>
             <p className="text-amber-200 text-lg">{message}</p>
           </>
         ) : null}

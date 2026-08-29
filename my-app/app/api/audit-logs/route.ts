@@ -35,14 +35,14 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     const [logs, total] = await Promise.all([
-      prisma.auditLog.findMany({
+      prisma.auditEvent.findMany({
         where,
         include: { user: { select: { id: true, name: true, email: true, role: true } } },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.auditLog.count({ where }),
+      prisma.auditEvent.count({ where }),
     ]);
 
     return NextResponse.json({

@@ -651,7 +651,7 @@ export default function TablesPage() {
                           <span className="text-sm font-medium text-gray-800 flex-1">{g.displayName}</span>
                           {g.moodNote && (
                             <span className="text-xs text-gray-400 truncate max-w-[80px]" title={g.moodNote}>
-                              "{g.moodNote}"
+                              &quot;{g.moodNote}&quot;
                             </span>
                           )}
                         </div>
@@ -778,7 +778,7 @@ export default function TablesPage() {
               </button>
             ) : (
               <div className="mt-4 bg-red-50 border border-red-100 rounded-2xl p-4 text-center">
-                <p className="text-red-600 text-sm font-semibold mb-3">Delete "{editTable.name}"?</p>
+                <p className="text-red-600 text-sm font-semibold mb-3">Delete &quot;{editTable.name}&quot;?</p>
                 <div className="flex gap-3">
                   <button onClick={() => setDeleteConfirm(false)} className="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors">Cancel</button>
                   <button onClick={() => deleteTable()} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-sm">Yes, Delete</button>

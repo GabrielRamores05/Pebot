@@ -846,7 +846,7 @@ export default function PosTerminalPage() {
             <h2 className="text-xl font-semibold text-[var(--pos-ink)] mb-2">Failed to Load Terminal</h2>
             <p className="text-[var(--pos-ink-soft)] mb-4">{fetchError}</p>
             <p className="text-sm text-[var(--pos-ink-soft)]/70 mb-4">
-              This usually happens on first install when the database hasn't been seeded yet.
+              This usually happens on first install when the database hasn&apos;t been seeded yet.
             </p>
             <button
               onClick={() => window.location.reload()}
@@ -1339,7 +1339,7 @@ export default function PosTerminalPage() {
         {/* Products Grid */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
           {search && (
-            <p className="mb-3 text-xs font-medium text-[var(--pos-ink-soft)]">{displayedProducts.length} result{displayedProducts.length !== 1 ? 's' : ''} for "{search}"</p>
+            <p className="mb-3 text-xs font-medium text-[var(--pos-ink-soft)]">{displayedProducts.length} result{displayedProducts.length !== 1 ? 's' : ''} for &quot;{search}&quot;</p>
           )}
           <div className="grid w-full grid-cols-4 gap-3">
             {displayedProducts.map(product => {

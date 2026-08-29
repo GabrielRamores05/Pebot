@@ -1,21 +1,21 @@
 # Plan — Loyalty Automation
 
-*Derived from `spec.md` plus `.edgepoint/standard/` and the recipes. Nobody asked
-the builder to author this and nobody should. It exists so that a build survives
-this session ending, or the builder switching to a different AI tool halfway
-through.*
+*Derived from `spec.md` plus the project constitution and locked technical
+decisions. Nobody asked the builder to author this and nobody should. It exists
+so that a build survives this session ending, or the builder switching to a
+different AI tool halfway through.*
 
 *Written during `/clarify`, once the spec is settled.*
 
 ## Recipes used
 
-No recipe in `.edgepoint/recipes/` covers loyalty awarding. The existing loyalty
-implementation was found during `/describe` exploration and is being reused, not
-rebuilt. The closest standard touchpoints:
+The existing loyalty implementation was found during `/describe` exploration and
+is being reused, not rebuilt. Relevant constitution touchpoints:
 
-- `standard/access.md` — who may confirm payment (ADMIN/STAFF cashier) versus who
-  only marks food ready (KITCHEN).
-- `standard/data.md` — the loyalty tables already exist; no schema change.
+- Constitution §II (Two trust zones) — who may confirm payment (ADMIN/STAFF
+  cashier) versus who only marks food ready (KITCHEN).
+- Constitution §III (Money append-only) — the loyalty tables already exist; no
+  schema change.
 
 This is the risk area: the build must *relocate* an existing trigger, not invent
 one, and the existing trigger currently fires on the wrong status.
@@ -27,7 +27,10 @@ Existing tables, reused unchanged:
 - `Order` — `status` (PENDING → PREPARING → COMPLETED), `loyaltyPromo`,
   `loyaltyCustomerName`, `paymentMethod`.
 - `LoyaltyCard` — per customer per category, `paidCoffeesCount`,
-  `claimedMilestones`.
+  `claimedMilestones`. Card lookup: match by `loyaltyCustomerName` (exact,
+  case-insensitive). If no card exists, create one with `paidCoffeesCount = 0`
+  and empty `claimedMilestones`. This is part of the same transaction as the
+  point award.
 - `LoyaltySetting` — per category, threshold, reward type/value, milestone mode.
 - `LoyaltyVoucher` — earned rewards, created when thresholds are crossed.
 
@@ -65,3 +68,9 @@ in `app/api/orders/[id]/route.ts`. The `/describe` exploration found it already
 works when it does fire; this build changes *when* it fires, not *how* it works.
 Escalation noted in `escalations.md` only if the relocation proves impossible
 within the existing route structure.
+
+**Transaction constraint (Constitution §III):** The payment status update
+(Order.status → PREPARING) and the loyalty point award + voucher creation
+MUST occur inside a single `prisma.$transaction()` block. If the loyalty
+award fails, the payment status must roll back. This is a money bug if
+separated.

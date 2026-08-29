@@ -1,20 +1,21 @@
 # Plan — Inventory Blocking
 
-*Derived from `spec.md` plus `.edgepoint/standard/` and the recipes. Nobody asked
-the builder to author this and nobody should. It exists so that a build survives
-this session ending, or the builder switching to a different AI tool halfway
-through.*
+*Derived from `spec.md` plus the project constitution and locked technical
+decisions. Nobody asked the builder to author this and nobody should. It exists
+so that a build survives this session ending, or the builder switching to a
+different AI tool halfway through.*
 
 *Written during `/clarify`, once the spec is settled.*
 
 ## Recipes used
 
-No recipe in `.edgepoint/recipes/` covers inventory blocking. The closest standard
-touchpoints:
+Relevant constitution touchpoints:
 
-- `standard/access.md` — who may place orders (CUSTOMER via QR menu, ADMIN/STAFF via
-  the counter terminal) versus who may change stock counts (admin inventory page).
-- `standard/data.md` — the `Inventory` table already exists; no schema change.
+- Constitution §II (Two trust zones) — who may place orders (CUSTOMER via QR
+  menu, ADMIN/STAFF via the counter terminal) versus who may change stock counts
+  (admin inventory page).
+- Constitution §III (Money append-only) — the `Inventory` table already exists;
+  no schema change.
 
 This is a comparatively small spec: the menu and terminal already *display* stock,
 and the order path already *deducts* stock. The gap is that the order route never
@@ -47,10 +48,8 @@ configures stock, it never orders, so it needs no order-time policy.
   every item's stock is sufficient before the order is created, inside the existing
   transaction, and refuse with a clear "item unavailable" response if not.
 - `app/menu/page.tsx` — already marks zero-stock items "Out of Stock" and prevents
-  adding them; needs a way to surface the run-out message for items already in the
-  cart (pending `/clarify`).
-- `app/admin/terminal/page.tsx` — already prevents adding zero-stock items; needs
-  the same run-out message for items already on the ticket (pending `/clarify`).
+  adding them; surfaces `409 {unavailable: [{productId, name}]}` as "Item <name> is unavailable — please remove it and try again" for items already in the cart.
+- `app/admin/terminal/page.tsx` — already prevents adding zero-stock items; surfaces the same `409` unavailable message for items already on the ticket.
 - `app/api/inventory/route.ts` — unchanged, but the order route's low-stock check
   after deduction (`quantity <= lowStockThreshold`) stays as-is.
 

@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { auditLog: { create: mocks.auditCreate } },
+  prisma: { auditEvent: { create: mocks.auditCreate } },
 }));
 
 vi.mock('@/lib/auth', () => ({ getAuthUser: mocks.getAuthUser }));

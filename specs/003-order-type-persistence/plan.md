@@ -1,9 +1,9 @@
 # Plan — order-type-persistence
 
-*Derived from `spec.md` plus `.edgepoint/standard/` and the recipes. Nobody asked
-the builder to author this and nobody should. It exists so that a build survives
-this session ending, or the builder switching to a different AI tool halfway
-through.*
+*Derived from `spec.md` plus the project constitution and locked technical
+decisions. Nobody asked the builder to author this and nobody should. It exists
+so that a build survives this session ending, or the builder switching to a
+different AI tool halfway through.*
 
 *Written during `/clarify`, once the spec is settled.*
 
@@ -15,7 +15,7 @@ through.*
 ## Data
 
 - **`Order`** (Prisma model): add
-  - `orderType String @default("DINE_IN")` — `DINE_IN | TAKEOUT | DELIVERY`
+  - `orderType String @default("DINE_IN")` with Zod enum `DINE_IN|TAKEOUT|DELIVERY` (unknown values → `400 "Invalid order type"`)
   - `deliveryAddress String?` — set only for delivery orders
 - No new tables. The existing `Order` row already carries `tableId` for dine-in.
 - Access rules (from "Who uses it"):
@@ -42,8 +42,8 @@ through.*
 - **Customer order page** (`app/order/[orderNumber]/page.tsx`): show order type,
   and the delivery address for delivery orders, in the order-details block.
 - **Order-create API** (`app/api/orders/route.ts`):
-  - Accept `orderType` (default `DINE_IN`) and `deliveryAddress`.
-  - Refuse a DELIVERY order with no address (HTTP 400, clear message).
+  - Accept `orderType` (default `DINE_IN`, validated via Zod enum) and `deliveryAddress`.
+  - Refuse if `deliveryAddress == null || deliveryAddress.trim() === ""` for `DELIVERY` → `400 {error: "Delivery address is required"}`.
 
 ## Outside connections
 

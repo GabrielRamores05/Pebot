@@ -22,7 +22,13 @@
 - [x] Write `tests/acceptance/loyalty-automation.spec.ts` (one test per acceptance
       criterion).
 - [x] Run `tsc --noEmit` and eslint; run `npm run build`.
-- [ ] Run `edgepoint check` and checkpoint the finished build.
+- [ ] Run verification: `npm run test:unit`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
+- [ ] Verify that the payment-confirmation trigger and loyalty-awarding logic
+      in `app/api/orders/[id]/route.ts` are wrapped in a single
+      `prisma.$transaction()`. If not, refactor. (Constitution §III)
+- [ ] Confirm that when a QR-menu order is paid at the counter terminal, the
+      `paymentConfirmed` marker is sent by the cashier's action, not by the
+      order-create path (which is for terminal-placed-as-paid orders).
 
 ## Acceptance criteria → tests
 
@@ -32,7 +38,7 @@ considered done.*
 
 | Criterion (from spec.md) | Test |
 |---|---|
-| When I confirm that a customer's order has been paid, then their loyalty card gains one point for each item they bought, without me doing anything else. | `tests/acceptance/loyalty-automation.spec.ts` → "awards points when I confirm payment" |
+| When I confirm that a customer's order has been paid, then their loyalty card gains one point for each item they bought, without me doing anything else. "Item" = each line item on the order, regardless of options/add-ons. | `tests/acceptance/loyalty-automation.spec.ts` → "awards points when I confirm payment" |
 | When I confirm a payment, then the order moves out of Pending so the kitchen can start. | `tests/acceptance/loyalty-automation.spec.ts` → "moves the order to preparing on payment" |
 | When the kitchen marks an order as ready, then no points are added to the customer's card. | `tests/acceptance/loyalty-automation.spec.ts` → "kitchen mark ready awards no points" |
 | When a customer reaches the shop's threshold, then the reward appears on their card automatically. | `tests/acceptance/loyalty-automation.spec.ts` → "reward appears at threshold" |

@@ -21,7 +21,7 @@ export async function logAction(params: LogActionParams): Promise<void> {
     const userId = params.userId ?? user?.userId ?? null;
     const ip = params.req?.ip ?? params.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
 
-    await prisma.auditLog.create({
+    await prisma.auditEvent.create({
       data: {
         userId,
         action: params.action,

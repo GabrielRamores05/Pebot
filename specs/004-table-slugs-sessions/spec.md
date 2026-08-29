@@ -38,7 +38,7 @@ the link keeps working even if the table is renamed later.
 - Gives each table a stable link for its QR sticker, so renaming a table does not
   break the stickers already printed.
 - Puts every order into the right visit automatically: when a new group scans a
-  table's QR and the last visit has clearly ended, the new group's orders start a
+  table's QR and the last visit has clearly ended (`TableSession.exitTime NOT NULL` or `>30m` since last order and table not `OCCUPIED`), the new group's orders start a
   fresh visit and are never mixed with the previous group's.
 
 ## What it does not do

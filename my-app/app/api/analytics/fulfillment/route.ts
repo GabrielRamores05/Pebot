@@ -31,7 +31,7 @@ interface FulfillmentStats {
 
 function getDateRange(range: string) {
   const now = new Date();
-  let startDate = new Date();
+  const startDate = new Date();
 
   if (range === 'today') {
     startDate.setHours(0, 0, 0, 0);

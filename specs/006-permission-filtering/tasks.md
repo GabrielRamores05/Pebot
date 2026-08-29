@@ -5,7 +5,7 @@
 1. Public kitchen sign-in gate → Phase 2 Task 2.1 (kitchen page `if (!isStaff)` redirect + `fetchOrders` guard)
 2. STAFF role can use Live Orders but not Staff Management/Settings → Phase 1 Task 1.1 (`requirePermission` + ADMIN check) + Phase 3 API gating (orders tables) + Phase 4 visibleNAV
 3. KITCHEN role can see kitchen screen but not Staff Management/Settings → Phase 2 Task 2.1 (kitchen UI visible when isStaff) + Phase 4 visibleNAV
-4. Customers cannot see each other's order details → Out of scope for spec 6 (customer auth is separate; currently order pages are public per design)
+4. Customers cannot see each other's order details → Phase 3 Task 3.1a: `GET /api/orders/[id]` + `app/order/[orderNumber]/page.tsx` must enforce orderNumber ownership; return 404 for mismatched orderNumbers. Test `other customer's order returns 404`. Mitigation: `orderNumber`/`barcodeValue` remain unguessable; document per constitution §II.
 5. STAFF sign-in hides Staff/Settings from sidebar → Phase 4 Task 4.1 (visibleNAV consistency with server-side gates)
 
 ## Phase 1: Add server-side permission helper
@@ -69,7 +69,8 @@
 ### Task 5.3 — Run `npm run build`
 - Verify production build passes.
 
-### Task 5.4 — Run `edgepoint check` + checkpoint
+### Task 5.4 — Run verification
+- Run `npm run test:unit`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 - Verify 5 acceptance criteria are addressed by the implementation.
 
 ### Task 5.5 — Live-verify against host dev server

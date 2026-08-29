@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const productId = searchParams.get('productId');
     const suggestionsOnly = searchParams.get('suggestions') === 'true';
 
-    let whereClause: any = {};
+    const whereClause: any = {};
     if (productId) {
       whereClause.productId = parseInt(productId);
     }
