@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -73,6 +75,9 @@ fun MainScreen() {
         NavigationItem("Customers", Icons.Default.Face, "customers"),
         NavigationItem("Staff", Icons.Default.Group, "staff"),
         NavigationItem("Vouchers", Icons.Default.ConfirmationNumber, "vouchers"),
+        NavigationItem("Reviews", Icons.Default.Star, "reviews"),
+        NavigationItem("Audit", Icons.Default.History, "audit"),
+        NavigationItem("AI Consultant", Icons.Default.Chat, "ai_consultant"),
         NavigationItem("Settings", Icons.Default.Settings, "settings")
     )
 
@@ -117,6 +122,9 @@ fun MainScreen() {
                     composable("customers") { CustomerManagementScreen(viewModel) }
                     composable("staff") { StaffManagementScreen(viewModel) }
                     composable("vouchers") { VoucherManagementScreen(viewModel) }
+                    composable("reviews") { ReviewsScreen(viewModel) }
+                    composable("audit") { AuditLogScreen(viewModel) }
+                    composable("ai_consultant") { AIConsultantScreen(viewModel) }
                     composable("settings") { SettingsScreen(viewModel) }
                 }
             }
