@@ -136,17 +136,24 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 - [x] **AuditEvent** entity — append-only audit trail ✅ (Entities.kt:339)
 - [x] **ProductOption** entity — product-specific option price deltas ✅
 - [x] **TableSession** entity — tracks table occupancy sessions ✅
-- [ ] **LoyaltyCard** entity — customer loyalty cards
-- [ ] **LoyaltyTransaction** entity — loyalty point transactions
-- [ ] **LoyaltySetting** entity — global loyalty configuration
-- [ ] **Attendance/LeaveRequest/Schedule/Payroll** — HR modules
-- [ ] **StaffDocument/StaffTraining/PerformanceReview** — staff development
-- [ ] **AIConversation/AIMessage** — AI consultant chat history
+- [x] **LoyaltyCard** entity — customer loyalty cards ✅ (Phase 3)
+- [x] **LoyaltyTransaction** entity — loyalty point transactions ✅ (Phase 3)
+- [x] **LoyaltySetting** entity — global loyalty configuration ✅ (Phase 3)
+- [x] **Attendance/LeaveRequest/Schedule/Payroll** — HR modules ✅ (Phase 2)
+- [x] **StaffDocument/StaffTraining/PerformanceReview** — staff development ✅ (Phase 2)
+- [x] **AIConversation/AIMessage** — AI consultant chat history ✅ (Phase 3)
 - [x] **Dao methods** — CRUD for Review, OrderMessage, ExpenseCategory, AuditEvent ✅
+- [x] **Dao methods** — CRUD for ProductOption, TableSession ✅
+- [x] **Dao methods** — CRUD for LoyaltyCard, LoyaltyTransaction, LoyaltySetting ✅
+- [x] **Dao methods** — CRUD for AIConversation, AIMessage ✅
+- [x] **Dao methods** — CRUD for Attendance, LeaveType, LeaveRequest, Schedule, Payroll, StaffDocument, StaffTraining, PerformanceReview ✅
 - [x] **ViewModel methods** — addOrderMessage, addReview, addExpenseCategory, logAuditEvent ✅
-- [x] **ExportData extended** — new entity lists for round-trip import/export ✅
-- [x] **DB v9** — new entities registered in CafeDatabase ✅
-- [x] **DB v10** — ProductOption and TableSession registered ✅
+- [x] **ViewModel methods** — addProductOption, openTableSession, closeTableSession ✅
+- [x] **ViewModel methods** — createLoyaltyCard, addLoyaltyPoints, redeemLoyaltyPoints ✅
+- [x] **ViewModel methods** — clockIn, requestLeave, approveLeaveRequest, generatePayroll ✅
+- [x] **ViewModel methods** — createAIConversation, addAIMessage ✅
+- [x] **ExportData extended** — all new entities for round-trip ✅
+- [x] **DB v11** — all Phase 1-3 entities registered ✅
 
 ### Phase 2: Staff/HR Module <span style="color:green">(COMPLETED)</span>
 - [x] **Login** (PIN auth with default fallback) ✅
