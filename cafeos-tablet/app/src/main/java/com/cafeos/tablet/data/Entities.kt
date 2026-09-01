@@ -316,6 +316,33 @@ data class LoyaltyVoucher(
  )
 
 @Serializable
+@Entity(
+    tableName = "ProductOption",
+    indices = [Index(value = ["productId"]), Index(value = ["optionId"])]
+)
+data class ProductOption(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val productId: Int,
+    val optionId: Int,
+    val priceDelta: Double = 0.0
+)
+
+@Serializable
+@Entity(
+    tableName = "TableSession",
+    indices = [Index(value = ["tableId"]), Index(value = ["orderId"])]
+)
+data class TableSession(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val tableId: Int,
+    val orderId: Int? = null,
+    val startedAt: Long,
+    val endedAt: Long? = null,
+    val status: String = "OCCUPIED",
+    val guestCount: Int = 0
+)
+
+@Serializable
 @Entity(tableName = "Attendance")
 data class Attendance(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

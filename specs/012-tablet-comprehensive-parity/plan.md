@@ -134,8 +134,8 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 - [x] **OrderMessage** entity — order notes/messages ✅ (Entities.kt:317)
 - [x] **ExpenseCategory** entity — categorization ✅ (Entities.kt:330)
 - [x] **AuditEvent** entity — append-only audit trail ✅ (Entities.kt:339)
-- [ ] **ProductOption** entity — product-specific option price deltas
-- [ ] **TableSession** entity — tracks table occupancy sessions
+- [x] **ProductOption** entity — product-specific option price deltas ✅
+- [x] **TableSession** entity — tracks table occupancy sessions ✅
 - [ ] **LoyaltyCard** entity — customer loyalty cards
 - [ ] **LoyaltyTransaction** entity — loyalty point transactions
 - [ ] **LoyaltySetting** entity — global loyalty configuration
@@ -145,7 +145,8 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 - [x] **Dao methods** — CRUD for Review, OrderMessage, ExpenseCategory, AuditEvent ✅
 - [x] **ViewModel methods** — addOrderMessage, addReview, addExpenseCategory, logAuditEvent ✅
 - [x] **ExportData extended** — new entity lists for round-trip import/export ✅
-- [x] **DB v8** — new entities registered in CafeDatabase ✅
+- [x] **DB v9** — new entities registered in CafeDatabase ✅
+- [x] **DB v10** — ProductOption and TableSession registered ✅
 
 ### Phase 2: Staff/HR Module <span style="color:green">(COMPLETED)</span>
 - [x] **Login** (PIN auth with default fallback) ✅

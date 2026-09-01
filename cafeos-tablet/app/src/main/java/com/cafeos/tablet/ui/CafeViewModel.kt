@@ -792,9 +792,47 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         dao.updatePerformanceReview(review)
     }
 
-    suspend fun getStaffReviews(staffId: Int): List<PerformanceReview> = dao.getStaffReviews(staffId)
+        suspend fun getStaffReviews(staffId: Int): List<PerformanceReview> = dao.getStaffReviews(staffId)
 
-    // Export/Import extensions for HR entities
+    // Product Options (product-specific price deltas)
+    val activeTableSessions = dao.getActiveTableSessions()
+
+    suspend fun getProductOptions(productId: Int): List<ProductOption> = dao.getProductOptions(productId)
+
+    fun addProductOption(productId: Int, optionId: Int, priceDelta: Double) {
+        viewModelScope.launch {
+            dao.insertProductOption(ProductOption(productId = productId, optionId = optionId, priceDelta = priceDelta))
+        }
+    }
+
+    suspend fun deleteProductOptionsByProduct(productId: Int) {
+        dao.deleteProductOptionsByProduct(productId)
+    }
+
+    // Table Sessions
+    fun openTableSession(tableId: Int, guestCount: Int = 0) {
+        viewModelScope.launch {
+            dao.insertTableSession(
+                TableSession(
+                    tableId = tableId,
+                    startedAt = System.currentTimeMillis(),
+                    guestCount = guestCount
+                )
+            )
+        }
+    }
+
+    suspend fun getTableSessions(tableId: Int): List<TableSession> = dao.getTableSessions(tableId)
+
+    fun closeTableSession(sessionId: Int) {
+        viewModelScope.launch {
+            dao.closeTableSession(sessionId, System.currentTimeMillis())
+        }
+    }
+
+    // Export/Import extensions for Phase 1 remaining entities
+
+
     suspend fun exportAttendance(): List<Attendance> = dao.getAllAttendanceNow()
     suspend fun exportLeaveTypes(): List<LeaveType> = dao.getAllLeaveTypesNow()
     suspend fun exportLeaveRequests(): List<LeaveRequest> = dao.getAllLeaveRequestsNow()
@@ -803,6 +841,9 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun exportStaffDocuments(): List<StaffDocument> = dao.getAllStaffDocumentsNow()
     suspend fun exportStaffTrainings(): List<StaffTraining> = dao.getAllStaffTrainingsNow()
     suspend fun exportPerformanceReviews(): List<PerformanceReview> = dao.getAllPerformanceReviewsNow()
+    suspend fun exportAttendance(): List<Attendance> = dao.getAllAttendanceNow()
+    suspend fun exportProductOptions(): List<ProductOption> = dao.getAllProductOptionsNow()
+    suspend fun exportTableSessions(): List<TableSession> = dao.getAllTableSessionsNow()
 
     suspend fun getOrderMessages(orderId: Int): List<OrderMessage> = dao.getOrderMessages(orderId)
 
@@ -1014,10 +1055,18 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         dao.insertPerformanceReview(review)
                         importedCount++
                     }
-                    for (att in data.attendance) {
-                        dao.insertAttendance(att)
-                        importedCount++
-                    }
+                     for (att in data.attendance) {
+                         dao.insertAttendance(att)
+                         importedCount++
+                     }
+                     for (option in data.productOptions) {
+                         dao.insertProductOption(option)
+                         importedCount++
+                     }
+                     for (session in data.tableSessions) {
+                         dao.insertTableSession(session)
+                         importedCount++
+                     }
                 }
             }
         } catch (e: Exception) {
@@ -1107,7 +1156,9 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             staffDocuments = dao.getAllStaffDocumentsNow(),
             staffTrainings = dao.getAllStaffTrainingsNow(),
             performanceReviews = dao.getAllPerformanceReviewsNow(),
-            attendance = dao.getAllAttendanceNow()
+            attendance = dao.getAllAttendanceNow(),
+            productOptions = dao.getAllProductOptionsNow(),
+            tableSessions = dao.getAllTableSessionsNow()
         )
 
         val json = Json { prettyPrint = true; encodeDefaults = true }
@@ -1156,7 +1207,9 @@ data class ExportData(
     val staffDocuments: List<StaffDocument> = emptyList(),
     val staffTrainings: List<StaffTraining> = emptyList(),
     val performanceReviews: List<PerformanceReview> = emptyList(),
-    val attendance: List<Attendance> = emptyList()
+    val attendance: List<Attendance> = emptyList(),
+    val productOptions: List<ProductOption> = emptyList(),
+    val tableSessions: List<TableSession> = emptyList()
 )
 
 @Serializable

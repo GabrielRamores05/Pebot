@@ -548,6 +548,44 @@ interface CafeDao {
 
     @Query("SELECT * FROM StaffTraining ORDER BY createdAt DESC")
     suspend fun getAllStaffTrainingsNow(): List<StaffTraining>
+
+    // Product Options (product-specific option price deltas)
+    @Query("SELECT * FROM ProductOption WHERE productId = :productId")
+    suspend fun getProductOptions(productId: Int): List<ProductOption>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProductOption(option: ProductOption)
+
+    @Update
+    suspend fun updateProductOption(option: ProductOption)
+
+    @Delete
+    suspend fun deleteProductOption(option: ProductOption)
+
+    @Query("DELETE FROM ProductOption WHERE productId = :productId")
+    suspend fun deleteProductOptionsByProduct(productId: Int)
+
+    @Query("SELECT * FROM ProductOption")
+    suspend fun getAllProductOptionsNow(): List<ProductOption>
+
+    // Table Sessions
+    @Query("SELECT * FROM TableSession WHERE status = 'OCCUPIED' ORDER BY startedAt DESC")
+    fun getActiveTableSessions(): Flow<List<TableSession>>
+
+    @Query("SELECT * FROM TableSession WHERE tableId = :tableId ORDER BY startedAt DESC LIMIT 1")
+    suspend fun getTableSessions(tableId: Int): List<TableSession>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTableSession(session: TableSession)
+
+    @Update
+    suspend fun updateTableSession(session: TableSession)
+
+    @Query("UPDATE TableSession SET endedAt = :endedAt, status = 'CLOSED' WHERE id = :id")
+    suspend fun closeTableSession(id: Int, endedAt: Long)
+
+    @Query("SELECT * FROM TableSession ORDER BY startedAt DESC")
+    suspend fun getAllTableSessionsNow(): List<TableSession>
 }
 
 data class ExpenseCategoryTotal(

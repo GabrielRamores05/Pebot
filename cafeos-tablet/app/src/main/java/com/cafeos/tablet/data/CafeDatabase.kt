@@ -39,9 +39,11 @@ import androidx.room.RoomDatabase
         Payroll::class,
         StaffDocument::class,
         StaffTraining::class,
-        PerformanceReview::class
+        PerformanceReview::class,
+        ProductOption::class,
+        TableSession::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class CafeDatabase : RoomDatabase() {
