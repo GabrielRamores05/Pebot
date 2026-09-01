@@ -317,6 +317,69 @@ data class LoyaltyVoucher(
 
 @Serializable
 @Entity(
+    tableName = "LoyaltyCard",
+    indices = [Index(value = ["customerId"]), Index(value = ["cardNumber"])]
+)
+data class LoyaltyCard(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val customerId: Int? = null,
+    val cardNumber: String,
+    val pointsBalance: Double = 0.0,
+    val tier: String = "CASUAL",
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "LoyaltyTransaction",
+    indices = [Index(value = ["cardId"]), Index(value = ["orderId"])]
+)
+data class LoyaltyTransaction(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val cardId: Int,
+    val type: String,
+    val points: Double,
+    val orderId: Int? = null,
+    val details: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(tableName = "LoyaltySetting")
+data class LoyaltySetting(
+    @PrimaryKey val key: String,
+    val value: String,
+    val scope: String = "GLOBAL"
+)
+
+@Serializable
+@Entity(
+    tableName = "AIConversation",
+    indices = [Index(value = ["createdAt"])]
+)
+data class AIConversation(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val title: String,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "AIMessage",
+    indices = [Index(value = ["conversationId"])]
+)
+data class AIMessage(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val conversationId: Int,
+    val role: String, // "user" or "assistant"
+    val content: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
     tableName = "ProductOption",
     indices = [Index(value = ["productId"]), Index(value = ["optionId"])]
 )

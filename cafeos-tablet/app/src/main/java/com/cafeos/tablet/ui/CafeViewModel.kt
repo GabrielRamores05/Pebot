@@ -844,6 +844,109 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun exportAttendance(): List<Attendance> = dao.getAllAttendanceNow()
     suspend fun exportProductOptions(): List<ProductOption> = dao.getAllProductOptionsNow()
     suspend fun exportTableSessions(): List<TableSession> = dao.getAllTableSessionsNow()
+    suspend fun exportLoyaltyCards(): List<LoyaltyCard> = dao.getAllLoyaltyCardsNow()
+    suspend fun exportLoyaltyTransactions(): List<LoyaltyTransaction> = dao.getAllLoyaltyTransactionsNow()
+    suspend fun exportLoyaltySettings(): List<LoyaltySetting> = dao.getAllLoyaltySettingsNow()
+    suspend fun exportAIConversations(): List<AIConversation> = dao.getAllAIConversationsNow()
+    suspend fun exportAIMessages(): List<AIMessage> = dao.getAllAIMessagesNow()
+
+    // Loyalty Cards
+    val allLoyaltyCards = dao.getAllLoyaltyCards()
+
+    suspend fun getCardsByCustomer(customerId: Int): List<LoyaltyCard> = dao.getCardsByCustomer(customerId)
+
+    fun createLoyaltyCard(customerId: Int? = null, cardNumber: String, startingPoints: Double = 0.0, tier: String = "CASUAL") {
+        viewModelScope.launch {
+            dao.insertLoyaltyCard(
+                LoyaltyCard(
+                    customerId = customerId,
+                    cardNumber = cardNumber,
+                    pointsBalance = startingPoints,
+                    tier = tier
+                )
+            )
+        }
+    }
+
+    fun addLoyaltyPoints(cardId: Int, points: Double, orderId: Int? = null, details: String? = null) {
+        viewModelScope.launch {
+            val card = dao.getLoyaltyCardById(cardId)
+            if (card != null) {
+                val newBalance = card.pointsBalance + points
+                dao.updateLoyaltyCard(card.copy(pointsBalance = newBalance, updatedAt = System.currentTimeMillis()))
+                dao.insertLoyaltyTransaction(
+                    LoyaltyTransaction(
+                        cardId = cardId,
+                        type = "EARN",
+                        points = points,
+                        orderId = orderId,
+                        details = details
+                    )
+                )
+            }
+        }
+    }
+
+    fun redeemLoyaltyPoints(cardId: Int, points: Double, orderId: Int? = null, details: String? = null) {
+        viewModelScope.launch {
+            val card = dao.getLoyaltyCardById(cardId)
+            if (card != null && card.pointsBalance >= points) {
+                val newBalance = card.pointsBalance - points
+                val newTier = when {
+                    newBalance >= 1000 -> "VIP"
+                    newBalance >= 500 -> "REGULAR"
+                    newBalance >= 100 -> "CASUAL"
+                    else -> "AT_RISK"
+                }
+                dao.updateLoyaltyCard(card.copy(pointsBalance = newBalance, tier = newTier, updatedAt = System.currentTimeMillis()))
+                dao.insertLoyaltyTransaction(
+                    LoyaltyTransaction(
+                        cardId = cardId,
+                        type = "REDEEM",
+                        points = -points,
+                        orderId = orderId,
+                        details = details
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun getLoyaltyTransactions(cardId: Int): List<LoyaltyTransaction> = dao.getTransactionsByCard(cardId)
+
+    suspend fun getLoyaltySetting(key: String, scope: String = "GLOBAL"): String? = dao.getLoyaltySetting(key, scope)
+
+    fun setLoyaltySetting(key: String, value: String, scope: String = "GLOBAL") {
+        viewModelScope.launch {
+            dao.upsertLoyaltySetting(LoyaltySetting(key = key, value = value, scope = scope))
+        }
+    }
+
+    // AI Conversations & Messages
+    val allAIConversations = dao.getAllAIConversations()
+
+    fun createAIConversation(title: String): Long {
+        var convId = 0L
+        viewModelScope.launch {
+            convId = dao.insertAIConversation(AIConversation(title = title))
+        }
+        return convId
+    }
+
+    suspend fun getAIMessages(conversationId: Int): List<AIMessage> = dao.getAIMessages(conversationId)
+
+    fun addAIMessage(conversationId: Int, role: String, content: String) {
+        viewModelScope.launch {
+            dao.insertAIMessage(AIMessage(conversationId = conversationId, role = role, content = content))
+            dao.updateAIConversation(
+                AIConversation(
+                    id = conversationId,
+                    title = "",
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
 
     suspend fun getOrderMessages(orderId: Int): List<OrderMessage> = dao.getOrderMessages(orderId)
 
@@ -1067,6 +1170,26 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                          dao.insertTableSession(session)
                          importedCount++
                      }
+                     for (card in data.loyaltyCards) {
+                         dao.insertLoyaltyCard(card)
+                         importedCount++
+                     }
+                     for (transaction in data.loyaltyTransactions) {
+                         dao.insertLoyaltyTransaction(transaction)
+                         importedCount++
+                     }
+                     for (setting in data.loyaltySettings) {
+                         dao.upsertLoyaltySetting(setting)
+                         importedCount++
+                     }
+                     for (conversation in data.aiConversations) {
+                         dao.insertAIConversation(conversation)
+                         importedCount++
+                     }
+                     for (message in data.aiMessages) {
+                         dao.insertAIMessage(message)
+                         importedCount++
+                     }
                 }
             }
         } catch (e: Exception) {
@@ -1158,7 +1281,12 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             performanceReviews = dao.getAllPerformanceReviewsNow(),
             attendance = dao.getAllAttendanceNow(),
             productOptions = dao.getAllProductOptionsNow(),
-            tableSessions = dao.getAllTableSessionsNow()
+            tableSessions = dao.getAllTableSessionsNow(),
+            loyaltyCards = dao.getAllLoyaltyCardsNow(),
+            loyaltyTransactions = dao.getAllLoyaltyTransactionsNow(),
+            loyaltySettings = dao.getAllLoyaltySettingsNow(),
+            aiConversations = dao.getAllAIConversationsNow(),
+            aiMessages = dao.getAllAIMessagesNow()
         )
 
         val json = Json { prettyPrint = true; encodeDefaults = true }
@@ -1209,7 +1337,12 @@ data class ExportData(
     val performanceReviews: List<PerformanceReview> = emptyList(),
     val attendance: List<Attendance> = emptyList(),
     val productOptions: List<ProductOption> = emptyList(),
-    val tableSessions: List<TableSession> = emptyList()
+    val tableSessions: List<TableSession> = emptyList(),
+    val loyaltyCards: List<LoyaltyCard> = emptyList(),
+    val loyaltyTransactions: List<LoyaltyTransaction> = emptyList(),
+    val loyaltySettings: List<LoyaltySetting> = emptyList(),
+    val aiConversations: List<AIConversation> = emptyList(),
+    val aiMessages: List<AIMessage> = emptyList()
 )
 
 @Serializable

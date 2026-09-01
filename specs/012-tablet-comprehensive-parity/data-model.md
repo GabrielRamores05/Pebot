@@ -52,13 +52,13 @@
 
 ### Phase 3 Priority (Loyalty & AI)
 
-| Entity | Fields | Relations |
-|--------|--------|-----------|
-| **LoyaltyCard** | id, customerId, cardNumber, pointsBalance, tier, createdAt | Customer(0):LoyaltyCard(N) |
-| **LoyaltyTransaction** | id, cardId, type, points, orderId, createdAt | LoyaltyCard(1):LoyaltyTransaction(N), Order(0):LoyaltyTransaction(N) |
-| **LoyaltySetting** | id, key, value, scope | singleton |
-| **AIConversation** | id, title, createdAt, updatedAt | AIConversation(1):AIMessage(N) |
-| **AIMessage** | id, conversationId, role, content, timestamp | AIConversation(N):AIMessage(N) |
+| Entity | Fields | Relations | Status |
+|--------|--------|-----------|--------|
+| **LoyaltyCard** | id, customerId, cardNumber, pointsBalance, tier, createdAt, updatedAt | Customer(0):LoyaltyCard(N) | ✅ Created |
+| **LoyaltyTransaction** | id, cardId, type, points, orderId, details, createdAt | LoyaltyCard(1):LoyaltyTransaction(N), Order(0):LoyaltyTransaction(N) | ✅ Created |
+| **LoyaltySetting** | id (key), value, scope | singleton | ✅ Created |
+| **AIConversation** | id, title, createdAt, updatedAt | AIConversation(1):AIMessage(N) | ✅ Created |
+| **AIMessage** | id, conversationId, role, content, timestamp | AIConversation(N):AIMessage(N) | ✅ Created |
 
 ## Schema Version
 

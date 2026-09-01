@@ -586,6 +586,71 @@ interface CafeDao {
 
     @Query("SELECT * FROM TableSession ORDER BY startedAt DESC")
     suspend fun getAllTableSessionsNow(): List<TableSession>
+
+    // Loyalty Cards
+    @Query("SELECT * FROM LoyaltyCard WHERE id = :cardId LIMIT 1")
+    suspend fun getLoyaltyCardById(cardId: Int): LoyaltyCard?
+
+    @Query("SELECT * FROM LoyaltyCard ORDER BY cardNumber ASC")
+    fun getAllLoyaltyCards(): Flow<List<LoyaltyCard>>
+
+    @Query("SELECT * FROM LoyaltyCard WHERE customerId = :customerId")
+    suspend fun getCardsByCustomer(customerId: Int): List<LoyaltyCard>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLoyaltyCard(card: LoyaltyCard)
+
+    @Update
+    suspend fun updateLoyaltyCard(card: LoyaltyCard)
+
+    @Delete
+    suspend fun deleteLoyaltyCard(card: LoyaltyCard)
+
+    @Query("SELECT * FROM LoyaltyCard ORDER BY createdAt DESC")
+    suspend fun getAllLoyaltyCardsNow(): List<LoyaltyCard>
+
+    // Loyalty Transactions
+    @Query("SELECT * FROM LoyaltyTransaction WHERE cardId = :cardId ORDER BY createdAt DESC")
+    suspend fun getTransactionsByCard(cardId: Int): List<LoyaltyTransaction>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLoyaltyTransaction(transaction: LoyaltyTransaction)
+
+    @Query("SELECT * FROM LoyaltyTransaction ORDER BY createdAt DESC")
+    suspend fun getAllLoyaltyTransactionsNow(): List<LoyaltyTransaction>
+
+    // Loyalty Settings (key-value store)
+    @Query("SELECT value FROM LoyaltySetting WHERE key = :key AND scope = :scope LIMIT 1")
+    suspend fun getLoyaltySetting(key: String, scope: String = "GLOBAL"): String?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertLoyaltySetting(setting: LoyaltySetting)
+
+    @Query("SELECT * FROM LoyaltySetting ORDER BY key ASC")
+    suspend fun getAllLoyaltySettingsNow(): List<LoyaltySetting>
+
+    // AI Conversations
+    @Query("SELECT * FROM AIConversation ORDER BY updatedAt DESC")
+    fun getAllAIConversations(): Flow<List<AIConversation>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAIConversation(conversation: AIConversation): Long
+
+    @Update
+    suspend fun updateAIConversation(conversation: AIConversation)
+
+    @Query("SELECT * FROM AIConversation ORDER BY createdAt DESC")
+    suspend fun getAllAIConversationsNow(): List<AIConversation>
+
+    // AI Messages
+    @Query("SELECT * FROM AIMessage WHERE conversationId = :conversationId ORDER BY timestamp ASC")
+    suspend fun getAIMessages(conversationId: Int): List<AIMessage>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAIMessage(message: AIMessage)
+
+    @Query("SELECT * FROM AIMessage ORDER BY timestamp DESC")
+    suspend fun getAllAIMessagesNow(): List<AIMessage>
 }
 
 data class ExpenseCategoryTotal(

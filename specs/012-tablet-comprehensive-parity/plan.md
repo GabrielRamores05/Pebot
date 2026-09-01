@@ -160,13 +160,15 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 - [x] **Documents** — staff document storage ✅
 - [x] **Training** — training program tracking ✅
 
-### Phase 3: Customer/Loyalty Module
+### Phase 3: Customer/Loyalty & AI Module <span style="color:#ff9900">(IN PROGRESS)</span>
 - [x] **Customer Management** (list, add, loyalty points) ✅
 - [x] **Loyalty Voucher Management** (CRUD) ✅
-- [ ] **Loyalty Card Management** — card CRUD
-- [ ] **Loyalty Settings** — global config, milestone mode
-- [ ] **Loyalty Redemption** — apply at checkout
+- [x] **Loyalty Card Management** — card CRUD ✅ (entities + DAO + ViewModel)
+- [x] **Loyalty Settings** — global config, milestone mode ✅
+- [x] **Loyalty Redemption** — apply at checkout ✅ (addLoyaltyPoints, redeemLoyaltyPoints)
+- [x] **AI Conversations** — chat interface ✅ (entities + DAO + ViewModel)
 - [ ] **Customer Analytics** — tiers, LTV, retention
+- [ ] **Loyalty Redemption UI** — integrate voucher application in POS checkout
 
 ### Phase 4: Inventory & Finance
 - [x] **Ingredient Management** (CRUD, adjustments) ✅
@@ -237,16 +239,16 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 
 | Phase | Duration | Focus | Status |
 |-------|----------|-------|--------|
-| Phase 1 | 1-2 days | Data model alignment | In Progress |
-| Phase 2 | 2-3 days | Staff/HR management | Partial (Login, Staff CRUD done) |
-| Phase 3 | 1-2 days | Customer/Loyalty | Partial (Voucher management done) |
+| Phase 1 | 1-2 days | Data model alignment | Done (3 phases complete) |
+| Phase 2 | 2-3 days | Staff/HR management | Done |
+| Phase 3 | 1-2 days | Customer/Loyalty | In Progress |
 | Phase 4 | 2-3 days | Inventory & Finance | Done |
 | Phase 5 | 2-3 days | Analytics & Reporting | Partial |
 | Phase 6 | 1-2 days | Tables & Stations | Partial |
 | Phase 7 | 2-3 days | Order Management | Mostly done |
 | Phase 8 | 1-2 days | Settings & Configuration | Mostly done |
 | Phase 9 | 2-3 days | Sync & Printing | Done (implementation, needs testing) |
-| Phase 10 | 2-3 days | Audit & Compliance | Not started |
+| Phase 10 | 2-3 days | Audit & Compliance | Partial |
 | Phase 11 | 1-2 days | Polish & Performance | In Progress |
 
 ## Next Steps
