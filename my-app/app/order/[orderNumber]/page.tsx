@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, use } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSocket } from '@/hooks/useSocket';
 import { playPreparingSound, playCompletedSound, fetchVoiceSettings } from '@/lib/sounds';
@@ -61,120 +61,139 @@ const STATUS_CONFIG = {
   CANCELLED:  { label: 'Cancelled',  color: 'bg-red-100 text-red-800 border-red-300',          icon: '❌', step: -1 },
 };
 
-function BarcodeDisplay({ value }: { value: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+function InvoiceDisplay({ order, branding }: { order: Order; branding: BrandingState }) {
+  const invoiceRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadInvoice = async () => {
+    if (!invoiceRef.current) return;
+    try {
+      setDownloading(true);
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(invoiceRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+      });
+      const link = document.createElement('a');
+      link.download = `invoice-${order.orderNumber}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Failed to download invoice:', error);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     import('jsbarcode').then((JsBarcode) => {
-      const svg = containerRef.current?.querySelector('svg');
+      const svg = invoiceRef.current?.querySelector('svg');
       if (svg) {
-        JsBarcode.default(svg, value, {
+        JsBarcode.default(svg, order.barcodeValue, {
           format: 'CODE128',
           width: 2,
-          height: 60,
+          height: 50,
           displayValue: true,
           fontSize: 12,
           margin: 8,
         });
       }
-    }).catch((e) => console.error('Failed to render order barcode:', e));
-  }, [value]);
+    }).catch((e) => console.error('Failed to render barcode:', e));
+  }, [order.barcodeValue]);
 
-  const downloadBarcode = async () => {
-    if (!containerRef.current) return;
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(containerRef.current, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-      });
-      const link = document.createElement('a');
-      link.download = `order-${value}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    } catch (error) {
-      console.error('Failed to download barcode:', error);
-    }
-  };
-
-  const printBarcode = () => {
-    if (!containerRef.current) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const svgElement = containerRef.current.querySelector('svg');
-    if (!svgElement) return;
-
-    const svgData = svgElement.outerHTML;
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Order Barcode - ${value}</title>
-          <style>
-            body {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              min-height: 100vh;
-              margin: 0;
-              font-family: Arial, sans-serif;
-              background: white;
-            }
-            .barcode-container {
-              text-align: center;
-              padding: 20px;
-            }
-            .order-number {
-              font-size: 18px;
-              font-weight: bold;
-              margin-bottom: 20px;
-              color: #333;
-            }
-            svg {
-              max-width: 100%;
-              height: auto;
-            }
-            @media print {
-              body { margin: 0; }
-              .barcode-container { page-break-inside: avoid; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="barcode-container">
-            <div class="order-number">Order: ${ticketCode(value)}</div>
-            ${svgData}
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
-  };
+  const paymentLabel = order.paymentMethod === 'CASH' ? 'Cash' :
+    order.paymentMethod === 'GCASH' ? 'GCash' :
+    order.paymentMethod === 'PAYMAYA' ? 'PayMaya' : order.paymentMethod;
 
   return (
     <div className="flex flex-col items-center space-y-3">
-      <div ref={containerRef} className="flex justify-center">
-        <svg className="w-full max-w-xs" />
+      <div ref={invoiceRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 w-full max-w-sm">
+        <div className="text-center border-b-2 border-dashed border-gray-300 pb-3 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Invoice</p>
+          <h3 className="text-lg font-bold text-gray-900 mt-1">{branding.shopName}</h3>
+          <p className="text-xs font-mono mt-1 text-gray-700">#{ticketCode(order.orderNumber)}</p>
+        </div>
+
+        <div className="text-[11px] space-y-1 border-b border-gray-200 pb-2 mb-2">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Date:</span>
+            <span className="text-gray-800">{new Date(order.createdAt).toLocaleDateString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Time:</span>
+            <span className="text-gray-800">{new Date(order.createdAt).toLocaleTimeString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Customer:</span>
+            <span className="text-gray-800 font-medium">{order.customerName}</span>
+          </div>
+          {order.table && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Table:</span>
+              <span className="text-gray-800">{order.table.name}</span>
+            </div>
+          )}
+          {order.orderType && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Order:</span>
+              <span className="text-gray-800">
+                {order.orderType === 'DINE_IN' ? 'Dine-in' : order.orderType === 'TAKEOUT' ? 'Takeout' : 'Delivery'}
+              </span>
+            </div>
+          )}
+          {order.deliveryAddress && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Deliver to:</span>
+              <span className="text-gray-800 text-right max-w-[60%]">{order.deliveryAddress}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-gray-500">Payment:</span>
+            <span className="text-gray-800 font-medium">{paymentLabel}</span>
+          </div>
+        </div>
+
+        <div className="py-2 border-b border-gray-200 mb-2">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Items</p>
+          <div className="space-y-1.5">
+            {order.items.map((item) => (
+              <div key={item.id} className="text-[11px]">
+                <div className="flex justify-between items-start">
+                  <span className="text-gray-800 flex-1">{item.product.name}</span>
+                  <span className="text-gray-800 font-medium ml-2">₱{item.subtotal.toFixed(2)}</span>
+                </div>
+                <div className="text-gray-500 text-[10px]">
+                  {item.quantity} x ₱{item.unitPrice.toFixed(2)}
+                  {item.selections && (
+                    <span className="ml-1 text-amber-700">{selectionsLabelFromJson(item.selections)}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="py-2 space-y-1 text-[11px] border-b border-gray-200 mb-2">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Total:</span>
+            <span className="text-gray-800 font-bold">₱{order.totalAmount.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div className="flex justify-center pt-2">
+          <svg className="w-full max-w-[200px]" />
+        </div>
+
+        <p className="text-center text-[10px] text-gray-400 mt-2">Order #{ticketCode(order.orderNumber)}</p>
       </div>
-      <div className="flex gap-2">
-        <button
-          onClick={downloadBarcode}
-          className="bg-black hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-full transition-colors flex items-center gap-1"
-        >
-          📥 Download
-        </button>
-        <button
-          onClick={printBarcode}
-          className="bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-1"
-        >
-          🖨️ Print
-        </button>
-      </div>
+
+      <button
+        onClick={downloadInvoice}
+        disabled={downloading}
+        className="bg-black hover:bg-gray-800 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-full transition-colors flex items-center gap-1"
+      >
+        {downloading ? 'Saving...' : '📥 Download Invoice'}
+      </button>
     </div>
   );
 }
@@ -797,11 +816,13 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
           </div>
         </div>
 
-        {/* Barcode */}
+        {/* Invoice */}
         <div className="bg-white rounded-2xl shadow-sm p-5 flex flex-col items-center">
-          <h3 className="font-bold text-gray-800 mb-3">Order Barcode</h3>
-          <BarcodeDisplay value={order.barcodeValue} />
-          <p className="text-gray-400 text-xs mt-2 text-center">Show this to the staff when collecting your order</p>
+          <h3 className="font-bold text-gray-800 mb-3">Invoice</h3>
+          <InvoiceDisplay order={order} branding={branding} />
+          {order.status === 'PENDING' && (
+            <p className="text-gray-400 text-xs mt-2 text-center">Invoice will be available after payment</p>
+          )}
         </div>
 
         {/* Follow Up / Messages */}

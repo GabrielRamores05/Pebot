@@ -128,13 +128,13 @@ export async function updateLeaveType(id: number, data: Record<string, any>, _lo
   return prisma.leaveType.update({ where: { id }, data } as any);
 }
 
-// ----- LeaveRequest – location-scoped -----
+// ----- LeaveRequest – no locationId column -----
 
 export async function listLeaveRequests(
   filters: { userId?: number; status?: string },
-  locationId: number = 1,
+  _locationId: number = 1,
 ) {
-  const where: Record<string, unknown> = { locationId };
+  const where: Record<string, unknown> = {};
   if (filters.userId) (where as any).userId = filters.userId;
   if (filters.status) (where as any).status = filters.status;
   return prisma.leaveRequest.findMany({
@@ -146,10 +146,10 @@ export async function listLeaveRequests(
 
 export async function createLeaveRequest(
   data: { userId: number; leaveTypeId: number; startDate: Date; endDate: Date; reason?: string | null; status?: string },
-  locationId: number = 1,
+  _locationId: number = 1,
 ) {
   return prisma.leaveRequest.create({
-    data: { ...data, reason: data.reason || null, status: data.status || 'PENDING', locationId } as any,
+    data: { ...data, reason: data.reason || null, status: data.status || 'PENDING' } as any,
     include: { user: { select: { id: true, name: true } }, leaveType: true },
   } as any);
 }
@@ -165,13 +165,13 @@ export async function updateLeaveRequest(
   });
 }
 
-// ----- Payroll – location-scoped -----
+// ----- Payroll – no locationId column -----
 
 export async function listPayrolls(
   filters: { userId?: number; status?: string },
-  locationId: number = 1,
+  _locationId: number = 1,
 ) {
-  const where: Record<string, unknown> = { locationId };
+  const where: Record<string, unknown> = {};
   if (filters.userId) (where as any).userId = filters.userId;
   if (filters.status) (where as any).status = filters.status;
   return prisma.payroll.findMany({
@@ -187,10 +187,10 @@ export async function createPayroll(
     regularHours: number; overtimeHours: number; grossPay: number;
     deductions: number; netPay: number; breakdown: string; status: string; processedById: number;
   },
-  locationId: number = 1,
+  _locationId: number = 1,
 ) {
   return prisma.payroll.create({
-    data: { ...data, locationId } as any,
+    data: data as any,
     include: { user: { select: { id: true, name: true, position: true } } },
   } as any);
 }

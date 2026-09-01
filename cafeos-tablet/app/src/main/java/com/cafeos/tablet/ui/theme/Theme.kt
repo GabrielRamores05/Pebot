@@ -10,37 +10,59 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = PosAccent,
+    onPrimary = Color.White,
+    primaryContainer = PosAccentSoft,
+    onPrimaryContainer = PosAccentHover,
+    secondary = PosGold,
+    onSecondary = PosCoffee,
+    tertiary = PosCream,
+    background = PosCoffee,
+    onBackground = PosPaper,
+    surface = PosCoffeeLight,
+    onSurface = PosPaper,
+    surfaceVariant = PosCoffeeLight,
+    onSurfaceVariant = PosMuted,
+    error = PosDanger,
+    onError = Color.White,
+    errorContainer = PosDangerSoft,
+    onErrorContainer = PosDanger,
+    outline = PosBorder,
+    outlineVariant = PosMuted
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = CafePrimary,
-    secondary = CafeSecondary,
-    tertiary = CafeTertiary,
-    background = CafeBackground,
-    surface = CafeSurface,
-    onPrimary = CafeOnPrimary,
-
-    /* Other default colors to override
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = PosAccent,
+    onPrimary = Color.White,
+    primaryContainer = PosAccentSoft,
+    onPrimaryContainer = PosAccentHover,
+    secondary = PosGold,
+    onSecondary = PosCoffee,
+    tertiary = PosCream,
+    background = PosPaper,
+    onBackground = PosInk,
+    surface = PosSurface,
+    onSurface = PosInk,
+    surfaceVariant = PosMuted,
+    onSurfaceVariant = PosInkSoft,
+    error = PosDanger,
+    onError = Color.White,
+    errorContainer = PosDangerSoft,
+    onErrorContainer = PosDanger,
+    outline = PosBorder,
+    outlineVariant = PosMuted
 )
 
 @Composable
-fun CafeOSTabletTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
+fun PebotTheme(
+    darkTheme: Boolean = true,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -49,7 +71,6 @@ fun CafeOSTabletTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
@@ -58,7 +79,7 @@ fun CafeOSTabletTheme(
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 

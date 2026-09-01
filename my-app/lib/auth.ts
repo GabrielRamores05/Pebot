@@ -9,8 +9,11 @@ const JWT_SECRET = configuredSecret ?? (
   process.env.NODE_ENV === 'production'
     ? (() => { throw new Error('JWT_SECRET must be set in production'); })()
     : (() => {
+        const cached = (globalThis as any).__cafeos_jwt_secret;
+        if (cached) return cached;
         const generatedSecret = randomBytes(32).toString('hex');
-        console.warn('[AUTH] JWT_SECRET is not set; generated a development-only secret. Tokens will not survive a restart.');
+        console.warn('[AUTH] JWT_SECRET is not set; generated a development-only secret. Tokens will not survive a server restart.');
+        (globalThis as any).__cafeos_jwt_secret = generatedSecret;
         return generatedSecret;
       })()
 );

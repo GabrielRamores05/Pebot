@@ -278,6 +278,40 @@ export default function AdminToolsSection({ shopName = 'CaféOS', logoUrl }: { s
         />
       </div>
 
+      {/* Tablet Import */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="text-sm font-semibold text-slate-800 mb-0.5">Tablet Import</h3>
+        <p className="text-xs text-slate-400 mb-4">Import orders, payments, and stock data from a CaféOS tablet export file.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-3 text-slate-700 hover:bg-slate-50 transition-colors w-full bg-white border border-slate-200 p-3 rounded-xl cursor-pointer">
+            <IconUpload size={20} strokeWidth={1.75} className="shrink-0" />
+            <span className="font-medium text-sm">Import Tablet Data</span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const form = new FormData();
+                form.append('export', file);
+                try {
+                  const res = await fetch('/api/import/tablet', { method: 'POST', body: form });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    alert(data.error || 'Import failed');
+                  } else {
+                    alert(`Import complete:\n${JSON.stringify(data.imported, null, 2)}`);
+                  }
+                } catch (err) {
+                  alert('Import failed: ' + String(err));
+                }
+              }}
+            />
+          </label>
+        </div>
+      </div>
+
       {/* Customer QR modal */}
       {showQR && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowQR(false)}>

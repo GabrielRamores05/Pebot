@@ -28,13 +28,13 @@ export async function createExpenseCategory(
   });
 }
 
-// ----- Expense – location-scoped -----
+// ----- Expense – no locationId column -----
 
 export async function listExpenses(
   filters: { categoryId?: number; supplierId?: number },
-  locationId: number = 1,
+  _locationId: number = 1,
 ) {
-  const where: Record<string, unknown> = { locationId };
+  const where: Record<string, unknown> = {};
   if (filters.categoryId) (where as any).categoryId = filters.categoryId;
   if (filters.supplierId) (where as any).supplierId = filters.supplierId;
   return prisma.expense.findMany({
@@ -50,7 +50,7 @@ export async function listExpenses(
 
 export async function createExpense(
   data: { categoryId: number; supplierId?: number | null; userId: number; amount: number; description?: string | null; expenseDate?: Date },
-  locationId: number = 1,
+  _locationId: number = 1,
 ) {
   return prisma.expense.create({
     data: {
@@ -60,7 +60,6 @@ export async function createExpense(
       amount: data.amount,
       description: data.description || null,
       expenseDate: data.expenseDate || new Date(),
-      locationId,
     },
     include: { category: true, supplier: true },
   } as any);

@@ -273,7 +273,8 @@ export async function updateOrder(idOrNumber: string, input: unknown) {
   if (data.tableId !== undefined) updateData.tableId = data.tableId;
 
   const addItems = data.addItems;
-  const isPaymentConfirmation = data.paymentConfirmed === true;
+  const isPaymentConfirmation = data.paymentConfirmed === true ||
+    (data.status === 'PREPARING' && existingStatus === 'PENDING');
   const isCancel = data.status === 'CANCELLED' && existingStatus !== 'CANCELLED';
   const isStatusTransitionActive =
     (data.status === 'COMPLETED' || data.status === 'CANCELLED') && existingStatus !== data.status;

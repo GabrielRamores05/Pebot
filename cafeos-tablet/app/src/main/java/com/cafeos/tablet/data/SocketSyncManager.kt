@@ -116,7 +116,7 @@ class SocketSyncManager(private val context: Context) {
     }
 
     private fun getSavedLocationId(): String {
-        val prefs = context.getSharedPreferences("cafeos_prefs", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("pebot_prefs", Context.MODE_PRIVATE)
         return prefs.getString("server_url", "") ?: ""
     }
 

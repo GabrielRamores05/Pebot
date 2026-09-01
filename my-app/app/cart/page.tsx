@@ -543,7 +543,12 @@ export default function CartPage() {
         <div className="space-y-3 mb-4 max-h-60 overflow-y-auto border border-gray-100 rounded-xl p-3">
           {cartStore.items.map((item) => (
             <div key={item.productId} className="flex justify-between text-sm">
-              <span>{item.name} x{item.quantity}</span>
+              <div className="flex-1">
+                <span>{item.name} x{item.quantity}</span>
+                {(item.selections?.length ?? 0) > 0 && (
+                  <span className="text-xs text-amber-700 ml-1">({item.selections!.map((s) => s.name).join(' · ')})</span>
+                )}
+              </div>
               <span>₱{(item.price * item.quantity).toFixed(2)}</span>
             </div>
           ))}

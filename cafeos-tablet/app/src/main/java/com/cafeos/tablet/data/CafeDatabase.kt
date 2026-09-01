@@ -44,7 +44,7 @@ abstract class CafeDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     CafeDatabase::class.java,
-                    "cafeos_database"
+                    "pebot_database"
                 )
                 .fallbackToDestructiveMigration()
                 .build()

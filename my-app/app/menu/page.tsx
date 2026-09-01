@@ -2150,7 +2150,10 @@ function MenuPageInner() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-stone-900">{item.name}</p>
-                          <p className="mt-1 text-[12px] text-stone-500">₱{item.price.toFixed(2)} each</p>
+                          {(item.selections?.length ?? 0) > 0 && (
+                            <p className="text-[11px] text-amber-700 mt-0.5">{item.selections!.map((s) => s.name).join(' · ')}</p>
+                          )}
+                          <p className="mt-0.5 text-[12px] text-stone-500">₱{item.price.toFixed(2)} each</p>
                         </div>
                         <button onClick={() => cartStore.removeItem(lineKey(item.productId, item.selections))} className="text-sm text-stone-400 transition hover:text-red-500">Remove</button>
                       </div>

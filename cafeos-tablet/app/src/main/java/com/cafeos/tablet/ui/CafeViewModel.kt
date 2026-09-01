@@ -746,7 +746,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun exportAllData(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.getDefault())
         val timestamp = sdf.format(Date())
-        val fileName = "CafeOS_Export_$timestamp.json"
+        val fileName = "Pebot_Export_$timestamp.json"
 
         val categories = dao.getAllCategories().firstOrNull() ?: emptyList()
         val products = dao.getAllProducts().firstOrNull() ?: emptyList()
