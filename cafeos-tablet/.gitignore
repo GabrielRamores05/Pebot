@@ -1,0 +1,39 @@
+# Build outputs
+/build/
+/.gradle/
+**/build/
+**/.gradle/
+
+# Generated files
+/gradle.properties (local only, not generated)
+
+# Android SDK
+/local.properties
+
+# IDE
+/.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+
+# Debug files
+*.hprof
+*.tmp
+*.log
+*.apk
+
+# Keystore
+*.keystore
+*.jks
+
+# Generated sources from KSP/KAPT
+/build/
+/**/build/
+**/CafeDao_Impl.java
+**/*_Factory.java
+**/*_MembersInjector.java
+**/kspCaches/
+
+# Local configuration
+/local.properties

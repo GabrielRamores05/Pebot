@@ -6,7 +6,20 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -17,13 +30,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.cafeos.tablet.ui.CafeViewModel
 import com.cafeos.tablet.ui.screens.*
-import com.cafeos.tablet.ui.theme.CafeOSTheme
+import com.cafeos.tablet.ui.theme.PebotTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            CafeOSTheme {
+            PebotTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -40,13 +53,27 @@ fun MainScreen() {
     val navController = rememberNavController()
     val viewModel: CafeViewModel = viewModel()
     var selectedItem by remember { mutableStateOf(0) }
+    var currentStaff by remember { mutableStateOf<com.cafeos.tablet.data.Staff?>(null) }
+
+    if (currentStaff == null) {
+        LoginScreen(viewModel = viewModel, onLoginSuccess = { currentStaff = it })
+        return
+    }
     
     val items = listOf(
         NavigationItem("POS", Icons.Default.ShoppingCart, "pos"),
+        NavigationItem("Live Orders", Icons.Default.List, "live_orders"),
+        NavigationItem("Kitchen", Icons.Default.Restaurant, "kitchen"),
         NavigationItem("Inventory", Icons.Default.Inventory, "inventory"),
         NavigationItem("Products", Icons.Default.Coffee, "products"),
         NavigationItem("Orders", Icons.Default.History, "orders"),
-        NavigationItem("Analytics", Icons.Default.BarChart, "analytics")
+        NavigationItem("Analytics", Icons.Default.BarChart, "analytics"),
+        NavigationItem("Expenses", Icons.Default.AttachMoney, "expenses"),
+        NavigationItem("Options", Icons.Default.FormatListBulleted, "option_groups"),
+        NavigationItem("Customers", Icons.Default.Face, "customers"),
+        NavigationItem("Staff", Icons.Default.Group, "staff"),
+        NavigationItem("Vouchers", Icons.Default.ConfirmationNumber, "vouchers"),
+        NavigationItem("Settings", Icons.Default.Settings, "settings")
     )
 
     Scaffold(
@@ -79,10 +106,18 @@ fun MainScreen() {
                     modifier = Modifier.weight(1f)
                 ) {
                     composable("pos") { POSScreen(viewModel) }
+                    composable("live_orders") { LiveOrdersScreen(viewModel) }
+                    composable("kitchen") { KitchenScreen(viewModel) }
                     composable("inventory") { InventoryScreen(viewModel) }
                     composable("products") { ProductScreen(viewModel) }
                     composable("orders") { OrderHistoryScreen(viewModel) }
                     composable("analytics") { AnalyticsScreen(viewModel) }
+                    composable("expenses") { ExpensesScreen(viewModel) }
+                    composable("option_groups") { OptionGroupScreen(viewModel) }
+                    composable("customers") { CustomerManagementScreen(viewModel) }
+                    composable("staff") { StaffManagementScreen(viewModel) }
+                    composable("vouchers") { VoucherManagementScreen(viewModel) }
+                    composable("settings") { SettingsScreen(viewModel) }
                 }
             }
         }

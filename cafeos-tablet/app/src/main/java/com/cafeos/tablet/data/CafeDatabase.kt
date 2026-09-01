@@ -12,9 +12,24 @@ import androidx.room.RoomDatabase
         Order::class,
         OrderItem::class,
         Ingredient::class,
-        IngredientTransaction::class
+        IngredientTransaction::class,
+        OrderOption::class,
+        Payment::class,
+        SyncMeta::class,
+        Customer::class,
+        Supplier::class,
+        CafeTable::class,
+        Station::class,
+        ProductIngredient::class,
+        OptionGroup::class,
+        ProductOptionGroup::class,
+        Option::class,
+        Expense::class,
+        BusinessSettings::class,
+        Staff::class,
+        LoyaltyVoucher::class
     ],
-    version = 1,
+    version = 7,
     exportSchema = false
 )
 abstract class CafeDatabase : RoomDatabase() {
@@ -30,7 +45,9 @@ abstract class CafeDatabase : RoomDatabase() {
                     context.applicationContext,
                     CafeDatabase::class.java,
                     "cafeos_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
