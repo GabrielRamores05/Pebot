@@ -651,6 +651,87 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun deleteVoucher(voucher: LoyaltyVoucher) = dao.deleteVoucher(voucher)
 
+    // Order Messages
+    val allReviews = dao.getAllReviews()
+    val allExpenseCategories = dao.getAllExpenseCategories()
+    val recentAuditEvents = dao.getRecentAuditEvents()
+
+    suspend fun getOrderMessages(orderId: Int): List<OrderMessage> = dao.getOrderMessages(orderId)
+
+    fun addOrderMessage(orderId: Int, text: String, senderType: String = "STAFF", senderName: String? = null) {
+        viewModelScope.launch {
+            dao.insertOrderMessage(
+                OrderMessage(
+                    orderId = orderId,
+                    text = text,
+                    senderType = senderType,
+                    senderName = senderName
+                )
+            )
+        }
+    }
+
+    suspend fun markMessagesRead(orderId: Int) {
+        dao.markMessagesRead(orderId)
+    }
+
+    fun addReview(productId: Int, rating: Int, comment: String? = null, customerId: Int? = null) {
+        viewModelScope.launch {
+            dao.insertReview(
+                Review(
+                    productId = productId,
+                    customerId = customerId,
+                    rating = rating,
+                    comment = comment
+                )
+            )
+        }
+    }
+
+    suspend fun deleteReview(review: Review) {
+        dao.deleteReview(review)
+    }
+
+    suspend fun getReviewsByProduct(productId: Int): List<Review> = dao.getReviewsByProduct(productId)
+
+    fun addExpenseCategory(name: String, color: String? = null, icon: String? = null) {
+        viewModelScope.launch {
+            dao.insertExpenseCategory(
+                ExpenseCategory(
+                    name = name,
+                    color = color,
+                    icon = icon
+                )
+            )
+        }
+    }
+
+    suspend fun updateExpenseCategory(category: ExpenseCategory) {
+        dao.updateExpenseCategory(category)
+    }
+
+    suspend fun deleteExpenseCategory(category: ExpenseCategory) {
+        dao.deleteExpenseCategory(category)
+    }
+
+    suspend fun logAuditEvent(eventType: String, entityType: String, entityId: Int, staffId: Int? = null, details: String? = null) {
+        dao.insertAuditEvent(
+            AuditEvent(
+                eventType = eventType,
+                entityType = entityType,
+                entityId = entityId,
+                staffId = staffId,
+                details = details
+            )
+        )
+    }
+
+    // Export/Import extensions for new entities
+    suspend fun exportReviews(): List<Review> = dao.getAllReviewsNow()
+    suspend fun exportOrderMessages(orderId: Int): List<OrderMessage> = dao.getOrderMessages(orderId)
+    suspend fun exportExpenseCategories(): List<ExpenseCategory> = dao.getAllExpenseCategoriesNow()
+    suspend fun exportAuditEvents(): List<AuditEvent> = dao.getAllAuditEventsNow()
+
     suspend fun importAllData(context: Context, uri: Uri): ImportResult {
         var importedCount = 0
         var skippedCount = 0
@@ -733,6 +814,30 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         dao.upsertBusinessSettings(settings)
                         importedCount++
                     }
+                    for (category in data.expenseCategories) {
+                        dao.insertExpenseCategory(category)
+                        importedCount++
+                    }
+                    for (staff in data.staff) {
+                        dao.insertStaff(staff)
+                        importedCount++
+                    }
+                    for (voucher in data.loyaltyVouchers) {
+                        dao.insertVoucher(voucher)
+                        importedCount++
+                    }
+                    for (review in data.reviews) {
+                        dao.insertReview(review)
+                        importedCount++
+                    }
+                    for (message in data.orderMessages) {
+                        dao.insertOrderMessage(message)
+                        importedCount++
+                    }
+                    for (event in data.auditEvents) {
+                        dao.insertAuditEvent(event)
+                        importedCount++
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -800,11 +905,21 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             suppliers = suppliers,
             tables = tables,
             stations = stations,
-             optionGroups = optionGroups,
+            optionGroups = optionGroups,
             productOptionGroups = productOptionGroups,
             options = allOptions,
             expenses = dao.getAllExpenses().firstOrNull() ?: emptyList(),
-            businessSettings = dao.getBusinessSettingsSync()
+            expenseCategories = dao.getAllExpenseCategoriesNow(),
+            businessSettings = dao.getBusinessSettingsSync(),
+            staff = dao.getAllStaffNow(),
+            loyaltyVouchers = dao.getActiveVouchersNow(),
+            reviews = dao.getAllReviewsNow(),
+            orderMessages = mutableListOf<OrderMessage>().apply {
+                for (order in orders) {
+                    addAll(dao.getOrderMessages(order.id))
+                }
+            },
+            auditEvents = dao.getAllAuditEventsNow()
         )
 
         val json = Json { prettyPrint = true; encodeDefaults = true }
@@ -839,7 +954,13 @@ data class ExportData(
     val productOptionGroups: List<ExportedProductOptionGroup>,
     val options: List<ExportedOption>,
     val expenses: List<Expense>,
-    val businessSettings: BusinessSettings?
+    val expenseCategories: List<ExpenseCategory> = emptyList(),
+    val businessSettings: BusinessSettings? = null,
+    val staff: List<Staff> = emptyList(),
+    val loyaltyVouchers: List<LoyaltyVoucher> = emptyList(),
+    val reviews: List<Review> = emptyList(),
+    val orderMessages: List<OrderMessage> = emptyList(),
+    val auditEvents: List<AuditEvent> = emptyList()
 )
 
 @Serializable

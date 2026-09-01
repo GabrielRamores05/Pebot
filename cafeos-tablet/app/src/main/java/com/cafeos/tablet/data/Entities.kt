@@ -309,8 +309,56 @@ data class LoyaltyVoucher(
     val maxDiscount: Double = 0.0,
     val usageLimit: Int = 0,
     val usedCount: Int = 0,
-    val startDate: Long = System.currentTimeMillis(),
-    val endDate: Long = System.currentTimeMillis(),
-    val active: Boolean = true,
+     val startDate: Long = System.currentTimeMillis(),
+     val endDate: Long = System.currentTimeMillis(),
+     val active: Boolean = true,
+     val createdAt: Long = System.currentTimeMillis()
+ )
+
+@Serializable
+@Entity(tableName = "OrderMessage")
+data class OrderMessage(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val orderId: Int,
+    val text: String,
+    val senderType: String = "STAFF",
+    val senderName: String? = null,
+    val isRead: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(tableName = "Review")
+data class Review(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val productId: Int,
+    val customerId: Int? = null,
+    val rating: Int,
+    val comment: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(tableName = "ExpenseCategory")
+data class ExpenseCategory(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,
+    val color: String? = null,
+    val icon: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "AuditEvent",
+    indices = [Index(value = ["entityType", "entityId"])]
+)
+data class AuditEvent(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val eventType: String,
+    val entityType: String,
+    val entityId: Int,
+    val staffId: Int? = null,
+    val details: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

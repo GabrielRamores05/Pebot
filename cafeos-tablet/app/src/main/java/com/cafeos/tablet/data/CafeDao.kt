@@ -336,8 +336,14 @@ interface CafeDao {
     suspend fun getAllStaffCount(): Int
 
     // Loyalty Vouchers
+    @Query("SELECT * FROM Staff ORDER BY name ASC")
+    suspend fun getAllStaffNow(): List<Staff>
+
     @Query("SELECT * FROM LoyaltyVoucher WHERE active = 1 AND endDate >= :now ORDER BY createdAt DESC")
     fun getActiveVouchers(now: Long = System.currentTimeMillis()): Flow<List<LoyaltyVoucher>>
+
+    @Query("SELECT * FROM LoyaltyVoucher WHERE active = 1 AND endDate >= :now ORDER BY createdAt DESC")
+    suspend fun getActiveVouchersNow(now: Long = System.currentTimeMillis()): List<LoyaltyVoucher>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVoucher(voucher: LoyaltyVoucher)
@@ -347,6 +353,61 @@ interface CafeDao {
 
     @Delete
     suspend fun deleteVoucher(voucher: LoyaltyVoucher)
+
+    // Order Messages
+    @Query("SELECT * FROM OrderMessage WHERE orderId = :orderId ORDER BY createdAt ASC")
+    suspend fun getOrderMessages(orderId: Int): List<OrderMessage>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrderMessage(message: OrderMessage): Long
+
+    @Query("UPDATE OrderMessage SET isRead = 1 WHERE orderId = :orderId AND isRead = 0")
+    suspend fun markMessagesRead(orderId: Int)
+
+    // Reviews
+    @Query("SELECT * FROM Review ORDER BY createdAt DESC")
+    fun getAllReviews(): Flow<List<Review>>
+
+    @Query("SELECT * FROM Review WHERE productId = :productId ORDER BY createdAt DESC")
+    suspend fun getReviewsByProduct(productId: Int): List<Review>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReview(review: Review)
+
+    @Delete
+    suspend fun deleteReview(review: Review)
+
+    // Expense Categories
+    @Query("SELECT * FROM ExpenseCategory ORDER BY name ASC")
+    fun getAllExpenseCategories(): Flow<List<ExpenseCategory>>
+
+    @Query("SELECT * FROM ExpenseCategory ORDER BY name ASC")
+    suspend fun getAllExpenseCategoriesNow(): List<ExpenseCategory>
+
+    @Query("SELECT * FROM Review ORDER BY createdAt DESC")
+    suspend fun getAllReviewsNow(): List<Review>
+
+    @Query("SELECT * FROM AuditEvent ORDER BY createdAt DESC")
+    suspend fun getAllAuditEventsNow(): List<AuditEvent>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertExpenseCategory(category: ExpenseCategory)
+
+    @Update
+    suspend fun updateExpenseCategory(category: ExpenseCategory)
+
+    @Delete
+    suspend fun deleteExpenseCategory(category: ExpenseCategory)
+
+    // Audit Events (append-only: INSERT only, no UPDATE/DELETE)
+    @Query("SELECT * FROM AuditEvent ORDER BY createdAt DESC LIMIT 100")
+    fun getRecentAuditEvents(): Flow<List<AuditEvent>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAuditEvent(event: AuditEvent)
+
+    @Query("SELECT COUNT(*) FROM AuditEvent")
+    suspend fun getAuditEventCount(): Int
 }
 
 data class ExpenseCategoryTotal(

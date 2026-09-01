@@ -25,11 +25,15 @@ import androidx.room.RoomDatabase
         ProductOptionGroup::class,
         Option::class,
         Expense::class,
+        ExpenseCategory::class,
         BusinessSettings::class,
         Staff::class,
-        LoyaltyVoucher::class
+        LoyaltyVoucher::class,
+        OrderMessage::class,
+        Review::class,
+        AuditEvent::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class CafeDatabase : RoomDatabase() {

@@ -28,14 +28,14 @@
 
 ### Phase 1 Priority (High Business Impact)
 
-| Entity | Fields | Relations |
-|--------|--------|-----------|
-| **Review** | id, productId, customerId, rating (1-5), comment, createdAt | Product(1):Review(N), Customer(0):Review(N) |
-| **OrderMessage** | id, orderId, text, senderType, isRead, createdAt | Order(1):OrderMessage(N) |
-| **ProductOption** | id, productId, optionId, priceDelta | Product(N):ProductOption(N), Option(N):ProductOption(N) |
-| **TableSession** | id, tableId, orderId, startedAt, endedAt, status | CafeTable(1):TableSession(N), Order(0):TableSession |
-| **ExpenseCategory** | id, name, color, icon, createdAt | ExpenseCategory(1):Expense(N) |
-| **AuditEvent** | id, eventType, entityType, entityId, userId, details, createdAt | User(N):AuditEvent(N) — append-only |
+| Entity | Fields | Relations | Status |
+|--------|--------|-----------|--------|
+| **Review** | id, productId, customerId, rating (1-5), comment, createdAt | Product(1):Review(N), Customer(0):Review(N) | ✅ Created |
+| **OrderMessage** | id, orderId, text, senderType, isRead, createdAt | Order(1):OrderMessage(N) | ✅ Created |
+| **ExpenseCategory** | id, name, color, icon, createdAt | ExpenseCategory(1):Expense(N) | ✅ Created |
+| **AuditEvent** | id, eventType, entityType, entityId, userId, details, createdAt | User(N):AuditEvent(N) — append-only | ✅ Created |
+| **ProductOption** | id, productId, optionId, priceDelta | Product(N):ProductOption(N), Option(N):ProductOption(N) | ❌ Pending |
+| **TableSession** | id, tableId, orderId, startedAt, endedAt, status | CafeTable(1):TableSession(N), Order(0):TableSession | ❌ Pending |
 
 ### Phase 2 Priority (HR Module)
 
