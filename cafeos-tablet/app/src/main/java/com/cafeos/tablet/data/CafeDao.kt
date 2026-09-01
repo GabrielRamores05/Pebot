@@ -408,6 +408,146 @@ interface CafeDao {
 
     @Query("SELECT COUNT(*) FROM AuditEvent")
     suspend fun getAuditEventCount(): Int
+
+    // Attendance
+    @Query("SELECT * FROM Attendance WHERE date >= :start AND date <= :end ORDER BY date DESC")
+    suspend fun getAttendanceRange(start: Long, end: Long): List<Attendance>
+
+    @Query("SELECT * FROM Attendance WHERE staffId = :staffId AND date >= :start AND date <= :end ORDER BY date DESC")
+    suspend fun getStaffAttendanceRange(staffId: Int, start: Long, end: Long): List<Attendance>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAttendance(attendance: Attendance)
+
+    @Update
+    suspend fun updateAttendance(attendance: Attendance)
+
+    @Query("UPDATE Attendance SET clockOut = :clockOut, breakStart = :breakStart, breakEnd = :breakEnd WHERE id = :id")
+    suspend fun updateAttendanceClockOut(id: Int, clockOut: Long, breakStart: Long?, breakEnd: Long?)
+
+    // Leave Types
+    @Query("SELECT * FROM LeaveType ORDER BY name ASC")
+    fun getAllLeaveTypes(): Flow<List<LeaveType>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLeaveType(leaveType: LeaveType)
+
+    @Update
+    suspend fun updateLeaveType(leaveType: LeaveType)
+
+    @Delete
+    suspend fun deleteLeaveType(leaveType: LeaveType)
+
+    // Leave Requests
+    @Query("SELECT * FROM LeaveRequest WHERE status = 'PENDING' ORDER BY createdAt DESC")
+    fun getPendingLeaveRequests(): Flow<List<LeaveRequest>>
+
+    @Query("SELECT * FROM LeaveRequest WHERE staffId = :staffId ORDER BY createdAt DESC")
+    suspend fun getStaffLeaveRequests(staffId: Int): List<LeaveRequest>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLeaveRequest(request: LeaveRequest)
+
+    @Update
+    suspend fun updateLeaveRequest(request: LeaveRequest)
+
+    @Query("SELECT * FROM LeaveRequest ORDER BY createdAt DESC LIMIT 100")
+    suspend fun getAllLeaveRequestsNow(): List<LeaveRequest>
+
+    // Schedules
+    @Query("SELECT * FROM Schedule WHERE staffId = :staffId ORDER BY dayOfWeek ASC")
+    suspend fun getStaffSchedules(staffId: Int): List<Schedule>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSchedule(schedule: Schedule)
+
+    @Update
+    suspend fun updateSchedule(schedule: Schedule)
+
+    @Delete
+    suspend fun deleteSchedule(schedule: Schedule)
+
+    @Query("SELECT * FROM Schedule ORDER BY staffId, dayOfWeek ASC")
+    suspend fun getAllSchedulesNow(): List<Schedule>
+
+    // Payroll
+    @Query("SELECT * FROM Payroll WHERE status = 'PENDING' ORDER BY createdAt DESC")
+    fun getPendingPayrolls(): Flow<List<Payroll>>
+
+    @Query("SELECT * FROM Payroll WHERE staffId = :staffId ORDER BY createdAt DESC")
+    suspend fun getStaffPayrolls(staffId: Int): List<Payroll>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPayroll(payroll: Payroll)
+
+    @Update
+    suspend fun updatePayroll(payroll: Payroll)
+
+    @Query("SELECT * FROM Payroll ORDER BY createdAt DESC")
+    suspend fun getAllPayrollsNow(): List<Payroll>
+
+    // Staff Documents
+    @Query("SELECT * FROM StaffDocument WHERE staffId = :staffId ORDER BY uploadedAt DESC")
+    suspend fun getStaffDocuments(staffId: Int): List<StaffDocument>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStaffDocument(document: StaffDocument)
+
+    @Delete
+    suspend fun deleteStaffDocument(document: StaffDocument)
+
+    @Query("SELECT * FROM StaffDocument ORDER BY uploadedAt DESC")
+    suspend fun getAllStaffDocumentsNow(): List<StaffDocument>
+
+    // Staff Training
+    @Query("SELECT * FROM StaffTraining WHERE staffId = :staffId ORDER BY createdAt DESC")
+    suspend fun getStaffTrainings(staffId: Int): List<StaffTraining>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStaffTraining(training: StaffTraining)
+
+    @Update
+    suspend fun updateStaffTraining(training: StaffTraining)
+
+    @Delete
+    suspend fun deleteStaffTraining(training: StaffTraining)
+
+    @Query("SELECT * FROM StaffTraining ORDER BY createdAt DESC")
+    suspend fun getAllStaffTrainingsNow(): List<StaffTraining>
+
+    // Performance Reviews
+    @Query("SELECT * FROM PerformanceReview WHERE staffId = :staffId ORDER BY date DESC")
+    suspend fun getStaffReviews(staffId: Int): List<PerformanceReview>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPerformanceReview(review: PerformanceReview)
+
+    @Update
+    suspend fun updatePerformanceReview(review: PerformanceReview)
+
+    @Query("SELECT * FROM PerformanceReview ORDER BY date DESC LIMIT 100")
+    suspend fun getAllPerformanceReviewsNow(): List<PerformanceReview>
+
+    @Query("SELECT * FROM Attendance ORDER BY date DESC")
+    suspend fun getAllAttendanceNow(): List<Attendance>
+
+    @Query("SELECT * FROM LeaveType ORDER BY name ASC")
+    suspend fun getAllLeaveTypesNow(): List<LeaveType>
+
+    @Query("SELECT * FROM LeaveRequest ORDER BY createdAt DESC")
+    suspend fun getAllLeaveRequestsNow(): List<LeaveRequest>
+
+    @Query("SELECT * FROM Schedule ORDER BY staffId, dayOfWeek ASC")
+    suspend fun getAllSchedulesNow(): List<Schedule>
+
+    @Query("SELECT * FROM Payroll ORDER BY createdAt DESC")
+    suspend fun getAllPayrollsNow(): List<Payroll>
+
+    @Query("SELECT * FROM StaffDocument ORDER BY uploadedAt DESC")
+    suspend fun getAllStaffDocumentsNow(): List<StaffDocument>
+
+    @Query("SELECT * FROM StaffTraining ORDER BY createdAt DESC")
+    suspend fun getAllStaffTrainingsNow(): List<StaffTraining>
 }
 
 data class ExpenseCategoryTotal(

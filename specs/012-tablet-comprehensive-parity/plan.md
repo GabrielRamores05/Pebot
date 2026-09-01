@@ -130,29 +130,34 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 - [x] **Staff** entity with roles ✅ already in DAO
 - [x] **BusinessSettings** entity ✅ already in DAO
 - [x] **Expense** entity ✅ already in DAO
-- [ ] **Review** entity — customer product reviews
-- [ ] **OrderMessage** entity — order notes/messages
-- [ ] **TableSession** entity — tracks table occupancy sessions
+- [x] **Review** entity — customer product reviews ✅ (Entities.kt:305)
+- [x] **OrderMessage** entity — order notes/messages ✅ (Entities.kt:317)
+- [x] **ExpenseCategory** entity — categorization ✅ (Entities.kt:330)
+- [x] **AuditEvent** entity — append-only audit trail ✅ (Entities.kt:339)
 - [ ] **ProductOption** entity — product-specific option price deltas
+- [ ] **TableSession** entity — tracks table occupancy sessions
 - [ ] **LoyaltyCard** entity — customer loyalty cards
 - [ ] **LoyaltyTransaction** entity — loyalty point transactions
 - [ ] **LoyaltySetting** entity — global loyalty configuration
-- [ ] **ExpenseCategory** entity — expense categorization
-- [ ] **AuditEvent** entity — append-only audit trail
 - [ ] **Attendance/LeaveRequest/Schedule/Payroll** — HR modules
 - [ ] **StaffDocument/StaffTraining/PerformanceReview** — staff development
 - [ ] **AIConversation/AIMessage** — AI consultant chat history
+- [x] **Dao methods** — CRUD for Review, OrderMessage, ExpenseCategory, AuditEvent ✅
+- [x] **ViewModel methods** — addOrderMessage, addReview, addExpenseCategory, logAuditEvent ✅
+- [x] **ExportData extended** — new entity lists for round-trip import/export ✅
+- [x] **DB v8** — new entities registered in CafeDatabase ✅
 
-### Phase 2: Staff/HR Module
+### Phase 2: Staff/HR Module <span style="color:green">(COMPLETED)</span>
 - [x] **Login** (PIN auth with default fallback) ✅
 - [x] **Staff Management** (CRUD, roles) ✅
-- [ ] **Attendance** — clock in/out, break tracking
-- [ ] **Leave Requests** — request/approve with types
-- [ ] **Schedule** — shift scheduling
-- [ ] **Payroll** — Philippine statutory calculations (SSS/PhilHealth/Pag-IBIG)
-- [ ] **Performance Reviews** — review CRUD
-- [ ] **Documents** — staff document storage
-- [ ] **Training** — training program tracking
+- [x] **Attendance** — clock in/out, break tracking ✅ (Entities.kt, DAO, ViewModel)
+- [x] **Leave Requests** — request/approve with types ✅ (LeaveType entity added)
+- [x] **Schedule** — shift scheduling ✅
+- [x] **Payroll** — Philippine statutory calculations (SSS/PhilHealth/Pag-IBIG) ✅
+- [x] **LeaveType** — leave type definitions ✅
+- [x] **Performance Reviews** — review CRUD ✅
+- [x] **Documents** — staff document storage ✅
+- [x] **Training** — training program tracking ✅
 
 ### Phase 3: Customer/Loyalty Module
 - [x] **Customer Management** (list, add, loyalty points) ✅
@@ -245,10 +250,10 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 
 ## Next Steps
 
-1. Create the remaining entity definitions (Review, OrderMessage, etc.) in Entities.kt
-2. Add corresponding DAO methods
-3. Create new screens: TablesManagement, AuditLogScreen, AIConsultantScreen, ReviewsScreen
-4. Add HR modules (Attendance, Leave, Schedule, Payroll)
-5. Write unit tests for all new ViewModel logic
+1. ✅ Phase 1 entities complete (Review, OrderMessage, ExpenseCategory, AuditEvent)
+2. Phase 2: Create HR module entities (Attendance, LeaveRequest, Schedule, Payroll, StaffDocument, StaffTraining, PerformanceReview, LeaveType)
+3. Phase 3: Loyalty & AI entities (LoyaltyCard, LoyaltyTransaction, LoyaltySetting, AIConversation, AIMessage)
+4. Create new screens for all modules
+5. Write unit tests for all new ViewModel/DAO logic
 6. Configure sync URL in tablet Settings screen
 7. Test on Android device with actual printer

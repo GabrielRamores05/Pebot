@@ -39,16 +39,16 @@
 
 ### Phase 2 Priority (HR Module)
 
-| Entity | Fields | Relations |
-|--------|--------|-----------|
-| **Attendance** | id, staffId, clockIn, clockOut, breakStart, breakEnd, date | Staff(1):Attendance(N) |
-| **LeaveRequest** | id, staffId, type, startDate, endDate, status, reason | Staff(1):LeaveRequest(N) |
-| **LeaveType** | id, name, requiresFile | LeaveType(1):LeaveRequest(N) |
-| **Schedule** | id, staffId, dayOfWeek, shiftStart, shiftEnd, role | Staff(1):Schedule(N) |
-| **Payroll** | id, staffId, periodStart, periodEnd, baseSalary, deductions, netPay, status | Staff(1):Payroll(N) |
-| **StaffDocument** | id, staffId, title, fileUri, fileType, uploadedAt | Staff(1):StaffDocument(N) |
-| **StaffTraining** | id, staffId, program, completed, certifiedAt | Staff(1):StaffTraining(N) |
-| **PerformanceReview** | id, staffId, reviewerId, score, comments, date | Staff(1):PerformanceReview(N), Staff(0):PerformanceReview(N) as reviewer |
+| Entity | Fields | Relations | Status |
+|--------|--------|-----------|--------|
+| **Attendance** | id, staffId, clockIn, clockOut, breakStart, breakEnd, date | Staff(1):Attendance(N) | ✅ Created |
+| **LeaveRequest** | id, staffId, typeId/type, startDate, endDate, status, reason | Staff(1):LeaveRequest(N) | ✅ Created |
+| **LeaveType** | id, name, requiresFile | LeaveType(1):LeaveRequest(N) | ✅ Created |
+| **Schedule** | id, staffId, dayOfWeek, shiftStart, shiftEnd, role | Staff(1):Schedule(N) | ✅ Created |
+| **Payroll** | id, staffId, periodStart, periodEnd, baseSalary, overtimePay, deductions, sss, philhealth, pagibig, tax, netPay, status | Staff(1):Payroll(N) | ✅ Created |
+| **StaffDocument** | id, staffId, title, fileUri, fileType, uploadedAt | Staff(1):StaffDocument(N) | ✅ Created |
+| **StaffTraining** | id, staffId, program, completed, certifiedAt | Staff(1):StaffTraining(N) | ✅ Created |
+| **PerformanceReview** | id, staffId, reviewerId, score, comments, date | Staff(1):PerformanceReview(N), Staff(0):as reviewer | ✅ Created |
 
 ### Phase 3 Priority (Loyalty & AI)
 

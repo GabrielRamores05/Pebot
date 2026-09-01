@@ -656,6 +656,154 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     val allExpenseCategories = dao.getAllExpenseCategories()
     val recentAuditEvents = dao.getRecentAuditEvents()
 
+    // HR: Attendance
+    val pendingLeaveRequests = dao.getPendingLeaveRequests()
+
+    fun clockIn(staffId: Int) {
+        viewModelScope.launch {
+            dao.insertAttendance(Attendance(staffId = staffId, clockIn = System.currentTimeMillis()))
+        }
+    }
+
+    fun clockOut(attendanceId: Int, breakStart: Long? = null, breakEnd: Long? = null) {
+        viewModelScope.launch {
+            dao.updateAttendanceClockOut(attendanceId, System.currentTimeMillis(), breakStart, breakEnd)
+        }
+    }
+
+    suspend fun getStaffAttendance(staffId: Int, start: Long, end: Long): List<Attendance> =
+        dao.getStaffAttendanceRange(staffId, start, end)
+
+    // HR: Leave Types
+    fun getAllLeaveTypes(): Flow<List<LeaveType>> = dao.getAllLeaveTypes()
+
+    fun addLeaveType(name: String, requiresFile: Boolean = false) {
+        viewModelScope.launch {
+            dao.insertLeaveType(LeaveType(name = name, requiresFile = requiresFile))
+        }
+    }
+
+    suspend fun updateLeaveType(leaveType: LeaveType) {
+        dao.updateLeaveType(leaveType)
+    }
+
+    suspend fun deleteLeaveType(leaveType: LeaveType) {
+        dao.deleteLeaveType(leaveType)
+    }
+
+    // HR: Leave Requests
+    fun requestLeave(staffId: Int, type: String, startDate: Long, endDate: Long, reason: String? = null) {
+        viewModelScope.launch {
+            dao.insertLeaveRequest(
+                LeaveRequest(staffId = staffId, type = type, startDate = startDate, endDate = endDate, reason = reason)
+            )
+        }
+    }
+
+    suspend fun approveLeaveRequest(request: LeaveRequest) {
+        dao.updateLeaveRequest(request.copy(status = "APPROVED"))
+    }
+
+    suspend fun rejectLeaveRequest(request: LeaveRequest) {
+        dao.updateLeaveRequest(request.copy(status = "REJECTED"))
+    }
+
+    suspend fun getStaffLeaveRequests(staffId: Int): List<LeaveRequest> = dao.getStaffLeaveRequests(staffId)
+
+    // HR: Schedules
+    fun addSchedule(staffId: Int, dayOfWeek: Int, shiftStart: String, shiftEnd: String, role: String? = null) {
+        viewModelScope.launch {
+            dao.insertSchedule(Schedule(staffId = staffId, dayOfWeek = dayOfWeek, shiftStart = shiftStart, shiftEnd = shiftEnd, role = role))
+        }
+    }
+
+    suspend fun updateSchedule(schedule: Schedule) {
+        dao.updateSchedule(schedule)
+    }
+
+    suspend fun deleteSchedule(schedule: Schedule) {
+        dao.deleteSchedule(schedule)
+    }
+
+    suspend fun getStaffSchedules(staffId: Int): List<Schedule> = dao.getStaffSchedules(staffId)
+
+    // HR: Payroll
+    fun generatePayroll(staffId: Int, periodStart: Long, periodEnd: Long, baseSalary: Double,
+                        overtimePay: Double = 0.0, sss: Double = 0.0, philhealth: Double = 0.0,
+                        pagibig: Double = 0.0, tax: Double = 0.0, deductions: Double = 0.0) {
+        viewModelScope.launch {
+            val totalDeductions = sss + philhealth + pagibig + tax + deductions
+            val netPay = baseSalary + overtimePay - totalDeductions
+            dao.insertPayroll(
+                Payroll(
+                    staffId = staffId, periodStart = periodStart, periodEnd = periodEnd,
+                    baseSalary = baseSalary, overtimePay = overtimePay, deductions = deductions,
+                    sss = sss, philhealth = philhealth, pagibig = pagibig, tax = tax,
+                    netPay = netPay
+                )
+            )
+        }
+    }
+
+    suspend fun updatePayroll(payroll: Payroll) {
+        dao.updatePayroll(payroll)
+    }
+
+    suspend fun getStaffPayrolls(staffId: Int): List<Payroll> = dao.getStaffPayrolls(staffId)
+
+    // HR: Staff Documents
+    fun addStaffDocument(staffId: Int, title: String, fileUri: String, fileType: String? = null) {
+        viewModelScope.launch {
+            dao.insertStaffDocument(StaffDocument(staffId = staffId, title = title, fileUri = fileUri, fileType = fileType))
+        }
+    }
+
+    suspend fun getStaffDocuments(staffId: Int): List<StaffDocument> = dao.getStaffDocuments(staffId)
+
+    suspend fun deleteStaffDocument(document: StaffDocument) {
+        dao.deleteStaffDocument(document)
+    }
+
+    // HR: Staff Training
+    fun addStaffTraining(staffId: Int, program: String, completed: Boolean = false, certifiedAt: Long? = null) {
+        viewModelScope.launch {
+            dao.insertStaffTraining(StaffTraining(staffId = staffId, program = program, completed = completed, certifiedAt = certifiedAt))
+        }
+    }
+
+    suspend fun updateStaffTraining(training: StaffTraining) {
+        dao.updateStaffTraining(training)
+    }
+
+    suspend fun deleteStaffTraining(training: StaffTraining) {
+        dao.deleteStaffTraining(training)
+    }
+
+    suspend fun getStaffTrainings(staffId: Int): List<StaffTraining> = dao.getStaffTrainings(staffId)
+
+    // HR: Performance Reviews
+    fun addPerformanceReview(staffId: Int, reviewerId: Int? = null, score: Int, comments: String? = null) {
+        viewModelScope.launch {
+            dao.insertPerformanceReview(PerformanceReview(staffId = staffId, reviewerId = reviewerId, score = score, comments = comments))
+        }
+    }
+
+    suspend fun updatePerformanceReview(review: PerformanceReview) {
+        dao.updatePerformanceReview(review)
+    }
+
+    suspend fun getStaffReviews(staffId: Int): List<PerformanceReview> = dao.getStaffReviews(staffId)
+
+    // Export/Import extensions for HR entities
+    suspend fun exportAttendance(): List<Attendance> = dao.getAllAttendanceNow()
+    suspend fun exportLeaveTypes(): List<LeaveType> = dao.getAllLeaveTypesNow()
+    suspend fun exportLeaveRequests(): List<LeaveRequest> = dao.getAllLeaveRequestsNow()
+    suspend fun exportSchedules(): List<Schedule> = dao.getAllSchedulesNow()
+    suspend fun exportPayrolls(): List<Payroll> = dao.getAllPayrollsNow()
+    suspend fun exportStaffDocuments(): List<StaffDocument> = dao.getAllStaffDocumentsNow()
+    suspend fun exportStaffTrainings(): List<StaffTraining> = dao.getAllStaffTrainingsNow()
+    suspend fun exportPerformanceReviews(): List<PerformanceReview> = dao.getAllPerformanceReviewsNow()
+
     suspend fun getOrderMessages(orderId: Int): List<OrderMessage> = dao.getOrderMessages(orderId)
 
     fun addOrderMessage(orderId: Int, text: String, senderType: String = "STAFF", senderName: String? = null) {
@@ -838,6 +986,38 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         dao.insertAuditEvent(event)
                         importedCount++
                     }
+                    for (leaveType in data.leaveTypes) {
+                        dao.insertLeaveType(leaveType)
+                        importedCount++
+                    }
+                    for (request in data.leaveRequests) {
+                        dao.insertLeaveRequest(request)
+                        importedCount++
+                    }
+                    for (schedule in data.schedules) {
+                        dao.insertSchedule(schedule)
+                        importedCount++
+                    }
+                    for (payroll in data.payrolls) {
+                        dao.insertPayroll(payroll)
+                        importedCount++
+                    }
+                    for (doc in data.staffDocuments) {
+                        dao.insertStaffDocument(doc)
+                        importedCount++
+                    }
+                    for (training in data.staffTrainings) {
+                        dao.insertStaffTraining(training)
+                        importedCount++
+                    }
+                    for (review in data.performanceReviews) {
+                        dao.insertPerformanceReview(review)
+                        importedCount++
+                    }
+                    for (att in data.attendance) {
+                        dao.insertAttendance(att)
+                        importedCount++
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -919,7 +1099,15 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                     addAll(dao.getOrderMessages(order.id))
                 }
             },
-            auditEvents = dao.getAllAuditEventsNow()
+            auditEvents = dao.getAllAuditEventsNow(),
+            leaveTypes = dao.getAllLeaveTypesNow(),
+            leaveRequests = dao.getAllLeaveRequestsNow(),
+            schedules = dao.getAllSchedulesNow(),
+            payrolls = dao.getAllPayrollsNow(),
+            staffDocuments = dao.getAllStaffDocumentsNow(),
+            staffTrainings = dao.getAllStaffTrainingsNow(),
+            performanceReviews = dao.getAllPerformanceReviewsNow(),
+            attendance = dao.getAllAttendanceNow()
         )
 
         val json = Json { prettyPrint = true; encodeDefaults = true }
@@ -960,7 +1148,15 @@ data class ExportData(
     val loyaltyVouchers: List<LoyaltyVoucher> = emptyList(),
     val reviews: List<Review> = emptyList(),
     val orderMessages: List<OrderMessage> = emptyList(),
-    val auditEvents: List<AuditEvent> = emptyList()
+    val auditEvents: List<AuditEvent> = emptyList(),
+    val leaveTypes: List<LeaveType> = emptyList(),
+    val leaveRequests: List<LeaveRequest> = emptyList(),
+    val schedules: List<Schedule> = emptyList(),
+    val payrolls: List<Payroll> = emptyList(),
+    val staffDocuments: List<StaffDocument> = emptyList(),
+    val staffTrainings: List<StaffTraining> = emptyList(),
+    val performanceReviews: List<PerformanceReview> = emptyList(),
+    val attendance: List<Attendance> = emptyList()
 )
 
 @Serializable

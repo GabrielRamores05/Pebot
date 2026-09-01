@@ -316,6 +316,121 @@ data class LoyaltyVoucher(
  )
 
 @Serializable
+@Entity(tableName = "Attendance")
+data class Attendance(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val staffId: Int,
+    val clockIn: Long,
+    val clockOut: Long? = null,
+    val breakStart: Long? = null,
+    val breakEnd: Long? = null,
+    val date: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(tableName = "LeaveType")
+data class LeaveType(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,
+    val requiresFile: Boolean = false
+)
+
+@Serializable
+@Entity(
+    tableName = "LeaveRequest",
+    indices = [Index(value = ["staffId"])]
+)
+data class LeaveRequest(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val staffId: Int,
+    val typeId: Int? = null,
+    val type: String = "ANNUAL",
+    val startDate: Long,
+    val endDate: Long,
+    val status: String = "PENDING",
+    val reason: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "Schedule",
+    indices = [Index(value = ["staffId"])]
+)
+data class Schedule(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val staffId: Int,
+    val dayOfWeek: Int,
+    val shiftStart: String,
+    val shiftEnd: String,
+    val role: String? = null
+)
+
+@Serializable
+@Entity(
+    tableName = "Payroll",
+    indices = [Index(value = ["staffId"])]
+)
+data class Payroll(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val staffId: Int,
+    val periodStart: Long,
+    val periodEnd: Long,
+    val baseSalary: Double,
+    val overtimePay: Double = 0.0,
+    val deductions: Double = 0.0,
+    val sss: Double = 0.0,
+    val philhealth: Double = 0.0,
+    val pagibig: Double = 0.0,
+    val tax: Double = 0.0,
+    val netPay: Double = 0.0,
+    val status: String = "PENDING",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "StaffDocument",
+    indices = [Index(value = ["staffId"])]
+)
+data class StaffDocument(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val staffId: Int,
+    val title: String,
+    val fileUri: String,
+    val fileType: String? = null,
+    val uploadedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "StaffTraining",
+    indices = [Index(value = ["staffId"])]
+)
+data class StaffTraining(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val staffId: Int,
+    val program: String,
+    val completed: Boolean = false,
+    val certifiedAt: Long? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "PerformanceReview",
+    indices = [Index(value = ["staffId"])]
+)
+data class PerformanceReview(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val staffId: Int,
+    val reviewerId: Int? = null,
+    val score: Int,
+    val comments: String? = null,
+    val date: Long = System.currentTimeMillis()
+)
+
+@Serializable
 @Entity(tableName = "OrderMessage")
 data class OrderMessage(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
