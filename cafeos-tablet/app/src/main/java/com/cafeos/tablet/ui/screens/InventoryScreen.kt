@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Remove
@@ -31,7 +32,7 @@ import java.util.*
 @Composable
 fun InventoryScreen(viewModel: CafeViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Products", "Ingredients", "Suppliers", "Capacity", "History", "Purchases")
+    val tabs = listOf("Products", "Ingredients", "Suppliers", "Capacity", "History", "Purchases", "Alerts")
 
     Column(
         modifier = Modifier
@@ -65,6 +66,7 @@ fun InventoryScreen(viewModel: CafeViewModel) {
             3 -> InventoryCapacityTab(viewModel)
             4 -> StockHistoryTab(viewModel)
             5 -> PurchasesTab(viewModel)
+            6 -> LowStockAlertTab(viewModel)
         }
     }
 }
@@ -589,6 +591,82 @@ fun SupplierFormDialog(supplier: Supplier?, onDismiss: () -> Unit, onSave: (Supp
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp)
     )
+}
+
+@Composable
+fun LowStockAlertTab(viewModel: CafeViewModel) {
+    val lowStockIngredients by viewModel.lowStockIngredients.collectAsState(initial = emptyList())
+    val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
+
+    if (lowStockIngredients.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = PosAccent, modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("All ingredients are sufficiently stocked.", style = MaterialTheme.typography.bodyLarge, color = PosMuted)
+            }
+        }
+    } else {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(lowStockIngredients) { ingredient ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = PosDangerSoft),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(ingredient.name, style = MaterialTheme.typography.titleMedium, color = PosDanger, fontWeight = FontWeight.Bold)
+                                Text(ingredient.category, style = MaterialTheme.typography.bodySmall, color = PosInkSoft)
+                            }
+                            Surface(
+                                color = PosDanger.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Text(
+                                    "LOW STOCK",
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PosDanger,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Current: ${ingredient.currentStock} ${ingredient.baseUnit}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = PosPaper
+                            )
+                            Text(
+                                "Min: ${ingredient.minStock} ${ingredient.baseUnit}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = PosMuted
+                            )
+                        }
+                        Text(
+                            "Value: ${currencyFormatter.format(ingredient.currentStock * ingredient.costPerUnit)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PosInkSoft
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -201,6 +201,24 @@ data class Supplier(
 )
 
 @Serializable
+@Entity(
+    tableName = "SupplierIngredientPrice",
+    foreignKeys = [
+        ForeignKey(entity = Supplier::class, parentColumns = ["id"], childColumns = ["supplierId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = Ingredient::class, parentColumns = ["id"], childColumns = ["ingredientId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index(value = ["supplierId"]), Index(value = ["ingredientId"])]
+)
+data class SupplierIngredientPrice(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val supplierId: Int,
+    val ingredientId: Int,
+    val unitPrice: Double,
+    val notes: String? = null,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
 @Entity(tableName = "CafeTable")
 data class CafeTable(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -566,4 +584,46 @@ data class AuditEvent(
     val staffId: Int? = null,
     val details: String? = null,
     val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "Guest",
+    indices = [Index(value = ["tableSessionId"])]
+)
+data class Guest(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val tableSessionId: Int,
+    val name: String? = null,
+    val mood: String? = null,
+    val joinedAt: Long = System.currentTimeMillis(),
+    val leftAt: Long? = null
+)
+
+@Serializable
+@Entity(
+    tableName = "TableSection",
+    indices = [Index(value = ["name"])]
+)
+data class TableSection(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,
+    val tableIds: String,
+    val floorNumber: Int = 1,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(
+    tableName = "ProductStation",
+    primaryKeys = ["productId", "stationId"],
+    foreignKeys = [
+        ForeignKey(entity = Product::class, parentColumns = ["id"], childColumns = ["productId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = Station::class, parentColumns = ["id"], childColumns = ["stationId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index(value = ["productId"]), Index(value = ["stationId"])]
+)
+data class ProductStation(
+    val productId: Int,
+    val stationId: Int
 )

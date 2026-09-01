@@ -85,7 +85,11 @@ or new ones to create):
 | AIMessage | AIMessage | ❌ New |
 | StaffDocument | StaffDocument | ❌ New |
 | StaffTraining | StaffTraining | ❌ New |
-| PerformanceReview | PerformanceReview | ❌ New |
+| PerformanceReview | PerformanceReview | ✅ Implemented |
+| Guest (tables) | Guest | ✅ Implemented |
+| TableSection | TableSection | ✅ Implemented |
+| ProductStation | ProductStation | ✅ Implemented |
+| SupplierIngredientPrice | SupplierIngredientPrice | ✅ Implemented (Phase 4) |
 
 ## Constitution Alignment
 

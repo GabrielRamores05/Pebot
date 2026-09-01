@@ -18,10 +18,12 @@ import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.Review
 import com.cafeos.tablet.ui.CafeViewModel
 import com.cafeos.tablet.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun ReviewsScreen(viewModel: CafeViewModel) {
     val reviews by viewModel.allReviews.collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -48,7 +50,11 @@ fun ReviewsScreen(viewModel: CafeViewModel) {
                 items(reviews, key = { it.id }) { review ->
                     ReviewCard(
                         review = review,
-                        onDelete = { viewModel.deleteReview(review) }
+                        onDelete = {
+                            scope.launch {
+                                viewModel.deleteReview(review)
+                            }
+                        }
                     )
                 }
             }
@@ -72,7 +78,7 @@ fun ReviewCard(review: Review, onDelete: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     repeat(5) { index ->
                         val iconTint = if (index < review.rating) Color(0xFFFFD700) else PosMuted
                         Icon(

@@ -56,9 +56,34 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     val allProducts = dao.getAllProducts()
     private val _productCache = HashMap<Int, Product>()
     private val _productCacheByName = HashMap<String, List<Product>>()
+    private val _imageCache = HashMap<String, android.graphics.Bitmap>()
 
     fun getCachedProduct(id: Int): Product? = _productCache[id]
     fun getCachedProductsByName(name: String): List<Product> = _productCacheByName[name] ?: emptyList()
+
+    fun getCachedImage(path: String?): android.graphics.Bitmap? {
+        if (path == null) return null
+        _imageCache[path]?.let { return it }
+        var bitmap = _imageCache[path]
+        if (bitmap == null) {
+            try {
+                val file = java.io.File(path)
+                if (file.exists()) {
+                    bitmap = android.graphics.BitmapFactory.decodeFile(path)
+                    if (bitmap != null) {
+                        _imageCache[path] = bitmap
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return bitmap
+    }
+
+    fun clearImageCache() {
+        _imageCache.clear()
+    }
 
     init {
         viewModelScope.launch {
@@ -86,6 +111,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     val allExpenses = dao.getAllExpenses()
     val allTransactions = dao.getAllTransactions()
     val allPurchases = dao.getAllPurchases()
+    val lowStockIngredients = dao.getLowStockIngredients()
     val businessSettings = dao.getBusinessSettings()
     val allStaff = dao.getAllStaff()
     val activeVouchers = dao.getActiveVouchers()
@@ -117,6 +143,9 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _discountRate = MutableStateFlow(0.0)
     val discountRate: StateFlow<Double> = _discountRate.asStateFlow()
+
+    private val _selectedVoucher = MutableStateFlow<LoyaltyVoucher?>(null)
+    val selectedVoucher: StateFlow<LoyaltyVoucher?> = _selectedVoucher.asStateFlow()
 
     private val _selectedTableId = MutableStateFlow<Int?>(null)
     val selectedTableId: StateFlow<Int?> = _selectedTableId.asStateFlow()
@@ -204,9 +233,31 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         when (type) {
             "PWD" -> _discountRate.value = 0.20
             "STUDENT" -> _discountRate.value = 0.20
+            "VOUCHER" -> _discountRate.value = 0.0
             else -> _discountRate.value = 0.0
         }
         calculateTotals()
+    }
+
+    fun setSelectedVoucher(voucher: LoyaltyVoucher?) {
+        _selectedVoucher.value = voucher
+        if (voucher != null) {
+            _discountType.value = "VOUCHER"
+        } else {
+            _discountType.value = "NONE"
+        }
+        calculateTotals()
+    }
+
+    private fun getVoucherDiscountAmount(subtotal: Double): Double {
+        val voucher = _selectedVoucher.value ?: return 0.0
+        val discount = if (voucher.discountType == "PERCENTAGE") {
+            subtotal * voucher.discountValue / 100.0
+        } else {
+            voucher.discountValue
+        }
+        val maxDiscount = if (voucher.maxDiscount > 0) voucher.maxDiscount else Double.MAX_VALUE
+        return minOf(discount, maxDiscount, subtotal)
     }
 
     fun openCheckout() {
@@ -260,7 +311,11 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     private fun calculateTotals() {
         val sub = _cartItems.sumOf { it.product.price * it.quantity + it.priceDelta * it.quantity }
         _subtotalAmount.value = sub
-        val discount = sub * _discountRate.value
+        val discount = if (_discountType.value == "VOUCHER") {
+            getVoucherDiscountAmount(sub)
+        } else {
+            sub * _discountRate.value
+        }
         _totalAmount.value = sub - discount
         _finalTotal.value = sub - discount
     }
@@ -298,9 +353,10 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                 totalAmount = total,
                 discountAmount = subtotal - total,
                 discountRate = _discountRate.value,
-                discountReason = when (_discountType.value) {
+                 discountReason = when (_discountType.value) {
                     "PWD" -> "PWD_DISCOUNT"
                     "STUDENT" -> "STUDENT_DISCOUNT"
+                    "VOUCHER" -> _selectedVoucher.value?.code
                     else -> null
                 },
                 paymentMethod = _paymentMethod.value,
@@ -355,7 +411,8 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             _showCheckout.value = false
             _paymentMethod.value = "CASH"
             _orderType.value = "DINE_IN"
-            _discountType.value = "NONE"
+             _discountType.value = "NONE"
+            _selectedVoucher.value = null
             _discountRate.value = 0.0
             _selectedTableId.value = null
             _screenshotPath.value = null
@@ -832,8 +889,6 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     // Export/Import extensions for Phase 1 remaining entities
 
-
-    suspend fun exportAttendance(): List<Attendance> = dao.getAllAttendanceNow()
     suspend fun exportLeaveTypes(): List<LeaveType> = dao.getAllLeaveTypesNow()
     suspend fun exportLeaveRequests(): List<LeaveRequest> = dao.getAllLeaveRequestsNow()
     suspend fun exportSchedules(): List<Schedule> = dao.getAllSchedulesNow()
@@ -849,6 +904,10 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun exportLoyaltySettings(): List<LoyaltySetting> = dao.getAllLoyaltySettingsNow()
     suspend fun exportAIConversations(): List<AIConversation> = dao.getAllAIConversationsNow()
     suspend fun exportAIMessages(): List<AIMessage> = dao.getAllAIMessagesNow()
+    suspend fun exportGuests(): List<Guest> = dao.getAllGuestsNow()
+    suspend fun exportTableSections(): List<TableSection> = dao.getAllTableSectionsNow()
+    suspend fun exportProductStations(): List<ProductStation> = dao.getAllProductStationsNow()
+    suspend fun exportSupplierIngredientPrices(): List<SupplierIngredientPrice> = dao.getAllSupplierIngredientPricesNow()
 
     // Loyalty Cards
     val allLoyaltyCards = dao.getAllLoyaltyCards()
@@ -1016,6 +1075,112 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                 details = details
             )
         )
+    }
+
+    // Guests
+    val allTableSections = dao.getAllTableSections()
+
+    suspend fun getGuestsForSession(tableSessionId: Int): List<Guest> = dao.getGuestsForSession(tableSessionId)
+
+    fun addGuest(tableSessionId: Int, name: String?) {
+        viewModelScope.launch {
+            dao.insertGuest(Guest(tableSessionId = tableSessionId, name = name))
+        }
+    }
+
+    fun updateGuestMood(guest: Guest, mood: String) {
+        viewModelScope.launch {
+            dao.updateGuest(guest.copy(mood = mood))
+        }
+    }
+
+    fun markGuestLeft(guestId: Int) {
+        viewModelScope.launch {
+            dao.markGuestLeft(guestId, System.currentTimeMillis())
+        }
+    }
+
+    // Table Sections
+    fun saveTableSection(section: TableSection) {
+        viewModelScope.launch {
+            if (section.id == 0) dao.insertTableSection(section) else dao.updateTableSection(section)
+        }
+    }
+
+    suspend fun deleteTableSection(section: TableSection) = dao.deleteTableSection(section)
+
+    // Product Station routing
+    fun assignProductToStation(productId: Int, stationId: Int) {
+        viewModelScope.launch {
+            dao.insertProductStation(ProductStation(productId = productId, stationId = stationId))
+        }
+    }
+
+    suspend fun getProductStations(productId: Int): List<ProductStation> = dao.getProductStations(productId)
+
+    suspend fun getProductsForStation(stationId: Int): List<ProductStation> = dao.getProductsForStation(stationId)
+
+    suspend fun deleteProductStation(productId: Int, stationId: Int) = dao.deleteProductStation(productId, stationId)
+
+    // Supplier Ingredient Pricing
+    suspend fun getPricesForIngredient(ingredientId: Int): List<SupplierIngredientPrice> = dao.getPricesForIngredient(ingredientId)
+
+    suspend fun getPricesForSupplier(supplierId: Int): List<SupplierIngredientPrice> = dao.getPricesForSupplier(supplierId)
+
+    fun saveSupplierIngredientPrice(price: SupplierIngredientPrice) {
+        viewModelScope.launch {
+            dao.insertSupplierIngredientPrice(price)
+        }
+    }
+
+    suspend fun deleteSupplierIngredientPrice(price: SupplierIngredientPrice) = dao.deleteSupplierIngredientPrice(price)
+
+    // Customer Analytics
+    suspend fun getCustomerOrderCount(customerId: Int): Int {
+        return dao.getAllOrders().firstOrNull()?.count { it.customerName == getCustomerNameById(customerId) } ?: 0
+    }
+
+    suspend fun getCustomerTotalSpent(customerId: Int): Double {
+        val name = getCustomerNameById(customerId)
+        return dao.getAllOrders().firstOrNull()?.filter { it.customerName == name }?.sumOf { it.totalAmount } ?: 0.0
+    }
+
+    suspend fun getCustomerNameById(customerId: Int): String {
+        // We don't have a direct relation, customers are looked up by name
+        // Return empty as customers are identified by name in orders
+        return ""
+    }
+
+    suspend fun getCustomerVisitFrequency(days: Int): Double {
+        val cutoff = System.currentTimeMillis() - (days * 24 * 3600_000L)
+        val recentOrders = dao.getAllOrders().firstOrNull()?.filter { it.createdAt >= cutoff } ?: emptyList()
+        val uniqueCustomers = recentOrders.mapNotNull { it.customerName }.toSet().size
+        return if (uniqueCustomers > 0) recentOrders.size.toDouble() / uniqueCustomers else 0.0
+    }
+
+    suspend fun getChurnRate(days: Int): Double {
+        val cutoff = System.currentTimeMillis() - (days * 24 * 3600_000L)
+        val allCustomers = dao.getAllCustomers().firstOrNull() ?: emptyList()
+        val recentOrders = dao.getAllOrders().firstOrNull()?.filter { it.createdAt >= cutoff } ?: emptyList()
+        val activeCustomers = recentOrders.mapNotNull { it.customerName }.toSet().size
+        val totalCustomers = allCustomers.size
+        return if (totalCustomers > 0) {
+            ((totalCustomers - activeCustomers).toDouble() / totalCustomers * 100.0)
+        } else 0.0
+    }
+
+    // Loyalty Voucher redemption
+    suspend fun getVoucherRedemptionRate(): Double {
+        val vouchers = dao.getActiveVouchersNow()
+        if (vouchers.isEmpty()) return 0.0
+        val totalPotentialUses = vouchers.sumOf { it.usageLimit }
+        val actualUses = vouchers.sumOf { it.usedCount }
+        return if (totalPotentialUses > 0) (actualUses.toDouble() / totalPotentialUses * 100.0) else 0.0
+    }
+
+    suspend fun getVoucherTotalSavings(): Double {
+        val vouchers = dao.getActiveVouchersNow()
+        return vouchers.sumOf { it.discountValue * it.usedCount }
     }
 
     // Export/Import extensions for new entities
@@ -1190,7 +1355,23 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                          dao.insertAIMessage(message)
                          importedCount++
                      }
-                }
+                     for (guest in data.guests) {
+                         dao.insertGuest(guest)
+                         importedCount++
+                     }
+                     for (section in data.tableSections) {
+                         dao.insertTableSection(section)
+                         importedCount++
+                     }
+                      for (productStation in data.productStations) {
+                          dao.insertProductStation(productStation)
+                          importedCount++
+                      }
+                      for (price in data.supplierIngredientPrices) {
+                          dao.insertSupplierIngredientPrice(price)
+                          importedCount++
+                      }
+                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -1286,7 +1467,11 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             loyaltyTransactions = dao.getAllLoyaltyTransactionsNow(),
             loyaltySettings = dao.getAllLoyaltySettingsNow(),
             aiConversations = dao.getAllAIConversationsNow(),
-            aiMessages = dao.getAllAIMessagesNow()
+            aiMessages = dao.getAllAIMessagesNow(),
+            guests = dao.getAllGuestsNow(),
+            tableSections = dao.getAllTableSectionsNow(),
+            productStations = dao.getAllProductStationsNow(),
+            supplierIngredientPrices = dao.getAllSupplierIngredientPricesNow()
         )
 
         val json = Json { prettyPrint = true; encodeDefaults = true }
@@ -1342,7 +1527,11 @@ data class ExportData(
     val loyaltyTransactions: List<LoyaltyTransaction> = emptyList(),
     val loyaltySettings: List<LoyaltySetting> = emptyList(),
     val aiConversations: List<AIConversation> = emptyList(),
-    val aiMessages: List<AIMessage> = emptyList()
+    val aiMessages: List<AIMessage> = emptyList(),
+    val guests: List<Guest> = emptyList(),
+    val tableSections: List<TableSection> = emptyList(),
+    val productStations: List<ProductStation> = emptyList(),
+    val supplierIngredientPrices: List<SupplierIngredientPrice> = emptyList()
 )
 
 @Serializable

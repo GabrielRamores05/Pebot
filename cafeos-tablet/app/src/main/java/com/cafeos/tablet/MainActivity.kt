@@ -22,10 +22,20 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TableBar
+import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -78,30 +88,40 @@ fun MainScreen() {
         NavigationItem("Reviews", Icons.Default.Star, "reviews"),
         NavigationItem("Audit", Icons.Default.History, "audit"),
         NavigationItem("AI Consultant", Icons.Default.Chat, "ai_consultant"),
+        NavigationItem("Floor Plan", Icons.Default.TableChart, "floor_plan"),
+        NavigationItem("Guests", Icons.Default.Group, "guests"),
+        NavigationItem("Tables", Icons.Default.TableBar, "tables"),
+        NavigationItem("Stations", Icons.Default.Restaurant, "station_assignment"),
         NavigationItem("Settings", Icons.Default.Settings, "settings")
     )
 
     Scaffold(
         content = { padding ->
-            androidx.compose.foundation.layout.Row(
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                NavigationRail {
-                    items.forEachIndexed { index, item ->
-                        NavigationRailItem(
-                            icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) },
-                            selected = selectedItem == index,
-                            onClick = {
-                                selectedItem = index
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.startDestinationId)
-                                    launchSingleTop = true
+                Column(
+                    modifier = Modifier
+                        .width(256.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    NavigationRail {
+                        items.forEachIndexed { index, item ->
+                            NavigationRailItem(
+                                icon = { Icon(item.icon, contentDescription = item.label) },
+                                label = { Text(item.label) },
+                                selected = selectedItem == index,
+                                onClick = {
+                                    selectedItem = index
+                                    navController.navigate(item.route) {
+                                        popUpTo(navController.graph.startDestinationId)
+                                        launchSingleTop = true
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
                 
@@ -125,6 +145,10 @@ fun MainScreen() {
                     composable("reviews") { ReviewsScreen(viewModel) }
                     composable("audit") { AuditLogScreen(viewModel) }
                     composable("ai_consultant") { AIConsultantScreen(viewModel) }
+                    composable("floor_plan") { FloorPlanScreen(viewModel) }
+                    composable("guests") { GuestManagementScreen(viewModel) }
+                    composable("tables") { TablesManagementScreen(viewModel) }
+                    composable("station_assignment") { StationAssignmentScreen(viewModel) }
                     composable("settings") { SettingsScreen(viewModel) }
                 }
             }

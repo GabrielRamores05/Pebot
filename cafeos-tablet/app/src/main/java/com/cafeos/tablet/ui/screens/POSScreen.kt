@@ -492,6 +492,7 @@ fun ProductOptionsBottomSheet(
 fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val totalAmount by viewModel.totalAmount.collectAsState()
+    val subtotalAmount by viewModel.subtotalAmount.collectAsState()
     val paymentMethod by viewModel.paymentMethod.collectAsState()
     val amountTendered by viewModel.amountTendered.collectAsState()
     val discountType by viewModel.discountType.collectAsState()
@@ -561,6 +562,12 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
                         fontWeight = FontWeight.Medium
                     )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Voucher", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+                VoucherApplicationSection(viewModel = viewModel, totalAmount = subtotalAmount)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -664,6 +671,87 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp)
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun VoucherApplicationSection(viewModel: CafeViewModel, totalAmount: Double) {
+    val vouchers by viewModel.activeVouchers.collectAsState(initial = emptyList())
+    val discountType by viewModel.discountType.collectAsState()
+    val selectedVoucher by viewModel.selectedVoucher.collectAsState()
+
+    var voucherExpanded by remember { mutableStateOf(false) }
+
+    val isVoucherCompatible = discountType == "NONE" || discountType == "VOUCHER"
+
+    ExposedDropdownMenuBox(
+        expanded = voucherExpanded,
+        onExpandedChange = { if (isVoucherCompatible) voucherExpanded = it }
+    ) {
+        OutlinedTextField(
+            value = selectedVoucher?.code ?: "Select voucher",
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier.fillMaxWidth(),
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = voucherExpanded) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PosAccent,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedTextColor = PosPaper,
+                unfocusedTextColor = PosPaper,
+                disabledTextColor = PosPaper,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledTrailingIconColor = PosMuted
+            ),
+            enabled = isVoucherCompatible
+        )
+
+        ExposedDropdownMenu(expanded = voucherExpanded, onDismissRequest = { voucherExpanded = false }) {
+            vouchers.forEach { voucher ->
+                val isApplicable = totalAmount >= voucher.minOrderAmount && voucher.active
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(voucher.code)
+                            Text(
+                                if (voucher.discountType == "PERCENTAGE") "${voucher.discountValue}%" else "₱${voucher.discountValue}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = PosMuted
+                            )
+                        }
+                    },
+                onClick = {
+                    if (isApplicable) {
+                        viewModel.setSelectedVoucher(voucher)
+                    }
+                    voucherExpanded = false
+                },
+                    enabled = isApplicable
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("Clear") },
+                onClick = { viewModel.setSelectedVoucher(null); voucherExpanded = false }
+            )
+        }
+    }
+
+    selectedVoucher?.let { voucher ->
+        Spacer(modifier = Modifier.height(8.dp))
+        val discountAmount = if (voucher.discountType == "PERCENTAGE") {
+            totalAmount * voucher.discountValue / 100.0
+        } else {
+            voucher.discountValue
+        }.coerceAtMost(if (voucher.maxDiscount > 0) voucher.maxDiscount else Double.MAX_VALUE)
+            .coerceAtMost(totalAmount)
+
+        Text(
+            text = "Voucher: ${voucher.code} (-${NumberFormat.getCurrencyInstance(Locale("en", "PH")).format(discountAmount)})",
+            style = MaterialTheme.typography.bodySmall,
+            color = PosAccent,
+            fontWeight = FontWeight.Bold
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

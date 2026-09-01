@@ -534,21 +534,6 @@ interface CafeDao {
     @Query("SELECT * FROM LeaveType ORDER BY name ASC")
     suspend fun getAllLeaveTypesNow(): List<LeaveType>
 
-    @Query("SELECT * FROM LeaveRequest ORDER BY createdAt DESC")
-    suspend fun getAllLeaveRequestsNow(): List<LeaveRequest>
-
-    @Query("SELECT * FROM Schedule ORDER BY staffId, dayOfWeek ASC")
-    suspend fun getAllSchedulesNow(): List<Schedule>
-
-    @Query("SELECT * FROM Payroll ORDER BY createdAt DESC")
-    suspend fun getAllPayrollsNow(): List<Payroll>
-
-    @Query("SELECT * FROM StaffDocument ORDER BY uploadedAt DESC")
-    suspend fun getAllStaffDocumentsNow(): List<StaffDocument>
-
-    @Query("SELECT * FROM StaffTraining ORDER BY createdAt DESC")
-    suspend fun getAllStaffTrainingsNow(): List<StaffTraining>
-
     // Product Options (product-specific option price deltas)
     @Query("SELECT * FROM ProductOption WHERE productId = :productId")
     suspend fun getProductOptions(productId: Int): List<ProductOption>
@@ -651,6 +636,80 @@ interface CafeDao {
 
     @Query("SELECT * FROM AIMessage ORDER BY timestamp DESC")
     suspend fun getAllAIMessagesNow(): List<AIMessage>
+
+    // Low Stock Alerts
+    @Query("SELECT * FROM Ingredient WHERE currentStock <= minStock AND minStock > 0 ORDER BY name ASC")
+    fun getLowStockIngredients(): Flow<List<Ingredient>>
+
+    // Guests
+    @Query("SELECT * FROM Guest WHERE tableSessionId = :tableSessionId ORDER BY joinedAt ASC")
+    suspend fun getGuestsForSession(tableSessionId: Int): List<Guest>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGuest(guest: Guest)
+
+    @Update
+    suspend fun updateGuest(guest: Guest)
+
+    @Query("UPDATE Guest SET leftAt = :leftAt WHERE id = :id")
+    suspend fun markGuestLeft(id: Int, leftAt: Long)
+
+    @Query("SELECT * FROM Guest ORDER BY joinedAt DESC")
+    suspend fun getAllGuestsNow(): List<Guest>
+
+    // Table Sections
+    @Query("SELECT * FROM TableSection ORDER BY floorNumber ASC, name ASC")
+    fun getAllTableSections(): Flow<List<TableSection>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTableSection(section: TableSection)
+
+    @Update
+    suspend fun updateTableSection(section: TableSection)
+
+    @Delete
+    suspend fun deleteTableSection(section: TableSection)
+
+    @Query("SELECT * FROM TableSection ORDER BY floorNumber ASC, name ASC")
+    suspend fun getAllTableSectionsNow(): List<TableSection>
+
+    // Product Station routing
+    @Query("SELECT * FROM ProductStation WHERE productId = :productId")
+    suspend fun getProductStations(productId: Int): List<ProductStation>
+
+    @Query("SELECT * FROM ProductStation WHERE stationId = :stationId")
+    suspend fun getProductsForStation(stationId: Int): List<ProductStation>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProductStation(productStation: ProductStation)
+
+    @Query("DELETE FROM ProductStation WHERE productId = :productId")
+    suspend fun deleteProductStations(productId: Int)
+
+    @Query("DELETE FROM ProductStation WHERE productId = :productId AND stationId = :stationId")
+    suspend fun deleteProductStation(productId: Int, stationId: Int)
+
+    @Query("SELECT * FROM ProductStation")
+    suspend fun getAllProductStationsNow(): List<ProductStation>
+
+    // Supplier Ingredient Prices
+    @Query("SELECT * FROM SupplierIngredientPrice WHERE ingredientId = :ingredientId")
+    suspend fun getPricesForIngredient(ingredientId: Int): List<SupplierIngredientPrice>
+
+    @Query("SELECT * FROM SupplierIngredientPrice WHERE supplierId = :supplierId")
+    suspend fun getPricesForSupplier(supplierId: Int): List<SupplierIngredientPrice>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSupplierIngredientPrice(price: SupplierIngredientPrice)
+
+    @Update
+    suspend fun updateSupplierIngredientPrice(price: SupplierIngredientPrice)
+
+    @Delete
+    suspend fun deleteSupplierIngredientPrice(price: SupplierIngredientPrice)
+
+    @Query("SELECT * FROM SupplierIngredientPrice")
+    suspend fun getAllSupplierIngredientPricesNow(): List<SupplierIngredientPrice>
 }
 
 data class ExpenseCategoryTotal(
