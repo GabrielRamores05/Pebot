@@ -291,6 +291,15 @@ interface CafeDao {
     @Query("SELECT * FROM IngredientTransaction WHERE ingredientId = :ingredientId ORDER BY createdAt DESC")
     fun getTransactionsForIngredient(ingredientId: Int): Flow<List<IngredientTransaction>>
 
+    // Spec 014: latest supplier (non-void purchase supplier link) for an ingredient.
+    @Query("SELECT referenceId FROM IngredientTransaction WHERE ingredientId = :ingredientId AND type = 'PURCHASE' AND referenceType = 'supplier' AND referenceId IS NOT NULL ORDER BY id DESC LIMIT 1")
+    suspend fun latestSupplierIdForIngredient(ingredientId: Int): Int?
+
+    // Spec 014: unit cost of the purchase immediately before :beforeId (row-id
+    // order = ledger order) for trend math.
+    @Query("SELECT unitCost FROM IngredientTransaction WHERE ingredientId = :ingredientId AND type = 'PURCHASE' AND id < :beforeId AND unitCost IS NOT NULL ORDER BY id DESC LIMIT 1")
+    suspend fun previousPurchaseUnitCost(ingredientId: Int, beforeId: Int): Double?
+
     @Query("SELECT * FROM IngredientTransaction WHERE type = 'PURCHASE' ORDER BY createdAt DESC")
     fun getAllPurchases(): Flow<List<IngredientTransaction>>
 

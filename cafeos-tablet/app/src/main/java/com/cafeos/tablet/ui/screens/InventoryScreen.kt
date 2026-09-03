@@ -289,9 +289,9 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
             ingredients = ingredients,
             suppliers = suppliers,
             onDismiss = { showPurchaseDialog = false },
-            onConfirm = { ingredientId, quantity, cost, supplierId, notes ->
+            onConfirm = { ingredientId, purchaseUnit, quantity, totalCost, supplierId, notes ->
                 scope.launch {
-                    viewModel.purchaseIngredient(ingredientId, quantity, cost, supplierId, notes)
+                    viewModel.purchaseIngredientWithUnits(ingredientId, purchaseUnit, quantity, totalCost, supplierId, notes)
                     showPurchaseDialog = false
                 }
             }
@@ -776,9 +776,10 @@ fun PurchaseIngredientDialog(
     ingredients: List<Ingredient>,
     suppliers: List<Supplier>,
     onDismiss: () -> Unit,
-    onConfirm: (ingredientId: Int, quantity: Double, cost: Double, supplierId: Int?, notes: String?) -> Unit
+    onConfirm: (ingredientId: Int, purchaseUnit: String, quantity: Double, totalCost: Double, supplierId: Int?, notes: String?) -> Unit
 ) {
     var selectedIngredientId by remember { mutableStateOf<Int?>(null) }
+    var purchaseUnit by remember { mutableStateOf("") }
     var quantityText by remember { mutableStateOf("") }
     var totalCostText by remember { mutableStateOf("") }
     var selectedSupplierId by remember { mutableStateOf<Int?>(null) }
@@ -787,6 +788,7 @@ fun PurchaseIngredientDialog(
     var supplierExpanded by remember { mutableStateOf(false) }
     var validationError by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
+    val selectedIngredient = ingredients.find { it.id == selectedIngredientId }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -830,7 +832,12 @@ fun PurchaseIngredientDialog(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { selectedIngredientId = ing.id; ingredientExpanded = false }
+                                        .clickable {
+                                            selectedIngredientId = ing.id
+                                            purchaseUnit = ing.baseUnit
+                                            quantityText = ""
+                                            ingredientExpanded = false
+                                        }
                                         .padding(horizontal = 14.dp, vertical = 10.dp)
                                 ) {
                                     Text(ing.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
@@ -899,13 +906,47 @@ fun PurchaseIngredientDialog(
                 }
                 Spacer(modifier = Modifier.height(14.dp))
 
-                OutlinedTextField(value = quantityText, onValueChange = { quantityText = it }, label = { Text("Quantity received (${ingredients.find { it.id == selectedIngredientId }?.baseUnit ?: "units"})") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(value = totalCostText, onValueChange = { totalCostText = it }, label = { Text("Total purchase cost (₱)") }, supportingText = { Text("Unit cost is calculated automatically") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
-                val calculatedUnitCost = totalCostText.toDoubleOrNull()?.div(quantityText.toDoubleOrNull() ?: 0.0)
-                if (calculatedUnitCost != null && calculatedUnitCost.isFinite()) {
+                if (selectedIngredient != null) {
+                    Text("Purchase unit", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("Calculated cost per ${ingredients.find { it.id == selectedIngredientId }?.baseUnit ?: "unit"}: ₱${"%.2f".format(calculatedUnitCost)}", color = PosAccent, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    val unitOptions = PurchaseUnits.purchaseUnitOptions(selectedIngredient.baseUnit)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        unitOptions.forEach { unit ->
+                            FilterChip(
+                                selected = purchaseUnit == unit,
+                                onClick = { purchaseUnit = unit },
+                                label = { Text(unit) },
+                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosAccentSoft, selectedLabelColor = PosAccent)
+                            )
+                        }
+                    }
+                    if (!PurchaseUnits.canConvert(selectedIngredient.baseUnit, purchaseUnit)) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Unit \"$purchaseUnit\" cannot be converted to the ingredient's base unit (${selectedIngredient.baseUnit}).",
+                            color = PosDanger, style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                OutlinedTextField(value = quantityText, onValueChange = { quantityText = it }, label = { Text("Quantity received (${if (purchaseUnit.isNotBlank()) purchaseUnit else "units"})") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(value = totalCostText, onValueChange = { totalCostText = it }, label = { Text("Total purchase cost (₱)") }, supportingText = { Text("Unit cost is calculated automatically — you only enter the amount you paid") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
+                val baseUnit = selectedIngredient?.baseUnit
+                val qtyParsed = quantityText.toDoubleOrNull()
+                val totalParsed = totalCostText.toDoubleOrNull()
+                if (baseUnit != null && purchaseUnit.isNotBlank() && qtyParsed != null && totalParsed != null && qtyParsed > 0.0 && totalParsed >= 0.0) {
+                    val perBase = PurchaseUnits.unitCost(baseUnit, purchaseUnit, qtyParsed, totalParsed)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    if (perBase != null) {
+                        Text(
+                            "Auto cost: ₱${"%.2f".format(totalParsed / qtyParsed)} per $purchaseUnit  ·  ₱${"%.2f".format(perBase)} per $baseUnit",
+                            color = PosAccent, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold
+                        )
+                    } else {
+                        Text("Unit cost cannot be calculated for this unit combination.", color = PosDanger, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
@@ -920,16 +961,18 @@ fun PurchaseIngredientDialog(
                 onClick = {
                     val qty = quantityText.toDoubleOrNull()
                     val totalCost = totalCostText.toDoubleOrNull()
-                    val cost = if (qty != null && qty > 0.0 && totalCost != null) totalCost / qty else null
+                    val base = selectedIngredient?.baseUnit
                     validationError = when {
                         selectedIngredientId == null -> "Select an ingredient."
+                        purchaseUnit.isBlank() -> "Choose a purchase unit."
+                        base == null || !PurchaseUnits.canConvert(base, purchaseUnit) ->
+                            "Unit \"$purchaseUnit\" cannot be converted to the ingredient's base unit."
                         qty == null || qty <= 0.0 -> "Enter a quantity greater than zero."
                         totalCost == null || totalCost < 0.0 -> "Enter a valid total purchase cost."
-                        cost == null -> "Quantity must be greater than zero."
                         else -> null
                     }
-                    if (validationError == null && selectedIngredientId != null && qty != null && cost != null) {
-                        onConfirm(selectedIngredientId!!, qty, cost, selectedSupplierId, notes.ifBlank { null })
+                    if (validationError == null && selectedIngredientId != null && qty != null && totalCost != null) {
+                        onConfirm(selectedIngredientId!!, purchaseUnit, qty, totalCost, selectedSupplierId, notes.ifBlank { null })
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PosAccent),

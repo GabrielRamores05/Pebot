@@ -56,10 +56,10 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Purchase row links supplier via `referenceType='supplier'`/`referenceId`; extend DAO insert/query helpers in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt`
+- [X] T006 [US1] Purchase row links supplier via `referenceType='supplier'`/`referenceId`; extend DAO insert/query helpers in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt`
 - [X] T007 [US1] Make purchase transactional in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt` (`purchaseIngredient`): convert quantity to base unit, stock += qty, `costPerUnit` = total Ã· converted qty (replace), `lastSupplierId` = supplier when given, insert PURCHASE row â€” all in one `db.withTransaction`; reject quantity â‰¤ 0 and unconvertible units
 - [X] T008 (web purchase write aligned to latest-cost + supplier-link via modules/inventory/repository.ts, thin route) [US1] Web purchase write: implement record-purchase in `my-app/modules/inventory/service.ts` (same math/transaction semantics) with Prisma access only via `my-app/modules/inventory/repository.ts`
-- [ ] T009 [P] [US1] Tablet UI: Record Purchase in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt` â€” purchase-unit selector (real-world unit), auto-calculated unit-cost preview line, supplier picker (existing inline lists)
+- [X] T009 [P] [US1] Tablet UI: Record Purchase in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt` â€” purchase-unit selector (real-world unit), auto-calculated unit-cost preview line, supplier picker (existing inline lists)
 - [ ] T010 [P] [US1] Web UI: purchase form with unit selector + auto unit-cost in `my-app/app/admin/inventory/page.tsx` (and any route handler in `my-app/app/api/` for it)
 - [ ] T011 [P] [US1] Unit tests for purchase math (conversion, unit cost replace, no-trust validation) on both platforms: `cafeos-tablet/app/src/test/.../PurchaseMathTest.kt` and `my-app/modules/inventory/*.test.ts` â€” write first, confirm they fail, then implement
 
@@ -219,5 +219,6 @@ Task: "Web UI (T010) in app/admin/inventory/page.tsx"
 - Money and stock writes are append-only and single-transaction (constitution); VOID replaces edit/delete
 - Unit costs are always computed from stored quantity + total â€” never accepted from the client
 - Commit after each task or logical group; stop at checkpoints to validate the story independently
+
 
 
