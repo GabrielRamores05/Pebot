@@ -91,6 +91,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 - [ ] T016 [US3] Tablet data: per-supplier ingredient aggregation (latest + previous same-supplier purchase per ingredient) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt` + ViewModel accessors
 - [ ] T017 [US3] Tablet UI: Suppliers page at `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/SuppliersScreen.kt` (new) showing ingredient rows with latest price and ₱/% change; wire into navigation in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/MainActivity.kt`
 - [ ] T018 [US3] Web: supplier page data (repository/service) and UI in `my-app/app/admin/suppliers/page.tsx` (or existing suppliers area) with the same change figures
+- [ ] T032 [P] [US3] Supplier-deletion safety on both apps: warn when a supplier has purchase history; on delete, recompute-or-clear `lastSupplierId` on every affected ingredient from remaining non-void purchases (tablet: `cafeos-tablet/.../ui/CafeViewModel.kt` + `data/CafeDao.kt`; web: `my-app/modules/inventory/service.ts`)
 
 **Checkpoint**: QS-2 supplier scenario passes on both apps; US3 independently testable.
 
@@ -102,9 +103,9 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 **Independent Test**: quickstart QS-3 — 3 ingredients adjusted in one batch; levels and ADJUSTMENT history rows update immediately; low flags refresh.
 
-- [ ] T019 [US4] Tablet data/state: batch-adjust in one transaction writing ADJUSTMENT rows with `referenceType='batch'` in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`
+- [ ] T019 [US4] Tablet data/state: batch-adjust in one transaction writing ADJUSTMENT rows with `referenceType='batch'` in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`; batch id = first ADJUSTMENT row id on every row; reject any row that would push stock below zero (validate the whole batch before writing)
 - [ ] T020 [US4] Tablet UI: bulk-adjust screen (multi-row edit + single save) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt`
-- [ ] T021 [US4] Web: bulk-adjust service + UI in `my-app/modules/inventory/` and `my-app/app/admin/inventory/page.tsx` (same single-transaction semantics)
+- [ ] T021 [US4] Web: bulk-adjust service + UI in `my-app/modules/inventory/` and `my-app/app/admin/inventory/page.tsx` (same single-transaction semantics; batch identity and below-zero rejection identical to T019)
 
 **Checkpoint**: QS-3 passes on both apps; US4 independently testable.
 
@@ -118,7 +119,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 - [ ] T022 [US5] Tablet: shared low/out rule + analytics inventory summary (counts + Σ currentStock×costPerUnit) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt` and `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/AnalyticsScreen.kt`
 - [ ] T023 [US5] Web: same rule + summary in `my-app/modules/analytics/` (or inventory) and `my-app/app/admin/analytics/page.tsx`
-- [ ] T024 [P] [US5] Unit tests for counts and stock-value math (incl. boundary stock == threshold) on both platforms
+- [ ] T024 [P] [US5] Unit tests for the shared low/out rule and stock-value math on both platforms, including the boundary `currentStock == minStock → LOW` and healthy/low/out transitions (tablet `app/src/test/.../`; web `my-app/modules/*.test.ts`)
 
 **Checkpoint**: QS-5 passes on both apps; US5 independently testable.
 
@@ -129,8 +130,8 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 **Purpose**: Ledger-safety features and parity glue that span all stories.
 
 - [ ] T025 [P] Export/import both platforms: carry `Ingredient.lastSupplierId`, purchase rows' `referenceType='supplier'`/`referenceId`, and `VOID_PURCHASE` type end-to-end (`cafeos-tablet` export/import in `CafeViewModel.kt`/`MenuImportParser.kt`; `my-app` tablet ingest + import/export services per `contracts/bridge-schema.md`)
-- [ ] T026 [P] Void + re-enter on the tablet: VOID_PURCHASE action (stock rollback, cost/last-supplier fallback to previous non-void purchase, audit event, row kept append-only) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt` + UI entry in history detail
-- [ ] T027 [P] Void + re-enter on the web: same behavior in `my-app/modules/inventory/service.ts` + admin UI
+- [ ] T026 [P] Void + re-enter on the tablet: voiding **appends a compensating `VOID_PURCHASE` row** (`referenceType='void-of'` → original row id; the original is never modified), reverses stock in the same transaction, reverts `costPerUnit`/`lastSupplierId` **only when the voided row is the latest non-void purchase**, writes an audit event (`cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`); UI entry in history detail
+- [ ] T027 [P] Void + re-enter on the web: identical additive compensation semantics in `my-app/modules/inventory/service.ts` + admin UI
 - [ ] T028 [P] Unit tests for void reversal math (incl. voiding the only/latest purchase) on both platforms
 - [ ] T029 [P] Tablet↔PC bridge payload fields per `specs/014-purchase-supplier-insights/contracts/bridge-schema.md` (`cafeos-tablet/.../data/PcBridgeClient.kt`, `SocketSyncManager.kt`, `my-app` tablet ingest service)
 - [ ] T030 Audit events for purchase/void/bulk writes on both platforms (tablet `logAuditEvent`; web audit log)

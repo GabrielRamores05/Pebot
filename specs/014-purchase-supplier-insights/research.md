@@ -39,23 +39,23 @@ and the locked scope decisions from the spec.
 
 ## R5: Void + re-enter
 
-**Decision**: Purchases are not editable/deletable. A detail view on a purchase offers **Void**: one transaction that (a) subtracts the purchased quantity from stock, (b) rolls `costPerUnit` back to the unit cost of the previous remaining non-void purchase (or leaves it if none), (c) clears `lastSupplierId` if that purchase was the latest (falling back to the prior supplier), (d) marks the row type `VOID_PURCHASE` (append-only marker, original row kept), and (e) writes an audit event. The corrected purchase is then entered fresh.
+**Decision**: Purchases are not editable/deletable. Voiding appends a **compensating row** (`VOID_PURCHASE`, negative quantity, `referenceType='void-of'` → original row id); the original purchase row is never modified, preserving the append-only rule literally. One transaction reverses the stock effect and — only when the voided row is the latest non-void purchase of that ingredient — reverts `costPerUnit` and `lastSupplierId` to the previous non-void purchase (or null); an audit event is written. The corrected purchase is then entered fresh.
 
-**Rationale**: Satisfies the locked Q3 decision and the constitution's append-only money rule with a reversible, auditable primitive rather than destructive edits.
+**Rationale**: Satisfies the locked Q3 decision and the constitution's append-only money rule without an in-place record mutation (the original VOID-by-rewrite design conflicted with "records are never modified"). Latest-only rollback keeps the current cost/latest-supplier truthful when an old purchase is voided.
 
-**Alternatives considered**: physical delete (violates constitution); direct UPDATE (same violation); "negative compensating purchase" row instead of a type marker — viable but complicates "previous purchase" math; keeping the original row with a VOID type is the simplest correct projection rule (queries filter out VOID rows from latest/trend math).
+**Alternatives considered**: physical delete (violates constitution); direct UPDATE (same violation); rewriting the original row's type to a VOID marker (rejected post-analysis: mutates an append-only record); a negative compensating row with a `void-of` reference — chosen.
 
 ## R6: Bulk adjust = stock corrections only
 
-**Decision**: One bulk screen (ingredient rows with current stock + target/delta inputs and a per-row reason note) supports increase and decrease. Saving runs one transaction writing an `ADJUSTMENT` (increase) / `ADJUSTMENT`-with-negative-quantity (decrease) row per ingredient, referencing the batch (`notes`/batch id). No supplier, no cost, no unit cost change (locked Q1 decision). Resulting low-stock flags appear immediately from the shared threshold logic.
+**Decision**: One bulk screen (ingredient rows with current stock + target/delta inputs and a per-row reason note) supports increase and decrease. Saving runs one transaction writing an `ADJUSTMENT` (increase) / `ADJUSTMENT`-with-negative-quantity (decrease) row per ingredient, referencing the batch (`notes`/batch id). No supplier, no cost, no unit cost change (locked Q1 decision). Resulting low-stock flags appear immediately from the shared threshold logic. Batch identity = the first `ADJUSTMENT` row's id in every row's `referenceId`. Manual corrections may not push stock below zero (validated pre-transaction).
 
-**Rationale**: Matches the locked decision, keeps bulk out of the money ledger, and can reuse the existing adjust-stock DAO path in a loop inside one transaction.
+**Rationale**: Matches the locked decision, keeps bulk out of the money ledger, and can reuse the existing adjust-stock DAO path in a loop inside one transaction. A zero floor keeps inventory counts meaningful; the transaction guard prevents partial batches.
 
 ## R7: Analytics reflection of low-stock thresholds
 
 **Decision**: The analytics inventory summary shows three counts — healthy / low (stock ≤ threshold, stock > 0) / out (stock ≤ 0) — plus total stock value (Σ currentStock × costPerUnit) and per-ingredient low/out flags computed from the same threshold rule used by the ingredient page and alerts (locked Q2 decision: no restock guidance).
 
-**Rationale**: One threshold rule in one domain service, consumed by every surface, guarantees the "change it once, reflected everywhere" acceptance criterion and keeps analytics free of procurement suggestions for v1.
+**Rationale**: One threshold rule in one domain service, consumed by every surface, guarantees the "change it once, reflected everywhere" acceptance criterion and keeps analytics free of procurement suggestions for v1. The rule is explicit at the boundary (stock equal to the threshold is LOW) and unit-tested on both platforms so the ingredient page, alerts, and analytics can never disagree.
 
 **Alternatives considered**: restock suggestions with supplier/latest price (deferred by Q2 decision); duplicating the low-stock rule inside analytics (rejected — drift risk, violates the consistency criterion).
 

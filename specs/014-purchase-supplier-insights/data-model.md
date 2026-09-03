@@ -32,7 +32,8 @@ Represents one stocked item whose stock is tracked in a single **base unit**.
 ### IngredientTransaction (existing — now the full purchase/adjustment ledger)
 
 Append-only; every stock movement is one row. `type` values used: `PURCHASE`,
-`ADJUSTMENT`, `USAGE`, `OPENING`, and the new `VOID_PURCHASE` marker.
+`ADJUSTMENT`, `USAGE`, `OPENING`, and `VOID_PURCHASE` (an appended compensating
+row that reverses a purchase — the original row is never modified).
 
 | Attribute | Type | Notes |
 |-----------|------|-------|
@@ -85,21 +86,31 @@ Ingredient 1 ───< IngredientTransaction (all types) ─── order consum
 - Purchase: draft (form) → `PURCHASE` row written; ingredient `currentStock += qty`;
   `costPerUnit = total/qty(base)`; `lastSupplierId = supplier` (when given).
   All inside one transaction.
-- Void purchase: `PURCHASE` row → `VOID_PURCHASE` (same row, type changed once —
-  the only permitted mutation, audited); stock subtracts back; costPerUnit and
-  lastSupplierId roll back to the previous remaining purchase (or null) in the
-  same transaction; audit event written.
+- Void purchase: a **compensating row** is appended: `type = 'VOID_PURCHASE'`,
+  `quantity = -qty`, `referenceType = 'void-of'`, `referenceId = <original row id>`.
+  The original `PURCHASE` row is **never modified**. In the same transaction:
+  stock subtracts back; if the voided row was the latest non-void purchase of that
+  ingredient, `costPerUnit` and `lastSupplierId` revert to the previous non-void
+  purchase (or null when none); an audit event is written. Voiding a purchase
+  that is NOT the latest only reverses stock.
 - Bulk adjustment: per row → new `ADJUSTMENT` row; stock changed; one transaction
-  for the whole batch.
+  for the whole batch. Batch identity = the first `ADJUSTMENT` row's id, written
+  into every row's `referenceId` with `referenceType = 'batch'`. No batch row may
+  push an ingredient's stock below zero (validated before the transaction).
 
 ## Invariants
 
 - Every purchase/void/bulk write happens in exactly one DB transaction
   (stock + ledger + cached latest supplier/cost can never disagree).
+- A purchase row is never updated or deleted; voiding appends a compensation row.
 - Trend/latest queries ignore VOID rows; row-id order defines "previous".
 - `lastSupplierId` is derived-only-consistent: any recompute path must reproduce
-  "latest non-void purchase's supplier" exactly.
+  "latest non-void purchase's supplier" exactly, and deleting a supplier
+  recomputes (or clears) it for every affected ingredient.
 - The low/out rule is implemented once per platform and shared by ingredient
-  page, alerts, and analytics.
+  page, alerts, and analytics: healthy = `currentStock > minStock`, low =
+  `0 < currentStock <= minStock` (stock equal to the threshold is low), out =
+  `currentStock <= 0`.
 - Client-submitted unit costs are never accepted; unit cost = stored total ÷
   stored converted quantity.
+- Manual stock corrections (bulk or single) never push stock below zero.

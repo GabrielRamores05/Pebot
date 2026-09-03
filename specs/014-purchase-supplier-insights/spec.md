@@ -90,7 +90,7 @@ The owner raises the low-stock threshold for coffee beans. The change is reflect
 
 - Purchase recorded with quantity 0 or negative → rejected with a clear message; nothing is written.
 - Purchase with a unit the system cannot convert to the ingredient's base unit → rejected before saving with an explanation of supported units.
-- Deleting or hiding a product/supplier that has history → history and trend numbers must stay intact (records are append-only).
+- Deleting or hiding a supplier that has history → purchase history and trend numbers stay intact, the supplier can only be deleted after warning, and every ingredient whose `latest supplier` pointed at it falls back to its prior supplier (or "none"), never a broken reference.
 - Two purchases at the exact same unit cost → trend shows 0.00 (₱0.00 / 0%), never "no data".
 - Supplier renamed/edited → previous purchase rows and trends keep pointing at the supplier record consistently.
 - Bulk adjustment where an ingredient is locked/out-of-stock/inactive → row is shown disabled with a reason; no silent skip.
@@ -105,9 +105,9 @@ The owner raises the low-stock threshold for coffee beans. The change is reflect
 - **FR-004**: Each ingredient MUST show its latest supplier and latest unit cost at a glance on the ingredient page.
 - **FR-005**: Purchase history MUST be explorable per ingredient: opening an entry shows supplier, date, quantity (as entered and in base unit), total, unit cost, and the unit-cost change vs the previous purchase of that ingredient (₱ and %).
 - **FR-006**: The supplier page MUST list all ingredients that supplier has provided, with the latest price from that supplier and the ₱/% change vs the previous price from that supplier.
-- **FR-007**: Staff MUST be able to bulk-adjust stock levels for multiple ingredients in one screen and save them in one action.
+- **FR-007**: Staff MUST be able to bulk-adjust stock levels for multiple ingredients in one screen and save them in one action. Bulk rows are stock corrections only (no supplier/cost); a bulk save may not push any ingredient's stock below zero — below-zero rows are rejected with a message before anything is written.
 - **FR-008**: Low-stock thresholds MUST remain adjustable per ingredient, and the low/high state derived from the threshold MUST be consistent across the ingredient page, alert lists, and the analytics inventory summary. Decision (Q2 = A): the analytics summary shows **low-stock counts and total stock value** derived from the thresholds — it does not generate restock/purchasing suggestions in v1.
-- **FR-009**: All purchase records, stock changes, and price data MUST be append-only money records. Decision (Q3 = A): a mistaken purchase is corrected by a **void + re-enter** flow — voiding rolls back stock and unit cost, marks the row VOID, and writes an audit entry; the correct purchase is then entered as a new row. Direct editing/deleting of a recorded purchase is not offered in v1.
+- **FR-009**: All purchase records, stock changes, and price data MUST be append-only money records. Decision (Q3 = A): a mistaken purchase is corrected by a **void + re-enter** flow. Voiding **never modifies the original record** — it appends a compensating `VOID` record that reverses the purchase's stock effect and, when the voided purchase is the latest non-void purchase of that ingredient, rolls the ingredient's unit cost and latest supplier back to the previous non-void purchase. Every void writes an audit event. Direct editing/deleting of a recorded purchase is not offered in v1.
 
 ### Key Entities *(include if feature involves data)*
 

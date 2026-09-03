@@ -35,16 +35,22 @@ has data).
 2. Save. Expected: all three current-stock values update immediately; each
    shows a new ADJUSTMENT history row referencing the same batch; low-stock
    flags appear/disappear instantly per the thresholds; no cost or supplier
-   changed on any row.
+   changed on any row; all rows share one batch id.
+3. Try decreasing an ingredient below zero in the same screen: expected a
+   rejection message and **no** rows written for the whole batch.
 
 ## QS-4: Void + re-enter
 
 1. From a purchase detail row, choose Void.
-2. Expected: stock rolls back by that purchase's quantity; unit cost rolls back
-   to the previous non-void purchase's unit cost (QS-1 scenario: back to
-   ₱0.40/g); latest supplier rolls back to the prior one (or none); the row now
-   shows VOID and is excluded from latest/trend numbers; an audit event exists.
-3. Re-enter the corrected purchase normally and confirm QS-1 numbers return.
+2. Expected: a **compensating VOID record is appended** — the original purchase
+   row is never modified; stock rolls back by that purchase's quantity. If the
+   voided purchase was the latest non-void purchase, unit cost rolls back to the
+   previous non-void purchase's unit cost (QS-1 scenario: back to ₱0.40/g) and
+   latest supplier rolls back to the prior one (or none); VOID records are
+   excluded from latest/trend numbers; an audit event exists.
+3. Voiding an **older** purchase instead: expected stock rolls back but current
+   unit cost and latest supplier stay unchanged.
+4. Re-enter the corrected purchase normally and confirm QS-1 numbers return.
 
 ## QS-5: Threshold drives every surface
 
@@ -52,7 +58,9 @@ has data).
 2. Expected, with no other action: ingredient page flags Low; the inventory
    alert list includes it; the Analytics inventory summary shows the new low
    count and the total stock value that includes its stock × latest cost.
-3. Lower the threshold back below stock → all flags clear together.
+3. Set `minStock` exactly equal to current stock: expected LOW on every surface
+   (boundary rule: stock equal to threshold is low).
+4. Lower the threshold back below stock → all flags clear together.
 
 ## QS-6: Parity between tablet and web
 
@@ -70,4 +78,8 @@ has data).
   message.
 - Voiding the only purchase → stock returns to prior level, cost/last-supplier
   become "none", no crash, audit written.
+- Voiding a non-latest purchase → stock only; current cost/latest supplier
+  unchanged.
 - Two purchases at identical unit cost → trend shows ₱0.00 / 0%.
+- Stock exactly equal to the low-stock threshold → ingredient is LOW on every
+  surface.
