@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   calcIngredientCost,
   calcInventoryValue,
+  calcPriceChange,
   calcPricePerUnit,
   calcWeightedAverage,
   convertFromBase,
@@ -88,5 +89,28 @@ describe('ingredient validation', () => {
     expect(getStockStatus(0, 5)).toBe('OUT_OF_STOCK');
     expect(getStockStatus(5, 5)).toBe('LOW_STOCK');
     expect(getStockStatus(6, 5)).toBe('IN_STOCK');
+  });
+});
+
+describe('price change (spec 014 trends)', () => {
+  test('first purchase has no comparison', () => {
+    expect(calcPriceChange(null, 0.5)).toBeNull();
+    expect(calcPriceChange(undefined, 0.5)).toBeNull();
+  });
+
+  test('equal prices show zero change', () => {
+    expect(calcPriceChange(0.5, 0.5)).toEqual({ delta: 0, percent: 0 });
+  });
+
+  test('increase computes delta and percent', () => {
+    expect(calcPriceChange(0.4, 0.5)).toEqual({ delta: 0.1, percent: 25 });
+  });
+
+  test('decrease computes negative delta and percent', () => {
+    expect(calcPriceChange(0.5, 0.4)).toEqual({ delta: -0.1, percent: -20 });
+  });
+
+  test('previous zero yields zero percent but real delta', () => {
+    expect(calcPriceChange(0, 0.75)).toEqual({ delta: 0.75, percent: 0 });
   });
 });

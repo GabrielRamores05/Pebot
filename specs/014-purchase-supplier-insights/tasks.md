@@ -61,7 +61,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 - [X] T008 (web purchase write aligned to latest-cost + supplier-link via modules/inventory/repository.ts, thin route) [US1] Web purchase write: implement record-purchase in `my-app/modules/inventory/service.ts` (same math/transaction semantics) with Prisma access only via `my-app/modules/inventory/repository.ts`
 - [X] T009 [P] [US1] Tablet UI: Record Purchase in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt` â€” purchase-unit selector (real-world unit), auto-calculated unit-cost preview line, supplier picker (existing inline lists)
 - [ ] T010 [P] [US1] Web UI: purchase form with unit selector + auto unit-cost in `my-app/app/admin/inventory/page.tsx` (and any route handler in `my-app/app/api/` for it)
-- [ ] T011 [P] [US1] Unit tests for purchase math (conversion, unit cost replace, no-trust validation) on both platforms: `cafeos-tablet/app/src/test/.../PurchaseMathTest.kt` and `my-app/modules/inventory/*.test.ts` â€” write first, confirm they fail, then implement
+- [X] T011 [P] [US1] Unit tests for purchase math (conversion, unit cost replace, no-trust validation) on both platforms: `cafeos-tablet/app/src/test/.../PurchaseMathTest.kt` and `my-app/modules/inventory/*.test.ts` â€” write first, confirm they fail, then implement
 
 **Checkpoint**: US1 works end-to-end on both apps (QS-1). MVP is complete and demoable.
 
@@ -76,7 +76,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 - [X] T012 [US2] Tablet data: DAO queries for latest purchase per ingredient and previous purchase per ingredient (row-id ordering, ignoring VOID) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt` + ViewModel accessors in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`
 - [X] T013 [US2] Tablet UI: ingredient card shows latest supplier name (from `lastSupplierId`) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt`; clicking a history row opens a detail dialog with supplier, entered/base quantities, total, unit cost, â‚± and % change vs previous
 - [ ] T014 [US2] Web: trend queries in `my-app/modules/inventory/repository.ts` + service, UI for ingredient detail/history in `my-app/app/admin/inventory/page.tsx`
-- [ ] T015 [P] [US2] Trend-math unit tests (first purchase â†’ no comparison; equal price â†’ â‚±0.00/0%; increase and decrease cases) on both platforms
+- [X] T015 [P] [US2] Trend-math unit tests (first purchase â†’ no comparison; equal price â†’ â‚±0.00/0%; increase and decrease cases) on both platforms
 
 **Checkpoint**: US1 + US2 function independently (QS-2).
 
@@ -219,6 +219,7 @@ Task: "Web UI (T010) in app/admin/inventory/page.tsx"
 - Money and stock writes are append-only and single-transaction (constitution); VOID replaces edit/delete
 - Unit costs are always computed from stored quantity + total â€” never accepted from the client
 - Commit after each task or logical group; stop at checkpoints to validate the story independently
+
 
 
 

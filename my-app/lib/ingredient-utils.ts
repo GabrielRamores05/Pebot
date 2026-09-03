@@ -117,6 +117,22 @@ export function calcInventoryValue(currentStock: number, costPerUnit: number): n
  * Converts from base-unit cost to purchase-unit or a more natural display unit.
  * e.g. if baseUnit=g and costPerUnit=0.60, display "₱0.60/g" or "₱600.00/kg"
  */
+
+/**
+ * Price change vs the previous purchase (spec 014): delta in ₱ and percent,
+ * both rounded to 2dp. Returns null when there is no previous price to compare.
+ * Percent is 0 when the previous price was 0 (undefined ratio).
+ */
+export function calcPriceChange(
+  previousUnitCost: number | null | undefined,
+  latestUnitCost: number,
+): { delta: number; percent: number } | null {
+  if (previousUnitCost == null) return null;
+  const delta = Math.round((latestUnitCost - previousUnitCost) * 100) / 100;
+  const percent = previousUnitCost === 0 ? 0 : Math.round((delta / previousUnitCost) * 10000) / 100;
+  return { delta, percent };
+}
+
 export function formatUnitCost(costPerUnit: number, baseUnit: string): string {
   if (baseUnit === 'g') {
     const perKg = costPerUnit * 1000;
