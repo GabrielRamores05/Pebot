@@ -34,6 +34,7 @@ fun ExpensesScreen(viewModel: CafeViewModel) {
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
     val dateFormatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
     var showAddDialog by remember { mutableStateOf(false) }
+    var showCategories by remember { mutableStateOf(false) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -45,14 +46,21 @@ fun ExpensesScreen(viewModel: CafeViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Expenses", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
-            Button(
-                onClick = { editingExpense = null; showAddDialog = true },
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PosAccent)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = { showCategories = true },
+                    border = androidx.compose.foundation.BorderStroke(1.dp, PosBorder)
+                ) { Text("Categories", color = PosGold) }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Expense", fontWeight = FontWeight.SemiBold)
+                Button(
+                    onClick = { editingExpense = null; showAddDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PosAccent)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Add Expense", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
 
@@ -125,6 +133,74 @@ fun ExpensesScreen(viewModel: CafeViewModel) {
             }
         )
     }
+
+    if (showCategories) {
+        ExpenseCategoriesDialog(
+            categories = expenseCategories,
+            onDismiss = { showCategories = false },
+            onAdd = { name -> viewModel.addExpenseCategory(name.trim()) },
+            onDelete = { category -> scope.launch { viewModel.deleteExpenseCategory(category) } }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExpenseCategoriesDialog(
+    categories: List<ExpenseCategory>,
+    onDismiss: () -> Unit,
+    onAdd: (String) -> Unit,
+    onDelete: (ExpenseCategory) -> Unit
+) {
+    var nameText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Expense Categories", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.height(300.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = nameText,
+                        onValueChange = { nameText = it },
+                        label = { Text("New category") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (nameText.isNotBlank()) {
+                                onAdd(nameText)
+                                nameText = ""
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PosAccent),
+                        shape = RoundedCornerShape(10.dp)
+                    ) { Text("Add", fontWeight = FontWeight.SemiBold) }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(categories) { category ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(category.name, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                            IconButton(onClick = { onDelete(category) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = PosDanger, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done", color = PosAccent) } },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(20.dp)
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

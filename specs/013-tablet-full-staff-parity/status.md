@@ -4,6 +4,13 @@ Last updated: 2026-09-04 (goal rounds 0–18). Gates last verified (round 18):
 Android lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/
 tsc clean/test:unit (422) green.
 
+## Latest increments (rounds 37–39)
+
+- Order-detail receipt reprint (Live Orders & Order History) via receipt printer.
+- Expense Categories management UI (add/delete) — feeds the expense editor's
+  category-id linking.
+- Full Android gates green at each checkpoint; commits through `888ee8f`.
+
 ## Latest increments (rounds 34–36)
 
 - Kitchen order cards: order-type badge + elapsed time, red/bold after 10 min in
