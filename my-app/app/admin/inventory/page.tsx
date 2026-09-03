@@ -1144,7 +1144,7 @@ const [shopName, setShopName] = useState('CafeOS');
                     <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
                       <p className="text-sm text-green-800 font-medium">Purchase recorded!</p>
                       <p className="text-xs text-green-700 mt-1">
-                        Price Per Unit: ₱{purchaseResult.pricePerUnit} | New Stock: {purchaseResult.newStock} | Weighted Avg Cost/Unit: ₱{purchaseResult.newWeightedCost}
+                        Price Per Unit: ₱{purchaseResult.pricePerUnit} | New Stock: {purchaseResult.newStock} | Latest Cost/Unit: ₱{purchaseResult.newWeightedCost}
                       </p>
                     </div>
                   )}

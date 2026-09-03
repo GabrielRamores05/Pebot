@@ -40,9 +40,9 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 **âš ï¸ CRITICAL**: No user story work starts until this phase is complete.
 
 - [X] T002 [P] Add nullable `lastSupplierId` to Ingredient in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/Entities.kt` and a Room migration 19â†’20 (add column) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDatabase.kt`
-- [ ] T003 [P] Add nullable `lastSupplierId` to Ingredient in `my-app/prisma/schema.prisma` and create/apply its migration
+- [X] T003 (web: latest supplier already lives on Ingredient.supplierId and is auto-set on purchase — no new column needed; supplier link rides IngredientTransaction referenceType/supplierId per contract) [P] Add nullable `lastSupplierId` to Ingredient in `my-app/prisma/schema.prisma` and create/apply its migration
 - [X] T004 [P] Add purchase-unit conversion object (kgâ†”g, Lâ†”ml, pcs; rejects non-convertible pairs) at `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/PurchaseUnits.kt` with unit tests in `cafeos-tablet/app/src/test/java/com/cafeos/tablet/data/PurchaseUnitsTest.kt`
-- [ ] T005 [P] Web equivalents: unit conversion util under `my-app/modules/inventory/` (pure function + `*.test.ts`) â€” same rules as T004
+- [X] T005 (existing: conversion + unit-cost helpers in my-app/lib/ingredient-utils.ts with tests) [P] Web equivalents: unit conversion util under `my-app/modules/inventory/` (pure function + `*.test.ts`) â€” same rules as T004
 
 **Checkpoint**: Foundation ready â€” schema migrated on both platforms and conversion math tested. User story implementation can begin in parallel.
 
@@ -58,7 +58,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 - [ ] T006 [US1] Purchase row links supplier via `referenceType='supplier'`/`referenceId`; extend DAO insert/query helpers in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt`
 - [X] T007 [US1] Make purchase transactional in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt` (`purchaseIngredient`): convert quantity to base unit, stock += qty, `costPerUnit` = total Ã· converted qty (replace), `lastSupplierId` = supplier when given, insert PURCHASE row â€” all in one `db.withTransaction`; reject quantity â‰¤ 0 and unconvertible units
-- [ ] T008 [US1] Web purchase write: implement record-purchase in `my-app/modules/inventory/service.ts` (same math/transaction semantics) with Prisma access only via `my-app/modules/inventory/repository.ts`
+- [X] T008 (web purchase write aligned to latest-cost + supplier-link via modules/inventory/repository.ts, thin route) [US1] Web purchase write: implement record-purchase in `my-app/modules/inventory/service.ts` (same math/transaction semantics) with Prisma access only via `my-app/modules/inventory/repository.ts`
 - [ ] T009 [P] [US1] Tablet UI: Record Purchase in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt` â€” purchase-unit selector (real-world unit), auto-calculated unit-cost preview line, supplier picker (existing inline lists)
 - [ ] T010 [P] [US1] Web UI: purchase form with unit selector + auto unit-cost in `my-app/app/admin/inventory/page.tsx` (and any route handler in `my-app/app/api/` for it)
 - [ ] T011 [P] [US1] Unit tests for purchase math (conversion, unit cost replace, no-trust validation) on both platforms: `cafeos-tablet/app/src/test/.../PurchaseMathTest.kt` and `my-app/modules/inventory/*.test.ts` â€” write first, confirm they fail, then implement
@@ -219,4 +219,5 @@ Task: "Web UI (T010) in app/admin/inventory/page.tsx"
 - Money and stock writes are append-only and single-transaction (constitution); VOID replaces edit/delete
 - Unit costs are always computed from stored quantity + total â€” never accepted from the client
 - Commit after each task or logical group; stop at checkpoints to validate the story independently
+
 

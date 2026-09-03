@@ -1,6 +1,6 @@
  
 import { prisma } from '@/lib/prisma';
-import { convertToBase, calcPricePerUnit, calcWeightedAverage } from '@/lib/ingredient-utils';
+import { convertToBase, calcPricePerUnit } from '@/lib/ingredient-utils';
 import { productsUsingIngredient, recomputeProducts } from '@/lib/availability';
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,11 @@ export async function findIngredientTransactions(
   });
 }
 
-// Transactional purchase — wraps weighted-average cost + stock + transaction creation
+// Transactional purchase (spec 014): latest purchase price replaces the
+// ingredient cost-per-unit (owner decision), the supplier is linked on the
+// transaction row (referenceType 'supplier' — same contract as the tablet),
+// and stock + ledger write in one transaction. Unit cost is stored per BASE
+// unit so trends and cross-platform numbers match the tablet.
 export async function recordIngredientPurchase(
   params: {
     ingredientId: number;
@@ -154,14 +158,13 @@ export async function recordIngredientPurchase(
 
     const quantityInBase = convertToBase(params.quantity, params.purchaseUnit);
     if (quantityInBase <= 0) throw new Error('Converted quantity must be greater than 0');
+    if (params.purchaseCost < 0) throw new Error('Purchase cost must not be negative');
 
     const pricePerUnit = calcPricePerUnit(params.purchaseCost, params.quantity, params.purchaseUnit);
-    const newCostPerUnit = calcWeightedAverage(
-      ingredient.costPerUnit,
-      ingredient.currentStock,
-      params.purchaseCost,
-      quantityInBase,
-    );
+    const unitCostBase = quantityInBase > 0
+      ? Math.round((params.purchaseCost / quantityInBase) * 100) / 100
+      : 0;
+    const newCostPerUnit = unitCostBase; // latest purchase price replaces the previous value
     const newStock = ingredient.currentStock + quantityInBase;
 
     const transaction = await tx.ingredientTransaction.create({
@@ -170,10 +173,10 @@ export async function recordIngredientPurchase(
         type: 'PURCHASE',
         quantity: quantityInBase,
         purchaseCost: params.purchaseCost,
-        unitCost: pricePerUnit ?? 0,
+        unitCost: unitCostBase,
         purchaseUnit: params.purchaseUnit,
-        referenceId: null,
-        referenceType: null,
+        referenceId: params.supplierId ?? null,
+        referenceType: params.supplierId != null ? 'supplier' : null,
         notes: params.notes || null,
         userId: params.userId ?? null,
         locationId,
@@ -189,6 +192,8 @@ export async function recordIngredientPurchase(
       },
     });
 
+    // newWeightedCost is kept as a compatibility alias; the semantics are now
+    // "latest purchase price per base unit" (see spec 014 decision Q-cost).
     return { ingredient: updated, transaction, pricePerUnit, newStock, newWeightedCost: newCostPerUnit };
   });
 }
