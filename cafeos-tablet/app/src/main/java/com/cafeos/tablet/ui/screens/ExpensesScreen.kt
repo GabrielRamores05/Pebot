@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,25 +43,22 @@ fun ExpensesScreen(viewModel: CafeViewModel) {
         PremiumHeader("Expenses", "Track operating costs with clarity")
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Expenses", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(
-                    onClick = { showCategories = true },
-                    border = androidx.compose.foundation.BorderStroke(1.dp, PosBorder)
-                ) { Text("Categories", color = PosGold) }
+            OutlinedButton(
+                onClick = { showCategories = true },
+                border = androidx.compose.foundation.BorderStroke(1.dp, PosBorder)
+            ) { Text("Categories", color = PosGold) }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = { editingExpense = null; showAddDialog = true },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PosAccent)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { editingExpense = null; showAddDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PosAccent)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add Expense", fontWeight = FontWeight.SemiBold)
-                }
+                Text("Add Expense", fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -74,9 +72,9 @@ fun ExpensesScreen(viewModel: CafeViewModel) {
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Total Expenses", style = MaterialTheme.typography.titleMedium, color = PosPaper.copy(alpha = 0.9f))
+                Text("Total Expenses", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(currencyFormatter.format(totalExpenses), style = MaterialTheme.typography.headlineLarge, color = PosPaper, fontWeight = FontWeight.Bold)
+                Text(currencyFormatter.format(totalExpenses), style = MaterialTheme.typography.headlineLarge, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
 

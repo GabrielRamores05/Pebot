@@ -881,11 +881,9 @@ fun VoucherApplicationSection(viewModel: CafeViewModel, totalAmount: Double) {
 
     var voucherExpanded by remember { mutableStateOf(false) }
 
-    val isVoucherCompatible = discountType == "NONE" || discountType == "VOUCHER"
-
     ExposedDropdownMenuBox(
         expanded = voucherExpanded,
-        onExpandedChange = { if (isVoucherCompatible) voucherExpanded = it }
+        onExpandedChange = { voucherExpanded = it }
     ) {
         OutlinedTextField(
             value = selectedVoucher?.code ?: "Select voucher",
@@ -902,7 +900,7 @@ fun VoucherApplicationSection(viewModel: CafeViewModel, totalAmount: Double) {
                 disabledBorderColor = MaterialTheme.colorScheme.outline,
                 disabledTrailingIconColor = PosMuted
             ),
-            enabled = isVoucherCompatible
+            enabled = true
         )
 
         ExposedDropdownMenu(expanded = voucherExpanded, onDismissRequest = { voucherExpanded = false }) {
@@ -917,14 +915,21 @@ fun VoucherApplicationSection(viewModel: CafeViewModel, totalAmount: Double) {
                                 style = MaterialTheme.typography.bodySmall,
                                 color = PosMuted
                             )
+                            if (!isApplicable && voucher.minOrderAmount > 0) {
+                                Text(
+                                    "Requires minimum of ₱${voucher.minOrderAmount}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PosMuted
+                                )
+                            }
                         }
                     },
-                onClick = {
-                    if (isApplicable) {
-                        viewModel.setSelectedVoucher(voucher)
-                    }
-                    voucherExpanded = false
-                },
+                    onClick = {
+                        if (isApplicable) {
+                            viewModel.setSelectedVoucher(voucher) // also clears any PWD/Student discount
+                        }
+                        voucherExpanded = false
+                    },
                     enabled = isApplicable
                 )
             }

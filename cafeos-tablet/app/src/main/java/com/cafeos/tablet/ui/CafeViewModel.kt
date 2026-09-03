@@ -709,7 +709,19 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteProduct(product: Product) {
         viewModelScope.launch {
-            dao.deleteProduct(product)
+            try {
+                dao.deleteProduct(product)
+                logAuditEvent("PRODUCT_DELETE", "product", product.id, details = product.name)
+            } catch (e: Exception) {
+                // Past orders reference this product (RESTRICT FK): hard delete is
+                // not allowed. Hide it from the menu instead — never crash the app.
+                try {
+                    dao.updateProduct(product.copy(available = false))
+                    logAuditEvent("PRODUCT_DELETE_BLOCKED", "product", product.id, details = "${product.name} hidden (was ordered in the past)")
+                } catch (_: Exception) {
+                    // give up quietly — the app must not close over a delete
+                }
+            }
         }
     }
 
