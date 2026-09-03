@@ -1651,7 +1651,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         importedCount++
                     }
                     for (option in data.options) {
-                        dao.insertOption(Option(id = option.id, groupId = option.groupId, name = option.name, priceDelta = option.priceDelta, sortOrder = option.sortOrder))
+                        dao.insertOption(Option(id = option.id, groupId = option.groupId, name = option.name, priceDelta = option.priceDelta, sortOrder = option.sortOrder, ingredientId = option.ingredientId, ingredientQuantity = option.ingredientQuantity))
                         importedCount++
                     }
                     for (expense in data.expenses) {
@@ -1806,7 +1806,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             dao.getProductOptionGroups(product.id).map { pog -> ExportedProductOptionGroup(pog.id, pog.productId, pog.groupId) }
         }
         val allOptions = optionGroups.flatMap { group ->
-            dao.getOptionsByGroup(group.id).map { opt -> ExportedOption(opt.id, opt.groupId, opt.name, opt.priceDelta, opt.sortOrder) }
+            dao.getOptionsByGroup(group.id).map { opt -> ExportedOption(opt.id, opt.groupId, opt.name, opt.priceDelta, opt.sortOrder, opt.ingredientId, opt.ingredientQuantity) }
         }
 
         val productMap = products.associateBy { it.id }
@@ -2251,7 +2251,11 @@ data class ExportedOption(
     val groupId: Int,
     val name: String,
     val priceDelta: Double,
-    val sortOrder: Int
+    val sortOrder: Int,
+    // Ingredient link: choosing this option consumes `ingredientQuantity` of
+    // `ingredientId`. Null = the option only adds price, no stock movement.
+    val ingredientId: Int? = null,
+    val ingredientQuantity: Double = 0.0
 )
 
 @Serializable
