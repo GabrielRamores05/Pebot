@@ -132,6 +132,10 @@ data class Ingredient(
     val currentStock: Double = 0.0,
     val minStock: Double = 0.0,
     val costPerUnit: Double = 0.0,
+    // Latest supplier of this ingredient (spec 014). Written inside the same
+    // transaction as a purchase; null = never purchased. Not a hard FK so the
+    // supplier can be deleted without breaking history — deletion recomputes it.
+    val lastSupplierId: Int? = null,
     val updatedAt: Long = System.currentTimeMillis()
 )
 
@@ -151,10 +155,15 @@ data class Ingredient(
 data class IngredientTransaction(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val ingredientId: Int,
-    val type: String, // PURCHASE, USAGE, ADJUSTMENT, OPENING
+    val type: String, // PURCHASE, USAGE, ADJUSTMENT, OPENING, VOID_PURCHASE
     val quantity: Double,
     val referenceId: Int? = null,
-    val referenceType: String? = null, // "order" or null
+    val referenceType: String? = null, // "supplier" | "void-of" | "batch" | "order" | null
+    // Purchase detail (spec 014): the unit the amount was entered in, the total
+    // pesos paid, and the per-base-unit cost at purchase time (display + trends).
+    val purchaseUnit: String? = null,
+    val purchaseCost: Double? = null,
+    val unitCost: Double? = null,
     val notes: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

@@ -55,7 +55,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SupplierIngredientPrice::class,
         OutboxEntry::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 abstract class CafeDatabase : RoomDatabase() {
@@ -153,6 +153,22 @@ abstract class CafeDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v19 -> v20 (spec 014): Ingredient.lastSupplierId (latest supplier
+         * cache) and IngredientTransaction purchase-detail columns
+         * (purchaseUnit/purchaseCost/unitCost) so purchase history and price
+         * trends can be shown from the append-only ledger on the tablet, mirroring
+         * the Windows Prisma model. All metadata-only ALTERs — no table rebuilds.
+         */
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE Ingredient ADD COLUMN lastSupplierId INTEGER")
+                db.execSQL("ALTER TABLE IngredientTransaction ADD COLUMN purchaseUnit TEXT")
+                db.execSQL("ALTER TABLE IngredientTransaction ADD COLUMN purchaseCost REAL")
+                db.execSQL("ALTER TABLE IngredientTransaction ADD COLUMN unitCost REAL")
+            }
+        }
+
         fun getDatabase(context: Context): CafeDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -161,7 +177,7 @@ abstract class CafeDatabase : RoomDatabase() {
                     "pebot_database"
                 )
                 // Real migrations for every versioned change going forward.
-                .addMigrations(MIGRATION_17_18, MIGRATION_18_19)
+                .addMigrations(MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
                 // Legacy fallback: builds before v17 had no migration history and
                 // destructive upgrades were the established behavior; keeping the
                 // fallback until the v17 baseline is in the field lets old alpha

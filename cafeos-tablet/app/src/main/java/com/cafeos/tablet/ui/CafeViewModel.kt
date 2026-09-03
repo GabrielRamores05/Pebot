@@ -884,18 +884,71 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun purchaseIngredient(ingredientId: Int, quantity: Double, unitCost: Double, supplierId: Int? = null, notes: String? = null) {
+        // Legacy path (base-unit entry): quantity is already in the ingredient's
+        // base unit and unitCost = total ÷ quantity. Delegates to the one shared
+        // transactional purchase path so stock, cost, supplier and history can
+        // never diverge (spec 014, US1).
         val ingredient = dao.getIngredientSync(ingredientId) ?: return
-        val newStock = ingredient.currentStock + quantity
-        dao.updateIngredient(ingredient.copy(currentStock = newStock, costPerUnit = unitCost))
-        dao.insertIngredientTransaction(
-            IngredientTransaction(
-                ingredientId = ingredientId,
-                type = "PURCHASE",
-                quantity = quantity,
-                notes = notes,
-                createdAt = System.currentTimeMillis()
-            )
+        commitPurchase(
+            ingredientId = ingredientId,
+            purchaseUnit = ingredient.baseUnit,
+            quantity = quantity,
+            totalCost = quantity * unitCost,
+            supplierId = supplierId,
+            notes = notes
         )
+    }
+
+    /** Unit-aware purchase entry (spec 014): converts to the base unit, stores the
+     *  auto-computed latest unit cost and the supplier link in ONE transaction. */
+    suspend fun purchaseIngredientWithUnits(
+        ingredientId: Int,
+        purchaseUnit: String,
+        quantity: Double,
+        totalCost: Double,
+        supplierId: Int? = null,
+        notes: String? = null,
+        purchaseName: String? = null
+    ) {
+        commitPurchase(ingredientId, purchaseUnit, quantity, totalCost, supplierId, notes, purchaseName)
+    }
+
+    private suspend fun commitPurchase(
+        ingredientId: Int,
+        purchaseUnit: String,
+        quantity: Double,
+        totalCost: Double,
+        supplierId: Int?,
+        notes: String?,
+        purchaseName: String? = null
+    ) {
+        db.withTransaction {
+            val ingredient = dao.getIngredientSync(ingredientId) ?: return@withTransaction
+            val baseQty = PurchaseUnits.toBaseQuantity(ingredient.baseUnit, purchaseUnit, quantity) ?: return@withTransaction
+            val unitCost = PurchaseUnits.unitCost(ingredient.baseUnit, purchaseUnit, quantity, totalCost) ?: return@withTransaction
+            dao.updateIngredient(
+                ingredient.copy(
+                    currentStock = ingredient.currentStock + baseQty,
+                    costPerUnit = unitCost,           // latest purchase price replaces (Q3 decision)
+                    lastSupplierId = supplierId,      // null when this purchase has no supplier
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            dao.insertIngredientTransaction(
+                IngredientTransaction(
+                    ingredientId = ingredientId,
+                    type = "PURCHASE",
+                    quantity = baseQty,
+                    referenceType = if (supplierId != null) "supplier" else null,
+                    referenceId = supplierId,
+                    purchaseUnit = purchaseUnit,
+                    purchaseCost = totalCost,
+                    unitCost = unitCost,
+                    notes = (if (!purchaseName.isNullOrBlank()) "$purchaseName · " else "") + (notes ?: ""),
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+        }
     }
 
     suspend fun adjustStock(ingredientId: Int, newStock: Double, notes: String? = null) {
