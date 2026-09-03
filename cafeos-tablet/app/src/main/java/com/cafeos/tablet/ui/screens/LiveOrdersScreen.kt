@@ -220,6 +220,16 @@ fun KanbanOrderCard(
                     Column {
                         Text(order.orderNumber, style = MaterialTheme.typography.labelMedium, color = PosPaper, fontWeight = FontWeight.Bold)
                         Text(order.tableLocation ?: order.tableId?.let { "Table $it" } ?: "Takeaway", style = MaterialTheme.typography.labelSmall, color = PosAccent, fontWeight = FontWeight.Bold)
+                        Text(
+                            when (order.orderType) {
+                                "DELIVERY" -> "🛵 Delivery"
+                                "TAKEOUT" -> "🥡 Takeout"
+                                else -> "🍽️ Dine-in"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PosGold,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
                 Surface(

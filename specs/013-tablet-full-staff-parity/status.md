@@ -13,6 +13,12 @@ green, and committed. What is NOT yet done (see below) is substantial UI and
 live-bridge work plus hardware acceptance; spec 013 should continue in a future
 session starting from this file.
 
+## Latest increments (rounds 45–48)
+
+- Live Orders kanban cards show the order-type badge (web parity).
+- Both-platform gates green through round 46 (Android lint/tests/APK; web
+  lint 0 errors/tsc clean/unit 422). Working tree clean.
+
 ## Latest increments (rounds 43–44)
 
 - Reviews admin: Reviews / Taste Suggestions toggle + per-product filter + product
