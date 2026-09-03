@@ -42,8 +42,8 @@ fun PremiumScreen(
         modifier = modifier
             .fillMaxSize()
             .background(PosCoffee)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content
     )
 }
@@ -57,11 +57,11 @@ fun PremiumHeader(
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Text(title, style = MaterialTheme.typography.headlineMedium, color = PosInk, fontWeight = FontWeight.Bold)
-            subtitle?.let { Text(it, color = PosInkSoft, style = MaterialTheme.typography.bodySmall) }
+            Text(title, style = MaterialTheme.typography.headlineSmall, color = PosInk, fontWeight = FontWeight.Bold)
+            subtitle?.let { Text(it, color = PosMuted, style = MaterialTheme.typography.labelMedium) }
         }
         action?.invoke()
     }

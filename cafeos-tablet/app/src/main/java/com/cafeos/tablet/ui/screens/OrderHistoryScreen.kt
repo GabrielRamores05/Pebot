@@ -5,8 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -50,17 +51,18 @@ fun OrderHistoryScreen(viewModel: CafeViewModel) {
     }
 
     PremiumScreen {
-        PremiumHeader("Order History", "Search, review, and export completed sales")
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Order History", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { templateLauncher.launch("order-history-template.csv") }) { Text("Template") }
-                OutlinedButton(onClick = { importLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel")) }) { Text("Import") }
-                Button(onClick = { exportLauncher.launch("order-history.csv") }, colors = ButtonDefaults.buttonColors(containerColor = PosAccent)) { Text("Export") }
+        PremiumHeader(
+            "Order History",
+            action = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { templateLauncher.launch("order-history-template.csv") }) { Text("Template") }
+                    OutlinedButton(onClick = { importLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel")) }) { Text("Import") }
+                    Button(onClick = { exportLauncher.launch("order-history.csv") }, colors = ButtonDefaults.buttonColors(containerColor = PosAccent)) { Text("Export") }
+                }
             }
-        }
-        importMessage?.let { Text(it, color = PosGold, modifier = Modifier.padding(top = 8.dp)) }
-        Spacer(modifier = Modifier.height(12.dp))
+        )
+        importMessage?.let { Text(it, color = PosGold, modifier = Modifier.padding(top = 4.dp)) }
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Filters mirror the Windows Order History page (search, status, presets).
         var query by remember { mutableStateOf("") }
@@ -109,16 +111,20 @@ fun OrderHistoryScreen(viewModel: CafeViewModel) {
         Spacer(modifier = Modifier.height(8.dp))
         Text("${filteredOrders.size} orders", style = MaterialTheme.typography.labelSmall, color = PosMuted)
 
-        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (filteredOrders.isEmpty()) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
-                        Text("No orders match your filters", color = PosMuted)
-                    }
-                }
+        if (filteredOrders.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
+                Text("No orders match your filters", color = PosMuted)
             }
-            items(filteredOrders) { order ->
-                OrderCard(order, currencyFormatter, dateFormatter, onClick = { selectedOrder = order })
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 340.dp),
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                gridItems(filteredOrders) { order ->
+                    OrderCard(order, currencyFormatter, dateFormatter, onClick = { selectedOrder = order })
+                }
             }
         }
     }

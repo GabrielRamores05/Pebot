@@ -54,12 +54,26 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     val discoveredSyncHosts: StateFlow<List<String>> = syncManager.discoveredHosts
 
     init {
+        // The QR ordering/kitchen pages must always be reachable on the LAN —
+        // not only after the user opens Connection and toggles host mode.
+        ensureWebServerRunning()
         if (savedSyncMode == "host") startSyncHost()
         viewModelScope.launch {
             syncManager.orderUpdates.collectLatest { event ->
                 event?.let { applyIncomingOrder(it) }
             }
         }
+    }
+
+    private fun ensureWebServerRunning() {
+        if (webServerStarted) return
+        try {
+            webServer.start()
+            webServerStarted = true
+        } catch (error: Exception) {
+            error.printStackTrace()
+        }
+        _webHostAddress.value = "http://${LocalWebServer.getLocalAddress()}:${LocalWebServer.PORT}"
     }
 
     private suspend fun applyIncomingOrder(event: OrderSyncEvent) {

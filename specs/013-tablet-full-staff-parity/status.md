@@ -5,6 +5,26 @@ lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/tsc
 clean/test:unit (422) green. Nine checkpoint commits: `3cea69c`, `dd3bb73`,
 `fce2a39`, `8a69d8a`, `ddc46cd`, `888ee8f`, `6249bf0`, `0d47d23`, `9dfa25c`.
 
+## Layout / space batch (2026-09-04, follow-up)
+
+- Inventory Products cards now show **plain availability numbers** (5,554 / 833…)
+  instead of "Can make NNN" (still "—" for recipe-less, red 0 when none).
+- Inventory **Ingredients and Suppliers are now 5-per-row grids** (like
+  Products); Capacity is a 5-per-row grid with stacked, wrapping "Limited by"
+  lines (was rendering vertically in a cramped row).
+- The redundant full-width top bar (PEBOT POS / Operations / Local workspace +
+  logout) is removed from every page — **Log out now lives at the bottom of the
+  side rail**. Page headers (PremiumHeader/PremiumScreen) slimmed globally
+  (smaller titles/subtitles, tighter spacing).
+- Order History: duplicate "Order History" heading removed (title now carries
+  the Template/Import/Export actions) and the history list is now a responsive
+  multi-column grid so many orders are visible per screen.
+- **QR ordering page now always runs**: `LocalWebServer` starts at app init
+  (not only after toggling host mode), so http://<tablet-ip>:3000/menu is
+  reachable on the LAN whenever the app is up (verified: port 3000 listening,
+  browser connects). The earlier "This site can't be reached" was the server
+  not being auto-started.
+
 ## Owner bug-fix / UI batch (2026-09-04, interactive session)
 
 Owner decisions this round: (1) customer orders may choose **Pay at counter**

@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
@@ -180,8 +182,9 @@ fun MainScreen() {
 
                         Column(
                             modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
-                                .fillMaxSize()
                         ) {
                             var lastGroup: String? = null
                             items.forEachIndexed { index, item ->
@@ -247,36 +250,30 @@ fun MainScreen() {
                                 )
                             }
                         }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { currentStaff = null }
+                                .padding(vertical = 10.dp, horizontal = 12.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Logout,
+                                contentDescription = "Log out",
+                                tint = PosCream.copy(alpha = 0.9f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            if (!navCollapsed) {
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text("Log out", color = PosCream.copy(alpha = 0.85f), style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
                     }
                 }
 
                 Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = PosCoffeeLight,
-                        shadowElevation = 1.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 9.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text("PEBOT POS", style = MaterialTheme.typography.titleMedium, color = PosInk, fontWeight = FontWeight.Bold)
-                                Text("Operations", style = MaterialTheme.typography.labelSmall, color = PosInkSoft)
-                            }
-                            Surface(color = PosAccentSoft, shape = RoundedCornerShape(50.dp)) {
-                                Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                    Box(Modifier.size(7.dp).background(PosAccent, RoundedCornerShape(50.dp)))
-                                    Spacer(Modifier.width(7.dp))
-                                    Text("Local workspace", color = PosAccentHover, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                            IconButton(onClick = { currentStaff = null }) {
-                                Icon(Icons.Default.Logout, contentDescription = "Log out", tint = PosAccent)
-                            }
-                        }
-                    }
                     NavHost(
                         navController = navController,
                         startDestination = startDestination,

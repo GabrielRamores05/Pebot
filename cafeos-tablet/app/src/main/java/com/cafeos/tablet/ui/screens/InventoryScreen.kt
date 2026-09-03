@@ -43,6 +43,10 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
+/** Formats a stock value without trailing ".0" when it is a whole number. */
+private fun trimStock(value: Double): String =
+    if (value == value.toLong().toDouble()) value.toLong().toString() else "%.2f".format(value)
+
 @Composable
 fun InventoryScreen(viewModel: CafeViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
@@ -138,9 +142,9 @@ fun InventoryProductsTab(viewModel: CafeViewModel) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = when {
-                            units == null -> "No recipe"
-                            units > 0 -> "Can make $units"
-                            else -> "Out of stock"
+                            units == null -> "—"
+                            units > 0 -> NumberFormat.getNumberInstance(Locale.US).format(units)
+                            else -> "0"
                         },
                         style = MaterialTheme.typography.titleLarge,
                         color = when {
@@ -150,9 +154,6 @@ fun InventoryProductsTab(viewModel: CafeViewModel) {
                         },
                         fontWeight = FontWeight.Bold
                     )
-                    if (units == 0) {
-                        Text("Low Stock", color = PosDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    }
                 }
             }
         }
@@ -189,37 +190,48 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
             Button(onClick = { exportLauncher.launch("ingredients.csv") }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = PosAccent)) { Text("Export") }
         }
         importMessage?.let { Text(it, color = PosAccent, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
-        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(ingredients) { ingredient ->
+        // Ingredients in a dense 5-per-row grid (same as the Products tab) so a
+        // tablet shows the whole pantry at a glance; tap a card to adjust stock.
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(5),
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            gridItems(ingredients) { ingredient ->
                 val isLow = ingredient.currentStock <= ingredient.minStock
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAdjustDialog = ingredient },
+                    shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { showAdjustDialog = ingredient }
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(12.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(ingredient.name, style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                            Text(ingredient.category, style = MaterialTheme.typography.bodySmall, color = PosMuted)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "${ingredient.currentStock} ${ingredient.baseUnit}",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = if (isLow) PosDanger else PosGold,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (isLow) {
-                                Text("Low Stock", color = PosDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                            }
+                        Text(
+                            ingredient.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = PosPaper,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(ingredient.category, style = MaterialTheme.typography.bodySmall, color = PosMuted)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "${trimStock(ingredient.currentStock)} ${ingredient.baseUnit}",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = if (isLow) PosDanger else PosGold,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        if (isLow) {
+                            Text("Low Stock", color = PosDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -295,53 +307,65 @@ fun InventorySuppliersTab(viewModel: CafeViewModel) {
     val scope = rememberCoroutineScope()
 
     Column {
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(5),
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(suppliers) { supplier ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(supplier.name, style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                            Surface(
-                                color = if (supplier.status == "ACTIVE") PosAccent.copy(alpha = 0.15f) else PosDanger.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(20.dp)
+            gridItems(suppliers) { supplier ->
+                Column {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = supplier.status,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (supplier.status == "ACTIVE") PosAccent else PosDanger,
-                                    fontWeight = FontWeight.Bold
+                                    supplier.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PosPaper,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
                                 )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    color = if (supplier.status == "ACTIVE") PosAccent.copy(alpha = 0.15f) else PosDanger.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(20.dp)
+                                ) {
+                                    Text(
+                                        text = supplier.status,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (supplier.status == "ACTIVE") PosAccent else PosDanger,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
+                                }
                             }
+                            supplier.contactPerson?.let { Text("Contact: $it", style = MaterialTheme.typography.bodySmall, color = PosMuted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            supplier.phone?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = PosMuted) }
+                            supplier.email?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = PosMuted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         }
-                        supplier.contactPerson?.let { Text("Contact: $it", style = MaterialTheme.typography.bodySmall, color = PosMuted) }
-                        supplier.phone?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = PosMuted) }
-                        supplier.email?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = PosMuted) }
                     }
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp, end = 16.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = { editingSupplier = supplier; showAddDialog = true }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = PosGold, modifier = Modifier.size(18.dp))
-                    }
-                    TextButton(onClick = { scope.launch { viewModel.deleteSupplier(supplier) } }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = PosDanger, modifier = Modifier.size(18.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { editingSupplier = supplier; showAddDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = PosGold, modifier = Modifier.size(18.dp))
+                        }
+                        TextButton(onClick = { scope.launch { viewModel.deleteSupplier(supplier) } }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = PosDanger, modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
             }
@@ -394,21 +418,23 @@ fun InventoryCapacityTab(viewModel: CafeViewModel) {
         }
     }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(capacity) { cap ->
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(5),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        gridItems(capacity) { cap ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(cap.productName, style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Can produce: ${cap.producibleUnits} units", style = MaterialTheme.typography.bodyMedium, color = PosPaper)
-                        Text("Limited by: ${cap.limitingIngredient}", style = MaterialTheme.typography.bodyMedium, color = PosMuted)
-                    }
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(cap.productName, style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Can produce: ${cap.producibleUnits} units", style = MaterialTheme.typography.bodyMedium, color = PosPaper)
+                    Text("Limited by: ${cap.limitingIngredient}", style = MaterialTheme.typography.bodySmall, color = PosMuted, maxLines = 2)
                     Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(
                         progress = (cap.producibleUnits / 100.0).coerceIn(0.0, 1.0).toFloat(),
@@ -418,7 +444,7 @@ fun InventoryCapacityTab(viewModel: CafeViewModel) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Inventory capacity: ${cap.producibleUnits} product(s)",
+                        text = "${cap.producibleUnits} product(s)",
                         style = MaterialTheme.typography.bodySmall,
                         color = if (cap.producibleUnits > 0) PosAccent else PosDanger,
                         fontWeight = FontWeight.Bold
