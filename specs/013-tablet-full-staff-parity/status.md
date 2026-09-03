@@ -4,6 +4,14 @@ Last updated: 2026-09-04 (goal rounds 0–18). Gates last verified (round 18):
 Android lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/
 tsc clean/test:unit (422) green.
 
+## Latest increments (rounds 34–36)
+
+- Kitchen order cards: order-type badge + elapsed time, red/bold after 10 min in
+  PENDING/PREPARING (web urgent coloring).
+- Order-detail dialog (Live Orders & Order History) can reprint the official
+  receipt via the receipt printer.
+- `AccessControl` unit coverage extended for the stations route.
+
 ## Latest increments (rounds 32–33)
 
 - Receipt printer honors the configured footer message; Settings ▸ Receipts can

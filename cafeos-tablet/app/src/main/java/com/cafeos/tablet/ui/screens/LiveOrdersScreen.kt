@@ -26,6 +26,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 @Composable
 fun LiveOrdersScreen(viewModel: CafeViewModel) {
@@ -272,6 +273,8 @@ fun OrderDetailDialog(order: Order, viewModel: CafeViewModel, onDismiss: () -> U
     var loading by remember { mutableStateOf(true) }
     val products by viewModel.allProducts.collectAsState(initial = emptyList())
     val productMap = products.associateBy { it.id }
+    val businessSettings by viewModel.businessSettings.collectAsState(initial = null)
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(order.id) {
         items = viewModel.getOrderItemsSync(order.id)
@@ -383,6 +386,17 @@ fun OrderDetailDialog(order: Order, viewModel: CafeViewModel, onDismiss: () -> U
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val payment = viewModel.getPaymentsForOrder(order.id).firstOrNull()
+                            viewModel.receiptPrinter.printReceipt(order, items, products, businessSettings, optionMap, payment)
+                        }
+                    },
+                    enabled = !loading,
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, PosBorder)
+                ) { Text("Print Receipt", color = PosGold) }
                 if (order.status == "PENDING") {
                     Button(
                         onClick = { onStatusChange("PREPARING") },
