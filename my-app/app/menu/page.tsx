@@ -524,15 +524,20 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
             className="relative w-full overflow-hidden rounded-2xl border border-[#f3e6d8] bg-[linear-gradient(135deg,#fefaf3_0%,#f1e5d7_100%)]"
             style={{ aspectRatio: '4 / 3' }}
           >
+            <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(135deg,#fefaf3_0%,#f3e7d6_100%)] text-3xl">
+              {catIcon && (catIcon.startsWith('/') || catIcon.startsWith('http'))
+                ? <img src={catIcon} alt="" className="h-full w-full object-cover opacity-40" />
+                : <span className="font-semibold text-[#c9a06b]">{product.name.charAt(0).toUpperCase()}</span>}
+            </div>
             {product.imageUrl ? (
-              <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#fefaf3_0%,#f3e7d6_100%)] text-3xl">
-                {catIcon && (catIcon.startsWith('/') || catIcon.startsWith('http'))
-                  ? <img src={catIcon} alt="" className="h-full w-full object-cover" />
-                  : catIcon}
-              </div>
-            )}
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                loading="lazy"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+              />
+            ) : null}
           </div>
         </div>
 

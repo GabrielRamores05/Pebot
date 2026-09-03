@@ -174,6 +174,17 @@ export default function OptionGroupManager() {
   }
 
   // ── Per-product option CRUD ──────────────────────────────────────────────
+  /** Refresh the group list + counts and re-open the expanded group detail so
+   *  newly added/removed options (and their ingredient-delta rows) appear
+   *  immediately instead of only after a page refresh. */
+  function refreshAfterOptionChange(groupId: number) {
+    fetchGroups();
+    if (expanded === groupId) {
+      setExpanded(null);
+      window.setTimeout(() => setExpanded(groupId), 80);
+    }
+  }
+
   async function addOption(productId: number, groupId: number) {
     const draft = newOption[productId];
     if (!draft?.name.trim()) { alert('Option name required'); return; }
@@ -187,6 +198,7 @@ export default function OptionGroupManager() {
     });
     if (res.ok) {
       setNewOption((prev) => ({ ...prev, [productId]: { name: '', priceDelta: '' } }));
+      refreshAfterOptionChange(groupId);
     } else {
       const err = await res.json().catch(() => ({}));
       alert(err.error || 'Failed to add option');
@@ -206,9 +218,10 @@ export default function OptionGroupManager() {
     }
   }
 
-  async function deleteOption(optId: number) {
+  async function deleteOption(optId: number, productId?: number, groupId?: number) {
     if (!confirm('Delete this option?')) return;
-    await fetch(`/api/product-options/${optId}`, { method: 'DELETE' });
+    const res = await fetch(`/api/product-options/${optId}`, { method: 'DELETE' });
+    if (res.ok && groupId != null) refreshAfterOptionChange(groupId);
   }
 
   // ── Option drafts ────────────────────────────────────────────────────────
@@ -477,7 +490,7 @@ export default function OptionGroupManager() {
                         Save
                       </button>
                       <button
-                        onClick={() => deleteOption(opt.id)}
+                        onClick={() => deleteOption(opt.id, p.id, group.id)}
                         className="px-2 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100"
                       >
                         Del
