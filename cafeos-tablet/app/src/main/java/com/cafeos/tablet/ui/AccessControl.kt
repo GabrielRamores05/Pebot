@@ -84,6 +84,7 @@ object AccessControl {
         "products" -> "products"
         "inventory" -> "inventory"
         "tables" -> "tables"
+        "stations" -> "tables"
         "stock_history" -> "inventory"
         "reviews" -> "products"
         "audit_logs" -> "settings"

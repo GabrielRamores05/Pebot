@@ -112,6 +112,15 @@ fun VoucherCard(voucher: LoyaltyVoucher, currencyFormatter: NumberFormat, dateFo
     }
 }
 
+private fun formatVoucherDate(millis: Long): String =
+    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date(millis))
+
+private fun parseVoucherDate(text: String): Long? = try {
+    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(text)?.time
+} catch (_: Exception) {
+    null
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VoucherFormDialog(voucher: LoyaltyVoucher?, onDismiss: () -> Unit, onSave: (LoyaltyVoucher) -> Unit) {
@@ -122,8 +131,8 @@ fun VoucherFormDialog(voucher: LoyaltyVoucher?, onDismiss: () -> Unit, onSave: (
     var minOrderText by remember { mutableStateOf((voucher?.minOrderAmount ?: 0.0).toString()) }
     var maxDiscountText by remember { mutableStateOf((voucher?.maxDiscount ?: 0.0).toString()) }
     var usageLimitText by remember { mutableStateOf((voucher?.usageLimit ?: 0).toString()) }
-    var startDate by remember { mutableStateOf(voucher?.startDate ?: System.currentTimeMillis()) }
-    var endDate by remember { mutableStateOf(voucher?.endDate ?: System.currentTimeMillis()) }
+    var startDateText by remember { mutableStateOf(voucher?.let { formatVoucherDate(it.startDate) } ?: formatVoucherDate(System.currentTimeMillis())) }
+    var endDateText by remember { mutableStateOf(voucher?.let { formatVoucherDate(it.endDate) } ?: formatVoucherDate(System.currentTimeMillis() + 30L * 24 * 3600_000L)) }
     var active by remember { mutableStateOf(voucher?.active ?: true) }
 
     val voucherTypes = listOf("PROMO", "REWARD", "MILESTONE")
@@ -163,6 +172,10 @@ fun VoucherFormDialog(voucher: LoyaltyVoucher?, onDismiss: () -> Unit, onSave: (
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(value = usageLimitText, onValueChange = { usageLimitText = it.filter { c -> c.isDigit() } }, label = { Text("Usage Limit") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline), singleLine = true)
                 Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(value = startDateText, onValueChange = { startDateText = it }, label = { Text("Start date (yyyy-MM-dd)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline), singleLine = true)
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(value = endDateText, onValueChange = { endDateText = it }, label = { Text("Expiry date (yyyy-MM-dd)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline), singleLine = true)
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Active", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
@@ -174,6 +187,11 @@ fun VoucherFormDialog(voucher: LoyaltyVoucher?, onDismiss: () -> Unit, onSave: (
             Button(
                 onClick = {
                     if (code.isNotBlank()) {
+                        val fallbackStart = voucher?.startDate ?: System.currentTimeMillis()
+                        val fallbackEnd = voucher?.endDate ?: (System.currentTimeMillis() + 30L * 24 * 3600_000L)
+                        var startDate = parseVoucherDate(startDateText) ?: fallbackStart
+                        var endDate = parseVoucherDate(endDateText) ?: fallbackEnd
+                        if (endDate < startDate) endDate = startDate
                         val saved = if (voucher == null) {
                             LoyaltyVoucher(
                                 code = code, type = type, discountType = discountType,

@@ -520,6 +520,15 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             _selectedVoucher.value?.let { voucher ->
                 dao.updateVoucher(voucher.copy(usedCount = voucher.usedCount + 1))
             }
+            // A dine-in sale occupies its table (only when the table was free —
+            // never clobber an OCCUPIED/NEEDS_CLEANING state set by staff).
+            if (order.orderType == "DINE_IN" && order.tableId != null) {
+                dao.getTable(order.tableId!!)?.let { table ->
+                    if (table.status == "AVAILABLE") {
+                        dao.updateTable(table.copy(status = "OCCUPIED", updatedAt = System.currentTimeMillis()))
+                    }
+                }
+            }
             placedOrderOut = order.copy(id = orderId)
             placedItemsOut = orderItems
             } // end db.withTransaction

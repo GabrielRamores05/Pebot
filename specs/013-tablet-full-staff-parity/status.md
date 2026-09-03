@@ -1,8 +1,24 @@
 # Spec 013 — Progress Status
 
-Last updated: 2026-09-04 (goal rounds 0–8). Gates last verified: Android
-lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/tsc/test:unit
-(422) green.
+Last updated: 2026-09-04 (goal rounds 0–18). Gates last verified (round 18):
+Android lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/
+tsc clean/test:unit (422) green.
+
+## Latest increments (rounds 12–18)
+
+- Audit emission wired into key tablet actions (order status, staff CRUD,
+  voucher CRUD, business-settings saves) — the reachable Audit Log screen now
+  shows real append-only events.
+- PWD/Student discountReason unified to the web's `STUDENT_PWD`.
+- Order History: search + status chips + date presets + count + empty state.
+- Expense editor: payment-method selector (CASH/GCASH/BANK) and categoryId
+  linkage when the item name matches a configured Expense Category.
+- Staff editor: never echoes the hashed PIN; blank PIN on edit keeps the current
+  credential; role vocabulary favors ADMIN/STAFF/KITCHEN (legacy roles stay
+  editable and are still mapped by AccessControl).
+- Voucher editor: start/expiry dates are editable (yyyy-MM-dd) with safe
+  fallbacks.
+- Checkpoint commit on main: `3cea69c` (round 15) — 40 files, +2,657/−239.
 
 ## Implemented & verified (this program so far)
 

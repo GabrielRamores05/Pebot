@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.FormatListBulleted
@@ -105,6 +106,7 @@ fun MainScreen() {
         NavigationItem("Order History", Icons.Default.TableChart, "order_history", group = "MANAGEMENT"),
         NavigationItem("Reviews", Icons.Default.Star, "reviews", group = "MANAGEMENT"),
         NavigationItem("Tables", Icons.Default.TableBar, "tables", group = "MANAGEMENT"),
+        NavigationItem("Stations", Icons.Default.Build, "stations", group = "MANAGEMENT"),
         NavigationItem("Staff", Icons.Default.Group, "staff", group = "MANAGEMENT"),
         NavigationItem("Settings", Icons.Default.Settings, "settings", group = "MANAGEMENT"),
         NavigationItem("Consultant", Icons.Default.Chat, "consultant", group = "MANAGEMENT"),
@@ -294,6 +296,7 @@ fun MainScreen() {
                     composable("order_history") { if (canAccess("order_history")) OrderHistoryScreen(viewModel) else AccessDeniedScreen() }
                     composable("reviews") { if (canAccess("reviews")) ReviewsScreen(viewModel) else AccessDeniedScreen() }
                     composable("tables") { if (canAccess("tables")) TablesManagementScreen(viewModel) else AccessDeniedScreen() }
+                    composable("stations") { if (canAccess("stations")) StationsScreen(viewModel) else AccessDeniedScreen() }
                     composable("staff") { if (canAccess("staff")) StaffManagementScreen(viewModel) else AccessDeniedScreen() }
                     composable("settings") { if (canAccess("settings")) SettingsScreen(viewModel) else AccessDeniedScreen() }
                     composable("consultant") { if (canAccess("consultant")) AIConsultantScreen(viewModel) else AccessDeniedScreen() }
