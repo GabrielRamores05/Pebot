@@ -175,6 +175,22 @@ fun KitchenOrderCard(order: Order, viewModel: CafeViewModel, currencyFormatter: 
                 }
             }
 
+            val elapsedMinutes = ((System.currentTimeMillis() - order.createdAt) / 60_000L).toInt()
+            val elapsedLabel = if (elapsedMinutes < 60) "$elapsedMinutes min ago" else "${elapsedMinutes / 60}h ${elapsedMinutes % 60}m ago"
+            val urgent = (order.status == "PENDING" || order.status == "PREPARING") && elapsedMinutes >= 10
+            val orderTypeLabel = when (order.orderType) {
+                "DELIVERY" -> "🛵 Delivery"
+                "TAKEOUT" -> "🥡 Takeout"
+                else -> "🍽️ Dine-in"
+            }
+            Text(
+                text = "$orderTypeLabel · $elapsedLabel",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (urgent) PosDanger else PosGold,
+                fontWeight = if (urgent) FontWeight.Bold else FontWeight.Medium,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+
             Spacer(modifier = Modifier.height(12.dp))
             Divider(color = PosBorder.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(12.dp))

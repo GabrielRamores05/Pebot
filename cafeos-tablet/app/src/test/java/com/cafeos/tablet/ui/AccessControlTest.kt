@@ -102,6 +102,14 @@ class AccessControlTest {
     }
 
     @Test
+    fun stationsRouteGatesBehindTablesPermissionLikeWebHomeTab() {
+        val withTables = staff(permissions = """{"tables":true,"liveOrders":true}""")
+        assertTrue(AccessControl.canAccessRoute(withTables, "stations"))
+        val noTables = staff(permissions = """{"liveOrders":true}""")
+        assertFalse(AccessControl.canAccessRoute(noTables, "stations"))
+    }
+
+    @Test
     fun malformedPermissionsNeverCrash() {
         // Broken JSON object -> no tokens (conservative: nothing granted).
         assertTrue(AccessControl.permissionTokens("{not: json").isEmpty())
