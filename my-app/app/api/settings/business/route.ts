@@ -3,32 +3,29 @@ import { prisma } from '@/lib/prisma';
 import { logAction } from '@/lib/audit-log';
 import { badRequest, serverError } from '@/lib/api-response';
 import { guardFeature } from '@/lib/api-guards';
+import { createBusinessSettings, findBusinessSettings } from '@/modules/system/repository';
 
-// GET /api/settings/business - Get business settings
-export async function GET(req: NextRequest) {
-  // Check if user has access to settings feature
-  const { error } = await guardFeature(req, 'settings');
-  if (error) return error;
-
+// GET /api/settings/business - Get business settings.
+// Public: customers' cart/order pages load branding, payment-account and
+// receipt info without a session. Only PUT (updates) requires the settings role.
+export async function GET() {
   try {
-    let settings = await prisma.businessSettings.findFirst();
+    let settings = await findBusinessSettings();
 
     // Create default settings if none exist
     if (!settings) {
-      settings = await prisma.businessSettings.create({
-        data: {
-          businessName: 'CaféOS Coffee Shop',
-          businessAddress: '',
-          tin: '',
-          branchCode: '0000',
-          vatRate: 12,
-          receiptSerialPrefix: 'INV',
-          lastReceiptNumber: 0,
-          footerMessage: 'Thank you for your visit!',
-          loyaltyEnabled: true,
-          aiFolderAccess: false,
-          aiReadBirPricing: false,
-        },
+      settings = await createBusinessSettings({
+        businessName: 'CaféOS Coffee Shop',
+        businessAddress: '',
+        tin: '',
+        branchCode: '0000',
+        vatRate: 12,
+        receiptSerialPrefix: 'INV',
+        lastReceiptNumber: 0,
+        footerMessage: 'Thank you for your visit!',
+        loyaltyEnabled: true,
+        aiFolderAccess: false,
+        aiReadBirPricing: false,
       });
     }
 
