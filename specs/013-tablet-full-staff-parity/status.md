@@ -19,6 +19,18 @@ session starting from this file.
 - Both-platform gates green through round 46 (Android lint/tests/APK; web
   lint 0 errors/tsc clean/unit 422). Working tree clean.
 
+## Real-device verification (Galaxy Tab A9+, SM-X210, Android 16)
+
+Performed via adb over USB (install → cold launch → first-run admin creation →
+auto-login). Result: **zero FATAL exceptions** across the session; app process
+stays alive. Screens verified rendering with real content/empty states:
+Live Orders home (kanban + counts), New Order/POS (cart rail + checkout), Kitchen
+(station filtering + empty state), Products (categories/ingredients/new-product),
+Tables (empty state), Staff & HR (tabs incl. Add Staff), Settings (System/Business/
+Payments/Receipts/Voice tabs), Order History (new search/status/preset filters),
+Reviews (toggle + product filter + empty state). Remaining device checks
+(live sync with the PC, printing, camera/mic, full CRUD walkthroughs) are owner-run.
+
 ## Latest increments (rounds 43–44)
 
 - Reviews admin: Reviews / Taste Suggestions toggle + per-product filter + product
