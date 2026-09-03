@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.Expense
+import com.cafeos.tablet.data.ExpenseCategory
 import com.cafeos.tablet.ui.CafeViewModel
 import com.cafeos.tablet.ui.components.PremiumHeader
 import com.cafeos.tablet.ui.components.PremiumScreen
@@ -29,6 +30,7 @@ import java.util.*
 @Composable
 fun ExpensesScreen(viewModel: CafeViewModel) {
     val expenses by viewModel.allExpenses.collectAsState(initial = emptyList())
+    val expenseCategories by viewModel.allExpenseCategories.collectAsState(initial = emptyList())
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
     val dateFormatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
     var showAddDialog by remember { mutableStateOf(false) }
@@ -114,6 +116,7 @@ fun ExpensesScreen(viewModel: CafeViewModel) {
     if (showAddDialog) {
         ExpenseFormDialog(
             expense = editingExpense,
+            categories = expenseCategories,
             onDismiss = { showAddDialog = false; editingExpense = null },
             onSave = { saved ->
                 viewModel.addExpense(saved)
@@ -128,6 +131,7 @@ fun ExpensesScreen(viewModel: CafeViewModel) {
 @Composable
 fun ExpenseFormDialog(
     expense: Expense?,
+    categories: List<ExpenseCategory> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (Expense) -> Unit
 ) {
@@ -167,6 +171,19 @@ fun ExpenseFormDialog(
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
+                Text("Payment Method", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("CASH", "GCASH", "BANK").forEach { method ->
+                        FilterChip(
+                            selected = paymentMethod == method,
+                            onClick = { paymentMethod = method },
+                            label = { Text(method) },
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosAccentSoft, selectedLabelColor = PosAccent)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = notesText,
                     onValueChange = { notesText = it },
@@ -181,10 +198,13 @@ fun ExpenseFormDialog(
                 onClick = {
                     val amount = amountText.toDoubleOrNull() ?: 0.0
                     if (itemNameText.isNotBlank() && amount > 0) {
+                        // Link the category id when the typed name matches a
+                        // configured expense category (v18 field parity).
+                        val matchedCategory = categories.firstOrNull { it.name.equals(itemNameText.trim(), ignoreCase = true) }
                         val saved = if (expense == null) {
-                            Expense(category = itemNameText, supplierId = null, amount = amount, notes = notesText.ifBlank { null }, paidBy = paidByText.ifBlank { null }, paymentMethod = paymentMethod)
+                            Expense(category = itemNameText.trim(), categoryId = matchedCategory?.id, supplierId = null, amount = amount, notes = notesText.ifBlank { null }, paidBy = paidByText.ifBlank { null }, paymentMethod = paymentMethod)
                         } else {
-                            expense.copy(category = itemNameText, supplierId = null, amount = amount, notes = notesText.ifBlank { null }, paidBy = paidByText.ifBlank { null }, paymentMethod = paymentMethod)
+                            expense.copy(category = itemNameText.trim(), categoryId = matchedCategory?.id, supplierId = null, amount = amount, notes = notesText.ifBlank { null }, paidBy = paidByText.ifBlank { null }, paymentMethod = paymentMethod)
                         }
                         onSave(saved)
                     }

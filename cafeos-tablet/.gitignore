@@ -26,6 +26,7 @@
 # Keystore
 *.keystore
 *.jks
+keystore.properties
 
 # Generated sources from KSP/KAPT
 /build/

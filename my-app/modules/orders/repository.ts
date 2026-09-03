@@ -69,6 +69,25 @@ export async function findOrderByIdSimple(id: number, locationId: number = 1) {
   return prisma.order.findFirst({ where: { id, locationId } });
 }
 
+// ----- Tablet ingest lookups (spec 013 Phase 2): resolve by name because id
+// ----- spaces differ between devices -----
+export async function findProductsByNames(names: string[], locationId: number = 1) {
+  if (names.length === 0) return [];
+  return prisma.product.findMany({ where: { name: { in: names }, locationId } as any });
+}
+
+export async function findProductOptionByName(productId: number, groupName: string, optionName: string) {
+  const group = await prisma.optionGroup.findFirst({ where: { name: groupName } as any });
+  if (!group) return null;
+  return prisma.productOption.findFirst({
+    where: { productId, groupId: group.id, name: optionName },
+  } as any);
+}
+
+export async function findRestaurantTableByName(name: string) {
+  return prisma.restaurantTable.findFirst({ where: { name } } as any);
+}
+
 export async function findOrderByOrderNumber(orderNumber: string, locationId: number = 1) {
   return prisma.order.findFirst({ where: { orderNumber, locationId } });
 }

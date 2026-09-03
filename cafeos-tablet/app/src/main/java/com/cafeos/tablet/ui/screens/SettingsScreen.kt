@@ -47,7 +47,11 @@ fun SettingsScreen(viewModel: CafeViewModel) {
             scope.launch {
                 try {
                     val result = viewModel.importAllData(context, uri)
-                    importResult = "Imported: ${result.imported}. Skipped: ${result.skipped}"
+                    importResult = if (result.success) {
+                        "Imported: ${result.imported}. Skipped: ${result.skipped}"
+                    } else {
+                        result.message ?: "Import failed"
+                    }
                 } catch (e: Exception) {
                     importResult = "Error: ${e.message}"
                 } finally {
@@ -263,6 +267,7 @@ fun BusinessSettingsContent(businessSettings: BusinessSettings?, onSave: (Busine
     var tin by remember { mutableStateOf(businessSettings?.tin ?: "") }
     var branchCode by remember { mutableStateOf(businessSettings?.branchCode ?: "") }
     var vatRate by remember { mutableStateOf((businessSettings?.vatRate ?: 12.0).toString()) }
+    var studentPwdRate by remember { mutableStateOf((businessSettings?.studentPwdDiscountRate ?: 20.0).toString()) }
     var quotaMode by remember { mutableStateOf(businessSettings?.dailyQuotaMode ?: "ORDERS") }
     var quotaTarget by remember { mutableStateOf((businessSettings?.dailyQuotaTarget ?: 0.0).toString()) }
 
@@ -299,6 +304,12 @@ fun BusinessSettingsContent(businessSettings: BusinessSettings?, onSave: (Busine
                     label = { Text("VAT Rate (%)") }, modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = studentPwdRate, onValueChange = { studentPwdRate = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("Student / PWD Discount (%)") }, modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Daily Quota", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
@@ -317,7 +328,7 @@ fun BusinessSettingsContent(businessSettings: BusinessSettings?, onSave: (Busine
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { onSave((businessSettings ?: BusinessSettings()).copy(shopName = shopName, tin = tin.ifBlank { null }, branchCode = branchCode.ifBlank { null }, vatRate = vatRate.toDoubleOrNull() ?: 12.0, dailyQuotaMode = quotaMode, dailyQuotaTarget = quotaTarget.toDoubleOrNull() ?: 0.0)) },
+                    onClick = { onSave((businessSettings ?: BusinessSettings()).copy(shopName = shopName, tin = tin.ifBlank { null }, branchCode = branchCode.ifBlank { null }, vatRate = vatRate.toDoubleOrNull() ?: 12.0, studentPwdDiscountRate = studentPwdRate.toDoubleOrNull() ?: 20.0, dailyQuotaMode = quotaMode, dailyQuotaTarget = quotaTarget.toDoubleOrNull() ?: 0.0)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PosAccent)
@@ -440,7 +451,7 @@ fun ReceiptSettingsContent(businessSettings: BusinessSettings?, onSave: (Busines
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Next receipt will be: ${receiptPrefix}-${(lastNumber.toIntOrNull() ?: 0 + 1).toString().padStart(6, '0')}",
+                    text = "Next receipt will be: ${receiptPrefix}-${((lastNumber.toIntOrNull() ?: 0) + 1).toString().padStart(6, '0')}",
                     style = MaterialTheme.typography.bodySmall,
                     color = PosMuted
                 )

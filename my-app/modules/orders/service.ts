@@ -72,6 +72,81 @@ export async function listOrders(input: unknown) {
 }
 
 // ---------------------------------------------------------------------------
+// Tablet ingest (spec 013 Phase 2) — a paired tablet posts an order; the PC
+// resolves products/options/tables by NAME (device id spaces differ), then runs
+// the exact same createOrder path so totals, vouchers, loyalty, stock and the
+// receipt sequence are all derived server-side. Never trust client pesos: the
+// payload carries only identities (product/option names, discount reason).
+// ---------------------------------------------------------------------------
+
+export async function ingestTabletOrder(payload: Record<string, unknown>) {
+  const rawItems = (payload.items as Array<Record<string, unknown>> | undefined) ?? [];
+  if (rawItems.length === 0) throw setErrorStatus(new Error('At least one item is required'), 400);
+
+  const names = rawItems.map((i) => String(i.productName ?? '')).filter((n) => n.length > 0);
+  const found = await repo.findProductsByNames(names);
+  const productByName = new Map(found.map((p: any) => [p.name, p]));
+
+  const items: { productId: number; quantity: number; notes?: string; optionIds?: number[] }[] = [];
+  for (const raw of rawItems) {
+    const product = productByName.get(String(raw.productName ?? ''));
+    if (!product) {
+      throw setErrorStatus(new Error(`Product "${String(raw.productName ?? '')}" is not on the café menu`), 409);
+    }
+    const quantity = Number(raw.quantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw setErrorStatus(new Error('Each product must have a valid quantity'), 400);
+    }
+    const optionIds: number[] = [];
+    for (const opt of (raw.options as Array<Record<string, unknown>> | undefined) ?? []) {
+      const record = await repo.findProductOptionByName(product.id, String(opt.name ?? ''), String(opt.value ?? ''));
+      if (record) optionIds.push(record.id);
+    }
+    items.push({
+      productId: product.id,
+      quantity,
+      notes: typeof raw.notes === 'string' && raw.notes ? raw.notes : undefined,
+      ...(optionIds.length > 0 ? { optionIds } : {}),
+    });
+  }
+
+  // Table mapping: resolve by the tablet-sent table name when possible.
+  const tableName = payload.tableName;
+  let tableId: number | undefined;
+  if (typeof tableName === 'string' && tableName.trim()) {
+    const table = await repo.findRestaurantTableByName(tableName.trim());
+    if (table) tableId = table.id;
+  }
+
+  // Discount identities only. Student/PWD (settings-driven on both devices) and
+  // reward vouchers are re-derived by createOrder server-side.
+  const reason = typeof payload.discountReason === 'string' ? payload.discountReason : null;
+  const voucherLike = reason && !reason.startsWith('PWD') && !reason.startsWith('STUDENT');
+  const input: Record<string, unknown> = {
+    customerName: typeof payload.customerName === 'string' && payload.customerName.trim()
+      ? payload.customerName.trim()
+      : 'Walk-in Customer',
+    items,
+    orderType: payload.orderType ?? 'DINE_IN',
+    deliveryAddress: typeof payload.deliveryAddress === 'string' ? payload.deliveryAddress : null,
+    notes: typeof payload.notes === 'string' && payload.notes ? payload.notes : undefined,
+    paymentMethod: String(payload.paymentMethod ?? 'CASH').toUpperCase() === 'PAYMAYA' ? 'MAYA' : String(payload.paymentMethod ?? 'CASH').toUpperCase(),
+    paymentConfirmed: true,
+    ...(tableId ? { tableId } : {}),
+    ...(payload.loyaltyCustomerName ? { loyaltyCustomerName: payload.loyaltyCustomerName } : {}),
+  };
+  if (reason && (reason === 'PWD_DISCOUNT' || reason === 'STUDENT_DISCOUNT' || reason === 'STUDENT_PWD')) {
+    input.discountReason = 'STUDENT_PWD';
+    input.discountRate = Number(payload.discountRate ?? 0.2);
+  } else if (voucherLike && reason) {
+    input.loyaltyVoucherCodes = [reason];
+  }
+
+  const order = await createOrder(input as any);
+  return { ok: true, orderId: order.id, orderNumber: order.orderNumber, totalAmount: Number(order.totalAmount) };
+}
+
+// ---------------------------------------------------------------------------
 // Create order
 // ---------------------------------------------------------------------------
 

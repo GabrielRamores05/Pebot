@@ -10,6 +10,7 @@ import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import com.cafeos.tablet.data.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,7 @@ import okio.use
 
 class CafeViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = CafeDatabase.getDatabase(application).cafeDao()
+    private val db = CafeDatabase.getDatabase(application)
     private val syncManager = SocketSyncManager(application)
     private val webServer = LocalWebServer(dao) { order -> announceOrder(order) }
     private val textToSpeech = TextToSpeech(application) { status ->
@@ -208,6 +210,9 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     private val _orderType = MutableStateFlow("DINE_IN")
     val orderType: StateFlow<String> = _orderType.asStateFlow()
 
+    private val _deliveryAddress = MutableStateFlow("")
+    val deliveryAddress: StateFlow<String> = _deliveryAddress.asStateFlow()
+
     private val _paymentMethod = MutableStateFlow("CASH")
     val paymentMethod: StateFlow<String> = _paymentMethod.asStateFlow()
 
@@ -280,6 +285,10 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         _orderType.value = type
     }
 
+    fun setDeliveryAddress(address: String) {
+        _deliveryAddress.value = address
+    }
+
     fun setPaymentMethod(method: String) {
         _paymentMethod.value = method
     }
@@ -306,13 +315,18 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDiscountType(type: String) {
         _discountType.value = type
-        when (type) {
-            "PWD" -> _discountRate.value = 0.20
-            "STUDENT" -> _discountRate.value = 0.20
-            "VOUCHER" -> _discountRate.value = 0.0
-            else -> _discountRate.value = 0.0
+        // Discount rate comes from the shop's BusinessSettings (web parity:
+        // studentPwdDiscountRate is configurable in Settings ▸ Business), not a
+        // hard-coded 20%.
+        viewModelScope.launch {
+            val settings = dao.getBusinessSettingsSync() ?: BusinessSettings()
+            val rate = when (type) {
+                "PWD", "STUDENT" -> (settings.studentPwdDiscountRate / 100.0).coerceIn(0.0, 1.0)
+                else -> 0.0
+            }
+            _discountRate.value = rate
+            calculateTotals()
         }
-        calculateTotals()
     }
 
     fun setSelectedVoucher(voucher: LoyaltyVoucher?) {
@@ -422,7 +436,14 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             val total = _finalTotal.value
             val tendered = if (_paymentMethod.value == "CASH") _amountTendered.value.toDoubleOrNull() else total
             if (tendered == null || tendered < total) return@launch
+            if (_orderType.value == "DELIVERY" && _deliveryAddress.value.isBlank()) return@launch
             val subtotal = _subtotalAmount.value
+            var placedOrderOut: Order? = null
+            var placedItemsOut: List<OrderItem> = emptyList()
+            // The whole order write — receipt number, order+items+options, stock
+            // consumption, payment, voucher use — is one transaction so a partial
+            // failure can never leave a half-recorded sale (constitution §III/§VII).
+            db.withTransaction {
             val nextReceipt = getNextReceiptNumber()
             val order = Order(
                 orderNumber = nextReceipt,
@@ -432,13 +453,14 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                 discountAmount = subtotal - total,
                 discountRate = _discountRate.value,
                  discountReason = when (_discountType.value) {
-                    "PWD" -> "PWD_DISCOUNT"
-                    "STUDENT" -> "STUDENT_DISCOUNT"
+                    // Web vocabulary: one code covers both PWD and Student.
+                    "PWD", "STUDENT" -> "STUDENT_PWD"
                     "VOUCHER" -> _selectedVoucher.value?.code
                     else -> null
                 },
                 paymentMethod = _paymentMethod.value,
                 orderType = _orderType.value,
+                deliveryAddress = if (_orderType.value == "DELIVERY") _deliveryAddress.value.trim().ifBlank { null } else null,
                 tableId = _selectedTableId.value,
                 tableLocation = _selectedTableId.value?.let { tableId ->
                     val table = dao.getTable(tableId)
@@ -489,6 +511,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                 Payment(
                     orderId = orderId,
                     method = _paymentMethod.value,
+                    amount = total,
                     amountTendered = tendered,
                     change = change,
                     screenshotPath = _screenshotPath.value
@@ -497,10 +520,14 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             _selectedVoucher.value?.let { voucher ->
                 dao.updateVoucher(voucher.copy(usedCount = voucher.usedCount + 1))
             }
+            placedOrderOut = order.copy(id = orderId)
+            placedItemsOut = orderItems
+            } // end db.withTransaction
 
-            _placedOrder.value = order.copy(id = orderId)
-            syncManager.handleOrderPlaced(order.copy(id = orderId), orderItems)
-            announceOrder(order.copy(id = orderId))
+            val placedOrder = placedOrderOut ?: return@launch
+            _placedOrder.value = placedOrder
+            syncManager.handleOrderPlaced(placedOrder, placedItemsOut)
+            announceOrder(placedOrder)
             _cartItems.clear()
             _totalAmount.value = 0.0
             _subtotalAmount.value = 0.0
@@ -510,6 +537,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             _showCheckout.value = false
             _paymentMethod.value = "CASH"
             _orderType.value = "DINE_IN"
+            _deliveryAddress.value = ""
              _discountType.value = "NONE"
             _selectedVoucher.value = null
             _discountRate.value = 0.0
@@ -565,11 +593,20 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     fun updateOrderStatus(orderId: Int, newStatus: String, adminAuthorized: Boolean = false) {
         if (newStatus == "CANCELLED" && !adminAuthorized) return
         viewModelScope.launch {
-            val order = dao.getOrderById(orderId)
-            order?.let {
-                dao.updateOrder(it.copy(status = newStatus))
-                syncManager.handleOrderPlaced(it.copy(status = newStatus))
+            db.withTransaction {
+                val order = dao.getOrderById(orderId) ?: return@withTransaction
+                if (order.status == newStatus) return@withTransaction
+                dao.updateOrder(order.copy(status = newStatus, updatedAt = System.currentTimeMillis()))
+                if (newStatus == "CANCELLED") {
+                    // Reverse everything the sale consumed, atomically (web parity:
+                    // "Order cancelled: stock restored").
+                    restoreStockForOrder(order)
+                    revertVoucherForOrder(order)
+                }
             }
+            val updated = dao.getOrderById(orderId) ?: return@launch
+            syncManager.handleOrderPlaced(updated)
+            logAuditEvent("ORDER_STATUS", "order", orderId, details = newStatus)
         }
     }
 
@@ -778,6 +815,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun updateBusinessSettings(settings: BusinessSettings) {
         dao.upsertBusinessSettings(settings)
+        logAuditEvent("SETTINGS_UPDATE", "business_settings", 1)
     }
 
     suspend fun getNextReceiptNumber(): String {
@@ -854,6 +892,53 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Reverses the stock consumption recorded for a cancelled order. Mirrors
+     *  [consumeRecipeStock] with additive adjustments, in the same transaction
+     *  as the status change so stock can never be lost on a cancellation. */
+    private suspend fun restoreStockForOrder(order: Order) {
+        val ingredients = dao.getAllIngredients().firstOrNull()?.associateBy { it.id } ?: return
+        dao.getOrderItems(order.id).forEach { item ->
+            dao.getProductIngredients(item.productId).forEach { recipe ->
+                val ingredient = ingredients[recipe.ingredientId] ?: return@forEach
+                val restored = recipe.quantity * item.quantity
+                dao.updateIngredient(ingredient.copy(currentStock = ingredient.currentStock + restored))
+                dao.insertIngredientTransaction(
+                    IngredientTransaction(
+                        ingredientId = ingredient.id,
+                        type = "ADJUSTMENT",
+                        quantity = restored,
+                        notes = "Order cancelled: stock restored"
+                    )
+                )
+            }
+            dao.getOrderOptions(item.id).forEach { option ->
+                val ingredientId = option.ingredientId ?: return@forEach
+                val ingredient = ingredients[ingredientId] ?: return@forEach
+                val restored = option.ingredientQuantity * item.quantity
+                if (restored <= 0.0) return@forEach
+                dao.updateIngredient(ingredient.copy(currentStock = ingredient.currentStock + restored))
+                dao.insertIngredientTransaction(
+                    IngredientTransaction(
+                        ingredientId = ingredientId,
+                        type = "ADJUSTMENT",
+                        quantity = restored,
+                        notes = "Order cancelled: add-on stock restored"
+                    )
+                )
+            }
+        }
+    }
+
+    /** Releases the voucher use counted when the order was placed. */
+    private suspend fun revertVoucherForOrder(order: Order) {
+        val code = order.discountReason ?: return
+        dao.getAllVouchersNow().firstOrNull { it.code == code }?.let { voucher ->
+            if (voucher.usedCount > 0) {
+                dao.updateVoucher(voucher.copy(usedCount = voucher.usedCount - 1))
+            }
+        }
+    }
+
     suspend fun saveSupplier(supplier: Supplier) {
         if (supplier.id == 0) dao.insertSupplier(supplier) else dao.updateSupplier(supplier)
     }
@@ -881,27 +966,41 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun deleteStation(station: Station) = dao.deleteStation(station)
 
     suspend fun saveStaff(staff: Staff) {
-        if (staff.id == 0) dao.insertStaff(staff) else dao.updateStaff(staff)
+        // Hash any newly-entered (plaintext) PIN. Already-hashed values (edits
+        // where the PIN was not changed, or imported data) pass through as-is.
+        val prepared = if (staff.pin != null && !PinHasher.isHashed(staff.pin)) {
+            staff.copy(pin = PinHasher.hash(staff.pin))
+        } else {
+            staff
+        }
+        if (prepared.id == 0) {
+            dao.insertStaff(prepared)
+            logAuditEvent("STAFF_CREATE", "staff", 0, details = prepared.name)
+        } else {
+            dao.updateStaff(prepared)
+            logAuditEvent("STAFF_UPDATE", "staff", prepared.id, details = prepared.name)
+        }
     }
 
-    suspend fun deleteStaff(staff: Staff) = dao.deleteStaff(staff)
+    suspend fun deleteStaff(staff: Staff) {
+        logAuditEvent("STAFF_DELETE", "staff", staff.id, details = staff.name)
+        dao.deleteStaff(staff)
+    }
+
+    /** True when at least one staff account exists. Drives first-run setup UI. */
+    suspend fun hasAnyStaff(): Boolean = dao.getAllStaffCount() > 0
 
     suspend fun authenticateStaff(pin: String): Staff? {
-        val staff = dao.getStaffByPin(pin)
-        if (staff != null && staff.active) {
-            return staff
-        }
-        // Master setup PIN fallback: Create Admin if 123456 is used but not found
-        if (pin == "123456") {
-            val admin = Staff(
-                id = 0,
-                name = "Admin",
-                pin = "123456",
-                role = "ADMIN",
-                active = true
-            )
-            dao.insertStaff(admin)
-            return admin
+        if (pin.isBlank()) return null
+        for (staff in dao.getAllStaffNow().filter { it.active }) {
+            val stored = staff.pin
+            if (PinHasher.matches(pin, stored)) {
+                // Upgrade legacy plaintext rows to a hash on first successful login.
+                if (!PinHasher.isHashed(stored)) {
+                    dao.updateStaff(staff.copy(pin = PinHasher.hash(pin)))
+                }
+                return staff
+            }
         }
         return null
     }
@@ -912,11 +1011,20 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveVoucher(voucher: LoyaltyVoucher) {
         viewModelScope.launch {
-            if (voucher.id == 0) dao.insertVoucher(voucher) else dao.updateVoucher(voucher)
+            if (voucher.id == 0) {
+                dao.insertVoucher(voucher)
+                logAuditEvent("VOUCHER_CREATE", "loyalty_voucher", 0, details = voucher.code)
+            } else {
+                dao.updateVoucher(voucher)
+                logAuditEvent("VOUCHER_UPDATE", "loyalty_voucher", voucher.id, details = voucher.code)
+            }
         }
     }
 
-    suspend fun deleteVoucher(voucher: LoyaltyVoucher) = dao.deleteVoucher(voucher)
+    suspend fun deleteVoucher(voucher: LoyaltyVoucher) {
+        logAuditEvent("VOUCHER_DELETE", "loyalty_voucher", voucher.id, details = voucher.code)
+        dao.deleteVoucher(voucher)
+    }
 
     // Order Messages
     val allReviews = dao.getAllReviews()
@@ -1227,7 +1335,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun getOrderMessages(orderId: Int): List<OrderMessage> = dao.getOrderMessages(orderId)
 
-    fun addOrderMessage(orderId: Int, text: String, senderType: String = "STAFF", senderName: String? = null) {
+    fun addOrderMessage(orderId: Int, text: String, senderType: String = "staff", senderName: String? = null) {
         viewModelScope.launch {
             dao.insertOrderMessage(
                 OrderMessage(
@@ -1416,6 +1524,9 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                     val jsonString = reader.readText()
                     val data = Json { ignoreUnknownKeys = true }.decodeFromString<ExportData>(jsonString)
 
+                    // The whole import is one transaction: any failure rolls back so a
+                    // partial snapshot is never left behind (constitution §VII).
+                    db.withTransaction {
                     for (category in data.categories) {
                         dao.insertCategory(category)
                         importedCount++
@@ -1424,25 +1535,38 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         dao.insertProduct(product)
                         importedCount++
                     }
+                    // Orders merge on the business key (orderNumber). Existing orders
+                    // are kept; children (items/payments/messages) are only copied for
+                    // orders inserted by THIS import, so re-importing a snapshot never
+                    // duplicates an order's rows.
+                    val existingOrdersByNumber = (dao.getAllOrders().firstOrNull() ?: emptyList()).associateBy { it.orderNumber }
+                    val orderIdMap = HashMap<Int, Int>()
+                    val orderImportedNow = HashSet<Int>()
                     for (order in data.orders) {
-                        val existing = dao.getOrderById(order.id)
-                        if (existing == null) {
-                            dao.insertOrder(order)
-                            importedCount++
-                        } else {
+                        val existing = dao.getOrderById(order.id) ?: existingOrdersByNumber[order.orderNumber]
+                        if (existing != null) {
+                            orderIdMap[order.id] = existing.id
                             skippedCount++
+                        } else {
+                            val newId = dao.insertOrder(order.copy(id = 0)).toInt()
+                            orderIdMap[order.id] = newId
+                            orderImportedNow.add(order.id)
+                            importedCount++
                         }
                     }
                     for (item in data.orderItems) {
-                        val order = dao.getOrderById(item.orderId)
-                        if (order != null) {
-                            val product = dao.getAllProducts().firstOrNull()?.find { it.id == item.productId }
-                            if (product != null) {
-                                val orderItem = OrderItem(orderId = item.orderId, productId = item.productId, quantity = item.quantity, unitPrice = item.unitPrice, subtotal = item.subtotal)
-                                val itemId = dao.insertOrderItem(orderItem).toInt()
-                                val options = item.options.map { OptionExport(it.name, it.value) }
-                                dao.insertOrderOptions(options.map { OrderOption(orderItemId = itemId, name = it.name, value = it.value) })
-                            }
+                        val orderId = orderIdMap[item.orderId]
+                        if (orderId == null || !orderImportedNow.contains(item.orderId)) {
+                            skippedCount++
+                            continue
+                        }
+                        val product = dao.getAllProducts().firstOrNull()?.find { it.id == item.productId }
+                        if (product != null) {
+                            val orderItem = OrderItem(orderId = orderId, productId = item.productId, quantity = item.quantity, unitPrice = item.unitPrice, subtotal = item.subtotal)
+                            val itemId = dao.insertOrderItem(orderItem).toInt()
+                            val options = item.options.map { OptionExport(it.name, it.value) }
+                            dao.insertOrderOptions(options.map { OrderOption(orderItemId = itemId, name = it.name, value = it.value) })
+                            importedCount++
                         }
                     }
                     for (ingredient in data.ingredients) {
@@ -1450,8 +1574,13 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         importedCount++
                     }
                     for (payment in data.payments) {
-                        dao.insertPayment(payment)
-                        importedCount++
+                        val orderId = orderIdMap[payment.orderId]
+                        if (orderId != null && orderImportedNow.contains(payment.orderId)) {
+                            dao.insertPayment(payment.copy(id = 0, orderId = orderId))
+                            importedCount++
+                        } else {
+                            skippedCount++
+                        }
                     }
                     for (customer in data.customers) {
                         dao.insertCustomer(customer)
@@ -1494,7 +1623,13 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         importedCount++
                     }
                     for (staff in data.staff) {
-                        dao.insertStaff(staff)
+                        dao.insertStaff(
+                            if (staff.pin != null && !PinHasher.isHashed(staff.pin)) {
+                                staff.copy(pin = PinHasher.hash(staff.pin))
+                            } else {
+                                staff
+                            }
+                        )
                         importedCount++
                     }
                     for (voucher in data.loyaltyVouchers) {
@@ -1506,8 +1641,13 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         importedCount++
                     }
                     for (message in data.orderMessages) {
-                        dao.insertOrderMessage(message)
-                        importedCount++
+                        val orderId = orderIdMap[message.orderId]
+                        if (orderId != null && orderImportedNow.contains(message.orderId)) {
+                            dao.insertOrderMessage(message.copy(id = 0, orderId = orderId))
+                            importedCount++
+                        } else {
+                            skippedCount++
+                        }
                     }
                     for (event in data.auditEvents) {
                         dao.insertAuditEvent(event)
@@ -1589,15 +1729,17 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                           dao.insertSupplierIngredientPrice(price)
                           importedCount++
                       }
+                    } // end db.withTransaction
                  }
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            return ImportResult(success = false, message = "Import failed: ${e.message ?: e.javaClass.simpleName}")
         }
-        return ImportResult(imported = importedCount, skipped = skippedCount)
+        return ImportResult(imported = importedCount, skipped = skippedCount, success = true)
     }
 
-    data class ImportResult(val imported: Int = 0, val skipped: Int = 0)
+    data class ImportResult(val imported: Int = 0, val skipped: Int = 0, val success: Boolean = true, val message: String? = null)
 
     suspend fun exportAllData(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.getDefault())

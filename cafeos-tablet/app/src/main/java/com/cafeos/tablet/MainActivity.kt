@@ -52,6 +52,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.cafeos.tablet.ui.AccessControl
 import com.cafeos.tablet.ui.CafeViewModel
 import com.cafeos.tablet.ui.screens.*
 import com.cafeos.tablet.ui.theme.*
@@ -86,24 +87,37 @@ fun MainScreen() {
         return
     }
     
-    val allowedPages = currentStaff?.permissions?.split(",")?.filter { it.isNotBlank() }?.toSet().orEmpty()
-    fun canAccess(route: String) = currentStaff?.role?.equals("ADMIN", ignoreCase = true) == true || allowedPages.isEmpty() || route in allowedPages
+    fun canAccess(route: String) = currentStaff != null && AccessControl.canAccessRoute(currentStaff!!, route)
 
+    // Navigation mirrors the Windows admin sidebar (spec 013 A1): same order,
+    // same labels, same grouping; Kitchen/Tables/Stations keep their own rail
+    // entries on the tablet. AccessControl applies the web role/permission rules.
     val items = listOf(
-        NavigationItem("POS", Icons.Default.ShoppingCart, "pos"),
-        NavigationItem("Live Orders", Icons.Default.FormatListBulleted, "live_orders"),
-        NavigationItem("Kitchen", Icons.Default.Restaurant, "kitchen"),
-        NavigationItem("Analytics", Icons.Default.BarChart, "analytics"),
-        NavigationItem("Order History", Icons.Default.History, "order_history"),
-        NavigationItem("Expenses", Icons.Default.AttachMoney, "expenses"),
-        NavigationItem("Vouchers", Icons.Default.LocalOffer, "vouchers"),
-        NavigationItem("Products", Icons.Default.Coffee, "products"),
-        NavigationItem("Inventory", Icons.Default.Inventory, "inventory"),
-        NavigationItem("Tables", Icons.Default.TableBar, "tables"),
-        NavigationItem("Connection", Icons.Default.Wifi, "connection"),
-        NavigationItem("Staff", Icons.Default.Group, "staff", adminOnly = true),
-        NavigationItem("Settings", Icons.Default.Settings, "settings", adminOnly = true)
-    ).filter { !it.adminOnly || currentStaff?.role?.equals("ADMIN", ignoreCase = true) == true }.filter { canAccess(it.route) }
+        NavigationItem("Live Orders", Icons.Default.FormatListBulleted, "live_orders", group = "OPERATIONS"),
+        NavigationItem("New Order", Icons.Default.ShoppingCart, "pos", group = "OPERATIONS"),
+        NavigationItem("Kitchen", Icons.Default.Restaurant, "kitchen", group = "OPERATIONS"),
+        NavigationItem("Analytics", Icons.Default.BarChart, "analytics", group = "OPERATIONS"),
+        NavigationItem("Products", Icons.Default.Coffee, "products", group = "OPERATIONS"),
+        NavigationItem("Inventory", Icons.Default.Inventory, "inventory", group = "OPERATIONS"),
+        NavigationItem("Stock History", Icons.Default.History, "stock_history", group = "OPERATIONS"),
+        NavigationItem("Expenses", Icons.Default.AttachMoney, "expenses", group = "OPERATIONS"),
+        NavigationItem("Loyalty", Icons.Default.LocalOffer, "loyalty", group = "MANAGEMENT"),
+        NavigationItem("Order History", Icons.Default.TableChart, "order_history", group = "MANAGEMENT"),
+        NavigationItem("Reviews", Icons.Default.Star, "reviews", group = "MANAGEMENT"),
+        NavigationItem("Tables", Icons.Default.TableBar, "tables", group = "MANAGEMENT"),
+        NavigationItem("Staff", Icons.Default.Group, "staff", group = "MANAGEMENT"),
+        NavigationItem("Settings", Icons.Default.Settings, "settings", group = "MANAGEMENT"),
+        NavigationItem("Consultant", Icons.Default.Chat, "consultant", group = "MANAGEMENT"),
+        NavigationItem("Audit Logs", Icons.Default.List, "audit_logs", group = "MANAGEMENT"),
+        NavigationItem("Connection", Icons.Default.Wifi, "connection", group = "SYSTEM")
+    ).filter { canAccess(it.route) }
+
+    // Home = Live Orders for staff/admin; kitchen-role staff land on the Kitchen.
+    val startDestination = when {
+        AccessControl.canAccessRoute(currentStaff!!, "live_orders") -> "live_orders"
+        AccessControl.canAccessRoute(currentStaff!!, "kitchen") -> "kitchen"
+        else -> items.firstOrNull()?.route ?: "pos"
+    }
 
     val navWidth by animateDpAsState(targetValue = if (navCollapsed) 88.dp else 250.dp, label = "navWidth")
     val activeOrderCount by viewModel.allOrders.collectAsState(initial = emptyList())
@@ -169,15 +183,21 @@ fun MainScreen() {
                                 .verticalScroll(rememberScrollState())
                                 .fillMaxSize()
                         ) {
+                            var lastGroup: String? = null
                             items.forEachIndexed { index, item ->
-                                if (!navCollapsed && index == 6) {
+                                if (!navCollapsed && item.group != lastGroup) {
                                     Text(
-                                        "MANAGEMENT",
+                                        item.group,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = PosGold,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(top = 14.dp, bottom = 8.dp, start = 12.dp)
+                                        modifier = Modifier.padding(
+                                            top = if (lastGroup == null) 2.dp else 16.dp,
+                                            bottom = 8.dp,
+                                            start = 12.dp
+                                        )
                                     )
+                                    lastGroup = item.group
                                 }
                                 val isSelected = selectedItem == index
                                 val indicatorColor by animateColorAsState(
@@ -259,22 +279,26 @@ fun MainScreen() {
                     }
                     NavHost(
                         navController = navController,
-                        startDestination = "pos",
+                        startDestination = startDestination,
                         modifier = Modifier.weight(1f)
                     ) {
-                    composable("pos") { if (canAccess("pos")) POSScreen(viewModel) else AccessDeniedScreen() }
                     composable("live_orders") { if (canAccess("live_orders")) LiveOrdersScreen(viewModel) else AccessDeniedScreen() }
+                    composable("pos") { if (canAccess("pos")) POSScreen(viewModel) else AccessDeniedScreen() }
                     composable("kitchen") { if (canAccess("kitchen")) KitchenScreen(viewModel) else AccessDeniedScreen() }
                     composable("analytics") { if (canAccess("analytics")) AnalyticsScreen(viewModel) else AccessDeniedScreen() }
-                    composable("order_history") { if (canAccess("order_history")) OrderHistoryScreen(viewModel) else AccessDeniedScreen() }
-                    composable("expenses") { if (canAccess("expenses")) ExpensesScreen(viewModel) else AccessDeniedScreen() }
-                    composable("vouchers") { if (canAccess("vouchers")) VoucherManagementScreen(viewModel) else AccessDeniedScreen() }
                     composable("products") { if (canAccess("products")) ProductScreen(viewModel) else AccessDeniedScreen() }
                     composable("inventory") { if (canAccess("inventory")) InventoryScreen(viewModel) else AccessDeniedScreen() }
+                    composable("stock_history") { if (canAccess("stock_history")) StockHistoryScreen(viewModel) else AccessDeniedScreen() }
+                    composable("expenses") { if (canAccess("expenses")) ExpensesScreen(viewModel) else AccessDeniedScreen() }
+                    composable("loyalty") { if (canAccess("loyalty")) LoyaltyScreen(viewModel) else AccessDeniedScreen() }
+                    composable("order_history") { if (canAccess("order_history")) OrderHistoryScreen(viewModel) else AccessDeniedScreen() }
+                    composable("reviews") { if (canAccess("reviews")) ReviewsScreen(viewModel) else AccessDeniedScreen() }
                     composable("tables") { if (canAccess("tables")) TablesManagementScreen(viewModel) else AccessDeniedScreen() }
-                    composable("connection") { if (canAccess("connection")) ConnectionScreen(viewModel) else AccessDeniedScreen() }
                     composable("staff") { if (canAccess("staff")) StaffManagementScreen(viewModel) else AccessDeniedScreen() }
                     composable("settings") { if (canAccess("settings")) SettingsScreen(viewModel) else AccessDeniedScreen() }
+                    composable("consultant") { if (canAccess("consultant")) AIConsultantScreen(viewModel) else AccessDeniedScreen() }
+                    composable("audit_logs") { if (canAccess("audit_logs")) AuditLogScreen(viewModel) else AccessDeniedScreen() }
+                    composable("connection") { if (canAccess("connection")) ConnectionScreen(viewModel) else AccessDeniedScreen() }
                     }
                 }
             }
@@ -282,7 +306,12 @@ fun MainScreen() {
     )
 }
 
-data class NavigationItem(val label: String, val icon: ImageVector, val route: String, val adminOnly: Boolean = false)
+data class NavigationItem(
+    val label: String,
+    val icon: ImageVector,
+    val route: String,
+    val group: String = "OPERATIONS"
+)
 
 @Composable
 private fun AccessDeniedScreen() {

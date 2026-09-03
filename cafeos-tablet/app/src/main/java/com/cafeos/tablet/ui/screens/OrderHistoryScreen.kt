@@ -2,6 +2,8 @@ package com.cafeos.tablet.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,6 +29,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrderHistoryScreen(viewModel: CafeViewModel) {
     val orders by viewModel.allOrders.collectAsState(initial = emptyList())
@@ -57,10 +60,64 @@ fun OrderHistoryScreen(viewModel: CafeViewModel) {
             }
         }
         importMessage?.let { Text(it, color = PosGold, modifier = Modifier.padding(top = 8.dp)) }
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Filters mirror the Windows Order History page (search, status, presets).
+        var query by remember { mutableStateOf("") }
+        var statusFilter by remember { mutableStateOf("ALL") }
+        var daysFilter by remember { mutableStateOf(0) } // 0 = All
+        val cutoff = if (daysFilter > 0) System.currentTimeMillis() - daysFilter * 24 * 3600_000L else 0L
+        val filteredOrders = orders
+            .filter { order ->
+                val matchesQuery = query.isBlank() ||
+                    order.orderNumber.contains(query, ignoreCase = true) ||
+                    order.customerName.contains(query, ignoreCase = true)
+                val matchesStatus = statusFilter == "ALL" || order.status == statusFilter
+                val matchesDate = cutoff == 0L || order.createdAt >= cutoff
+                matchesQuery && matchesStatus && matchesDate
+            }
+            .sortedByDescending { it.createdAt }
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("Search order number or customer") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            listOf("ALL", "PENDING", "PREPARING", "COMPLETED", "CANCELLED").forEach { status ->
+                FilterChip(
+                    selected = statusFilter == status,
+                    onClick = { statusFilter = status },
+                    label = { Text(status) },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosAccentSoft, selectedLabelColor = PosAccent)
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+            listOf(Pair(0, "All time"), Pair(1, "Today"), Pair(7, "7 days"), Pair(30, "30 days")).forEach { (days, label) ->
+                FilterChip(
+                    selected = daysFilter == days,
+                    onClick = { daysFilter = days },
+                    label = { Text(label) },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosAccentSoft, selectedLabelColor = PosAccent)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("${filteredOrders.size} orders", style = MaterialTheme.typography.labelSmall, color = PosMuted)
 
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(orders) { order ->
+            if (filteredOrders.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
+                        Text("No orders match your filters", color = PosMuted)
+                    }
+                }
+            }
+            items(filteredOrders) { order ->
                 OrderCard(order, currencyFormatter, dateFormatter, onClick = { selectedOrder = order })
             }
         }

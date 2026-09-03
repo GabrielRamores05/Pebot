@@ -228,7 +228,7 @@ class LocalWebServer(private val dao: CafeDao, private val onOrderCreated: ((Ord
             file.writeBytes(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
             file.absolutePath
         } else null
-        dao.insertPayment(Payment(orderId = orderId, method = paymentMethod, amountTendered = total, screenshotPath = proofPath))
+        dao.insertPayment(Payment(orderId = orderId, method = paymentMethod, amount = total, amountTendered = total, screenshotPath = proofPath))
         dao.getOrderById(orderId)?.let { onOrderCreated?.invoke(it) }
         jsonResponse(JSONObject().put("success", true).put("orderNumber", orderNumber).put("totalAmount", total).toString(), Response.Status.CREATED)
     }

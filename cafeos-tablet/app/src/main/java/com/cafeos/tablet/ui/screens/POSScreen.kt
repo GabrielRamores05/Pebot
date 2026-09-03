@@ -30,6 +30,7 @@ import com.cafeos.tablet.ui.CafeViewModel
 import com.cafeos.tablet.ui.CartItem
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.text.NumberFormat
 import java.util.*
 import androidx.compose.ui.geometry.Offset
@@ -142,9 +143,11 @@ fun POSScreen(viewModel: CafeViewModel) {
             Spacer(modifier = Modifier.height(16.dp))
 
             val filteredProducts = if (selectedCategoryId == null) {
-                products.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                // Only products available on the menu are sellable at POS (web parity);
+                // toggling Available off in Product admin hides them everywhere.
+                products.filter { it.available && it.name.contains(searchQuery, ignoreCase = true) }
             } else {
-                products.filter { it.categoryId == selectedCategoryId && it.name.contains(searchQuery, ignoreCase = true) }
+                products.filter { it.available && it.categoryId == selectedCategoryId && it.name.contains(searchQuery, ignoreCase = true) }
             }
 
             LazyVerticalGrid(
@@ -577,12 +580,16 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
     val amountTendered by viewModel.amountTendered.collectAsState()
     val customerName by viewModel.customerName.collectAsState()
     val discountType by viewModel.discountType.collectAsState()
+    val discountRate by viewModel.discountRate.collectAsState()
+    val orderType by viewModel.orderType.collectAsState()
+    val deliveryAddress by viewModel.deliveryAddress.collectAsState()
     val selectedTableId by viewModel.selectedTableId.collectAsState()
     val tables by viewModel.tables.collectAsState(initial = emptyList())
     val businessSettings by viewModel.businessSettings.collectAsState(initial = null)
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
     val change = (amountTendered.toDoubleOrNull() ?: 0.0) - totalAmount
-    val canComplete = paymentMethod != "CASH" || (amountTendered.toDoubleOrNull() ?: 0.0) >= totalAmount
+    val deliveryMissing = orderType == "DELIVERY" && deliveryAddress.isBlank()
+    val canComplete = (paymentMethod != "CASH" || (amountTendered.toDoubleOrNull() ?: 0.0) >= totalAmount) && !deliveryMissing
 
     var tableExpanded by remember { mutableStateOf(false) }
     var showInvoiceReview by remember { mutableStateOf(false) }
@@ -656,6 +663,44 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
                         }
                     }
 
+                    Column(Modifier.fillMaxWidth()) {
+                        Text("Order Type", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                Pair("DINE_IN", "Dine-in"),
+                                Pair("TAKEOUT", "Takeout"),
+                                Pair("DELIVERY", "Delivery")
+                            ).forEach { (value, label) ->
+                                FilterChip(
+                                    selected = orderType == value,
+                                    onClick = {
+                                        viewModel.setOrderType(value)
+                                        if (value != "DELIVERY") viewModel.setDeliveryAddress("")
+                                    },
+                                    label = { Text(label) },
+                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosAccentSoft, selectedLabelColor = PosAccent)
+                                )
+                            }
+                        }
+                        if (orderType == "DELIVERY") {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = deliveryAddress,
+                                onValueChange = { viewModel.setDeliveryAddress(it) },
+                                label = { Text("Delivery Address") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                isError = deliveryMissing,
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline, errorBorderColor = PosDanger)
+                            )
+                            if (deliveryMissing) {
+                                Spacer(Modifier.height(4.dp))
+                                Text("A delivery address is required for delivery orders", style = MaterialTheme.typography.bodySmall, color = PosDanger)
+                            }
+                        }
+                    }
+
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text("Discount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -665,7 +710,7 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
                                     FilterChip(selected = discountType == type, onClick = { viewModel.setDiscountType(type) }, label = { Text(if (type == "NONE") "None" else type) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosAccentSoft, selectedLabelColor = PosAccent))
                                 }
                             }
-                            if (discountType != "NONE") Text("20% discount applied", style = MaterialTheme.typography.bodySmall, color = PosAccent, fontWeight = FontWeight.Medium)
+                            if (discountType != "NONE" && discountType != "VOUCHER") Text("${(discountRate * 100).roundToInt()}% discount applied", style = MaterialTheme.typography.bodySmall, color = PosAccent, fontWeight = FontWeight.Medium)
                         }
                         Column(Modifier.weight(1f)) {
                             Text("Payment Method", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)

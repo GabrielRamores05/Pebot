@@ -28,6 +28,7 @@ import java.util.*
 fun KitchenScreen(viewModel: CafeViewModel) {
     val orders by viewModel.allOrders.collectAsState(initial = emptyList())
     val stationsFromDb by viewModel.stations.collectAsState(initial = emptyList())
+    val productsList by viewModel.allProducts.collectAsState(initial = emptyList())
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
     val dateFormatter = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
     var pendingCancellation by remember { mutableStateOf<Order?>(null) }
@@ -36,12 +37,25 @@ fun KitchenScreen(viewModel: CafeViewModel) {
     var showCompleted by remember { mutableStateOf(false) }
 
     val stationNames = listOf("All") + stationsFromDb.map { it.name }
-    
+    val productStationType: Map<Int, String> = productsList.associate { it.id to it.stationType }
+
+    // Load each order's items once per order set so filtering can route orders to
+    // the station of the products they contain (web parity: Product.stationType).
+    var itemsByOrder by remember(orders) { mutableStateOf<Map<Int, List<OrderItem>>>(emptyMap()) }
+    LaunchedEffect(orders) {
+        itemsByOrder = orders.mapNotNull { order ->
+            val items = viewModel.getOrderItemsSync(order.id)
+            if (items.isEmpty()) null else order.id to items
+        }.toMap()
+    }
+
+    val selectedStationType = stationsFromDb.firstOrNull { it.name == selectedStation }?.stationType
     val filtered = if (selectedStation == "All") {
         orders
     } else {
-        // In a real app, we'd filter by checking if any OrderItem belongs to this station
-        orders
+        orders.filter { order ->
+            itemsByOrder[order.id].orEmpty().any { productStationType[it.productId] == selectedStationType }
+        }
     }
     val displayOrders = if (showCompleted) filtered else filtered.filter { it.status != "COMPLETED" && it.status != "CANCELLED" }
 

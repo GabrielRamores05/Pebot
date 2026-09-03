@@ -350,9 +350,6 @@ interface CafeDao {
     @Delete
     suspend fun deleteStaff(staff: Staff)
 
-    @Query("SELECT * FROM Staff WHERE pin = :pin LIMIT 1")
-    suspend fun getStaffByPin(pin: String): Staff?
-
     @Query("SELECT COUNT(*) FROM Staff")
     suspend fun getAllStaffCount(): Int
 
@@ -740,6 +737,28 @@ interface CafeDao {
 
     @Query("SELECT * FROM SupplierIngredientPrice")
     suspend fun getAllSupplierIngredientPricesNow(): List<SupplierIngredientPrice>
+
+    // ── Outbox queue (tablet → PC ledger bridge, spec 013 Phase 2) ──────────────
+    @Insert
+    suspend fun insertOutbox(entry: OutboxEntry): Long
+
+    @Query("SELECT * FROM OutboxQueue WHERE state IN ('PENDING','FAILED') ORDER BY id ASC")
+    fun getPendingOutbox(): Flow<List<OutboxEntry>>
+
+    @Query("SELECT * FROM OutboxQueue WHERE state IN ('PENDING','FAILED') ORDER BY id ASC")
+    suspend fun getPendingOutboxNow(): List<OutboxEntry>
+
+    @Update
+    suspend fun updateOutbox(entry: OutboxEntry)
+
+    @Query("UPDATE OutboxQueue SET state = 'SYNCED', updatedAt = :now WHERE id = :id")
+    suspend fun markOutboxSynced(id: Int, now: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM OutboxQueue WHERE state = 'SYNCED'")
+    suspend fun clearSyncedOutbox()
+
+    @Query("SELECT COUNT(*) FROM OutboxQueue WHERE state IN ('PENDING','FAILED')")
+    suspend fun countPendingOutbox(): Int
 }
 
 data class ExpenseCategoryTotal(

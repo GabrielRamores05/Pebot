@@ -64,7 +64,10 @@ data class ProductIngredient(
 )
 
 @Serializable
-@Entity(tableName = "Orders")
+@Entity(
+    tableName = "Orders",
+    indices = [Index(value = ["orderNumber"], unique = true)]
+)
 data class Order(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val orderNumber: String,
@@ -72,14 +75,22 @@ data class Order(
     val status: String = "PENDING", // PENDING, PREPARING, COMPLETED, CANCELLED
     val totalAmount: Double,
     val discountAmount: Double = 0.0,
+    // Non-null on the tablet (0.0 = none); the sync layer maps 0.0 <-> null for
+    // the Windows schema where discountRate is nullable.
     val discountRate: Double = 0.0,
     val discountReason: String? = null,
     val paymentMethod: String = "CASH", // CASH, GCASH, PAYMAYA
-    val orderType: String = "DINE_IN",
+    val orderType: String = "DINE_IN", // DINE_IN, TAKEOUT, DELIVERY
     val tableId: Int? = null,
     val tableLocation: String? = null,
+    val deliveryAddress: String? = null,
+    val notes: String? = null,
+    val loyaltyCustomerName: String? = null,
+    val loyaltyPromo: Boolean = false,
+    val queueNumber: Int? = null,
     val barcodeValue: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Serializable
@@ -140,8 +151,10 @@ data class Ingredient(
 data class IngredientTransaction(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val ingredientId: Int,
-    val type: String, // PURCHASE, USAGE, ADJUSTMENT
+    val type: String, // PURCHASE, USAGE, ADJUSTMENT, OPENING
     val quantity: Double,
+    val referenceId: Int? = null,
+    val referenceType: String? = null, // "order" or null
     val notes: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -159,11 +172,15 @@ data class OrderOption(
 )
 
 @Serializable
-@Entity(tableName = "Payment")
+@Entity(
+    tableName = "Payment",
+    indices = [Index(value = ["orderId"])]
+)
 data class Payment(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val orderId: Int,
     val method: String,      // CASH, GCASH, PAYMAYA
+    val amount: Double = 0.0,
     val amountTendered: Double,
     val change: Double = 0.0,
     val screenshotPath: String? = null,
@@ -226,10 +243,12 @@ data class SupplierIngredientPrice(
 data class CafeTable(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
+    val slug: String? = null,
     val capacity: Int = 4,
     val currentOccupants: Int = 0,
-    val status: String = "AVAILABLE",
-    val createdAt: Long = System.currentTimeMillis()
+    val status: String = "AVAILABLE", // AVAILABLE, OCCUPIED, NEEDS_CLEANING
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Serializable
@@ -278,6 +297,7 @@ data class Option(
 data class Expense(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val category: String,
+    val categoryId: Int? = null,
     val supplierId: Int? = null,
     val amount: Double,
     val notes: String? = null,
@@ -297,10 +317,18 @@ data class BusinessSettings(
     val vatRate: Double = 12.0,
     val receiptPrefix: String = "INV",
     val lastReceiptNumber: Int = 0,
+    val footerMessage: String = "Thank you for your visit!",
+    val loyaltyEnabled: Boolean = true,
+    val studentPwdDiscountRate: Double = 20.0,
     val gcashAccountName: String? = null,
     val gcashQrPath: String? = null,
     val paymayaAccountName: String? = null,
     val paymayaQrPath: String? = null,
+    val aiApiKey: String? = null,
+    val aiModel: String? = null,
+    val aiSystemPrompt: String? = null,
+    val aiFolderAccess: Boolean = false,
+    val aiReadBirPricing: Boolean = false,
     val voiceEnabled: Boolean = true,
     val voiceVolume: Float = 1.0f,
     val voiceSpeed: Float = 1.0f,
@@ -316,14 +344,27 @@ data class BusinessSettings(
 data class Staff(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
-    val role: String = "STAFF",
+    val role: String = "STAFF", // ADMIN, STAFF, KITCHEN (Windows vocabulary)
     val email: String? = null,
     val phone: String? = null,
     val pin: String? = null,
     val active: Boolean = true,
     val permissions: String = "",
     val profitShareRate: Double = 0.0,
-    val createdAt: Long = System.currentTimeMillis()
+    // Windows User HR profile fields (tablet parity)
+    val address: String? = null,
+    val dateOfBirth: Long? = null,
+    val hireDate: Long? = null,
+    val position: String? = null,
+    val department: String? = null,
+    val profilePhoto: String? = null,
+    val emergencyContactName: String? = null,
+    val emergencyContactPhone: String? = null,
+    val hourlyRate: Double? = null,
+    val monthlySalary: Double? = null,
+    val paymentType: String? = null, // HOURLY, SALARIED
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Serializable
@@ -555,8 +596,9 @@ data class PerformanceReview(
 data class OrderMessage(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val orderId: Int,
+    val type: String = "text", // "text", "voice" (voice: text holds the audio URL)
     val text: String,
-    val senderType: String = "STAFF",
+    val senderType: String = "customer", // "customer" or "staff" (Windows vocabulary)
     val senderName: String? = null,
     val isRead: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
@@ -568,8 +610,11 @@ data class Review(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val productId: Int,
     val customerId: Int? = null,
+    val customerName: String? = null,
     val rating: Int,
     val comment: String? = null,
+    val tasteSuggestion: String? = null,
+    val imageUrl: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -638,4 +683,26 @@ data class TableSection(
 data class ProductStation(
     val productId: Int,
     val stationId: Int
+)
+
+/**
+ * Outbound queue for the tablet → PC ledger bridge (spec 013 Phase 2).
+ * Every value-changing action made while the PC is unreachable is appended here
+ * and flushed idempotently on reconnect (PC merges by entityKey / orderNumber).
+ */
+@Serializable
+@Entity(
+    tableName = "OutboxQueue",
+    indices = [Index(value = ["state"]), Index(value = ["createdAt"])]
+)
+data class OutboxEntry(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val eventType: String,      // ORDER_PLACED, ORDER_STATUS, STOCK_ADJUST, ATTENDANCE, AUDIT
+    val entityKey: String,      // idempotency key: orderNumber or "type:key"
+    val payloadJson: String,
+    val state: String = "PENDING", // PENDING, SENDING, SYNCED, FAILED
+    val attempts: Int = 0,
+    val lastError: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )

@@ -5,6 +5,21 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
 
+import java.io.FileInputStream
+import java.util.Properties
+
+// Release signing secrets live in cafeos-tablet/keystore.properties (gitignored).
+// CI or machines without that file build unsigned release APKs instead of failing.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) {
+        FileInputStream(keystorePropsFile).use { load(it) }
+    }
+}
+val hasReleaseSigning = keystorePropsFile.exists() &&
+    !keystoreProps.getProperty("storePassword").isNullOrBlank() &&
+    !keystoreProps.getProperty("keyPassword").isNullOrBlank()
+
 android {
     namespace = "com.cafeos.tablet"
     compileSdk = 34
@@ -23,11 +38,13 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file("../pebot-release-key.jks")
-            storePassword = "Pebot2026!"
-            keyAlias = "pebotsign"
-            keyPassword = "Pebot2026!"
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile") ?: "pebot-release-key.jks")
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias") ?: "pebotsign"
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
         }
     }
 
@@ -42,7 +59,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {

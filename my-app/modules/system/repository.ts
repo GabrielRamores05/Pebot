@@ -129,6 +129,25 @@ export async function upsertSetting(key: string, value: string) {
   });
 }
 
+// ----- Tablet device credentials (Setting kv doc "tabletDevices") -----
+
+export const TABLET_DEVICES_KEY = 'tabletDevices';
+
+export async function getTabletDevicesDoc(): Promise<Array<Record<string, any>>> {
+  const row = await findSettingByKey(TABLET_DEVICES_KEY);
+  if (!row) return [];
+  try {
+    const parsed = JSON.parse(row.value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveTabletDevicesDoc(devices: Array<Record<string, any>>) {
+  await upsertSetting(TABLET_DEVICES_KEY, JSON.stringify(devices));
+}
+
 // ----- Admin Users – User (no locationId) -----
 
 export async function listAdminUsers() {
