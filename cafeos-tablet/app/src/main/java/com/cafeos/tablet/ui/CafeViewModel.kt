@@ -877,10 +877,15 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun getNextReceiptNumber(): String {
         val settings = dao.getBusinessSettingsSync() ?: BusinessSettings()
-        val lastNum = dao.getLastReceiptNumber()
-        val next = lastNum + 1
+        val prefix = settings.receiptPrefix?.takeIf { it.isNotBlank() } ?: "INV"
+        // Never reuse or collide: the next number is past BOTH the stored counter
+        // and the highest suffix already used under this prefix (orders may exist
+        // that the counter never saw — imports, restores, earlier builds).
+        val fromCounter = dao.getLastReceiptNumber()
+        val fromOrders = dao.getMaxReceiptSuffix("$prefix-%", prefix.length + 2)
+        val next = maxOf(fromCounter, fromOrders) + 1
         dao.updateLastReceiptNumber(next)
-        return "${settings.receiptPrefix}-${next.toString().padStart(6, '0')}"
+        return "${prefix}-${next.toString().padStart(6, '0')}"
     }
 
     suspend fun purchaseIngredient(ingredientId: Int, quantity: Double, unitCost: Double, supplierId: Int? = null, notes: String? = null) {

@@ -54,6 +54,29 @@ Everything under `.claude/`, `.kilo/`, and `.opencode/` is **generated** by
 `specify`. Don't hand-edit it — it will be overwritten. The canonical content is
 this file, `.specify/`, and `specs/`.
 
+## Working style (harness-portable ruleset)
+
+These style rules apply in every harness (Claude Code, Kilo Code, opencode, Pi,
+this DeepSeek harness, …). They are **subordinate**: wherever they conflict with
+the master prompt, this file, or the constitution, those win. They never license
+cutting validation, error handling, transaction integrity, audit events, tests,
+or any POS invariant above. They mirror two published rule sets — Ponytail's
+code-minimalism ladder and Caveman's terse prose — so per-host plugin installs of
+those stay consistent with this project.
+
+1. **Minimal change (Ponytail-style).** Before writing code, stop at the first
+   rung that holds: does this need to exist (YAGNI) → does it already exist in
+   this codebase → does the standard library do it → native platform feature →
+   an already-installed dependency → one line → only then the smallest correct
+   implementation. Prefer extending an existing module over a new one. Never
+   weaken an existing guarantee to shrink a diff.
+2. **Read first, judge after.** Lazy about the solution, never about reading:
+   trace the real flow before choosing the smallest fix.
+3. **Terse prose (Caveman-style).** Cut filler, pleasantries, and restated
+   context from chat. Keep substance: decisions, reasoning that matters, what
+   changed, and anything the owner asked for. Code, file paths, commands, and
+   error text stay byte-exact — never paraphrase those.
+
 ## Checks before you call something done
 
 Run from `my-app/`:

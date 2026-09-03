@@ -358,6 +358,13 @@ interface CafeDao {
     @Query("SELECT lastReceiptNumber FROM BusinessSettings WHERE id = 1")
     suspend fun getLastReceiptNumber(): Int
 
+    // Highest numeric suffix already used for a receipt prefix (e.g. "INV-000007"
+    // under prefix "INV"). Used together with the counter so numbering never
+    // collides with orders that exist but predate/outran the stored counter
+    // (imports, restores, pre-counter builds).
+    @Query("SELECT COALESCE(MAX(CAST(SUBSTR(orderNumber, :skipLen) AS INTEGER)), 0) FROM Orders WHERE orderNumber LIKE :likePattern")
+    suspend fun getMaxReceiptSuffix(likePattern: String, skipLen: Int): Int
+
     @Query("UPDATE BusinessSettings SET lastReceiptNumber = :number WHERE id = 1")
     suspend fun updateLastReceiptNumber(number: Int)
 
