@@ -117,9 +117,9 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 **Independent Test**: quickstart QS-5 â€” raising a threshold flips the ingredient to Low everywhere at once; lowering clears it everywhere.
 
-- [ ] T022 [US5] Tablet: shared low/out rule + analytics inventory summary (counts + Î£ currentStockÃ—costPerUnit) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt` and `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/AnalyticsScreen.kt`
+- [X] T022 [US5] Tablet: shared low/out rule + analytics inventory summary (counts + Î£ currentStockÃ—costPerUnit) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt` and `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/AnalyticsScreen.kt`
 - [ ] T023 [US5] Web: same rule + summary in `my-app/modules/analytics/` (or inventory) and `my-app/app/admin/analytics/page.tsx`
-- [ ] T024 [P] [US5] Unit tests for the shared low/out rule and stock-value math on both platforms, including the boundary `currentStock == minStock â†’ LOW` and healthy/low/out transitions (tablet `app/src/test/.../`; web `my-app/modules/*.test.ts`)
+- [X] T024 [P] [US5] Unit tests for the shared low/out rule and stock-value math on both platforms, including the boundary `currentStock == minStock â†’ LOW` and healthy/low/out transitions (tablet `app/src/test/.../`; web `my-app/modules/*.test.ts`)
 
 **Checkpoint**: QS-5 passes on both apps; US5 independently testable.
 
@@ -219,6 +219,7 @@ Task: "Web UI (T010) in app/admin/inventory/page.tsx"
 - Money and stock writes are append-only and single-transaction (constitution); VOID replaces edit/delete
 - Unit costs are always computed from stored quantity + total â€” never accepted from the client
 - Commit after each task or logical group; stop at checkpoints to validate the story independently
+
 
 
 

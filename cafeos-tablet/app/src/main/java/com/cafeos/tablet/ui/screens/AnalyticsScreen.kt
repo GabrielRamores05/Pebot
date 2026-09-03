@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
-import com.cafeos.tablet.data.Order
+import com.cafeos.tablet.data.*
 import com.cafeos.tablet.ui.CafeViewModel
 import com.cafeos.tablet.ui.IngredientSpendInfo
 import com.cafeos.tablet.ui.IngredientSpendTrendPoint
@@ -42,6 +42,45 @@ import android.view.View
 import com.cafeos.tablet.ui.components.PremiumHeader
 import com.cafeos.tablet.ui.components.PremiumScreen
 
+/** Inventory health summary in Analytics (spec 014, US5): threshold-driven counts + stock value. */
+@Composable
+fun InventoryHealthPanel(summary: StockSummary, formatter: NumberFormat) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = PosSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text("Inventory Health", style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HealthStat("Healthy", summary.healthy, PosAccent)
+                HealthStat("Low", summary.low, PosGold)
+                HealthStat("Out", summary.out, PosDanger)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Stock value: ${formatter.format(summary.totalValue)}", style = MaterialTheme.typography.bodyMedium, color = PosPaper, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun HealthStat(label: String, count: Int, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(count.toString(), style = MaterialTheme.typography.titleLarge, color = color, fontWeight = FontWeight.Bold)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun AnalyticsScreen(viewModel: CafeViewModel) {
@@ -51,6 +90,7 @@ fun AnalyticsScreen(viewModel: CafeViewModel) {
     val categories by viewModel.categories.collectAsState(initial = emptyList())
     val settings by viewModel.businessSettings.collectAsState(initial = null)
     val lowStockIngredients by viewModel.lowStockIngredients.collectAsState(initial = emptyList())
+    val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
     var range by remember { mutableStateOf("TODAY") }
     var metrics by remember { mutableStateOf<com.cafeos.tablet.ui.PeriodMetrics?>(null) }
     var productProfit by remember { mutableStateOf<List<ProductProfitInfo>>(emptyList()) }
@@ -64,6 +104,7 @@ fun AnalyticsScreen(viewModel: CafeViewModel) {
     var salesTrend by remember { mutableStateOf<List<IngredientSpendTrendPoint>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val formatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
+    val inventorySummary = remember(ingredients) { StockSummaryRule.summarize(ingredients) }
     val now = System.currentTimeMillis()
     val start = when (range) {
         "TODAY" -> Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
@@ -145,6 +186,9 @@ fun AnalyticsScreen(viewModel: CafeViewModel) {
                 item {
                     EmptyAnalyticsPanel(range)
                 }
+            }
+            item {
+                InventoryHealthPanel(inventorySummary, formatter)
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
