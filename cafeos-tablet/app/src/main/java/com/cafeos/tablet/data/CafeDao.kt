@@ -304,6 +304,14 @@ interface CafeDao {
     @Query("SELECT * FROM IngredientTransaction WHERE type = 'PURCHASE' AND referenceType = 'supplier' AND referenceId = :supplierId ORDER BY id ASC")
     suspend fun purchasesForSupplier(supplierId: Int): List<IngredientTransaction>
 
+    // Spec 014 void support: the newest PURCHASE row id for an ingredient.
+    @Query("SELECT id FROM IngredientTransaction WHERE ingredientId = :ingredientId AND type = 'PURCHASE' ORDER BY id DESC LIMIT 1")
+    suspend fun latestPurchaseRowId(ingredientId: Int): Int?
+
+    // Spec 014 void support: supplier of the newest supplier-linked purchase BEFORE :beforeId.
+    @Query("SELECT referenceId FROM IngredientTransaction WHERE ingredientId = :ingredientId AND type = 'PURCHASE' AND referenceType = 'supplier' AND referenceId IS NOT NULL AND id < :beforeId ORDER BY id DESC LIMIT 1")
+    suspend fun previousPurchaseSupplierId(ingredientId: Int, beforeId: Int): Int?
+
     @Query("SELECT * FROM IngredientTransaction WHERE type = 'PURCHASE' ORDER BY createdAt DESC")
     fun getAllPurchases(): Flow<List<IngredientTransaction>>
 

@@ -1072,11 +1072,13 @@ fun IngredientHistoryDialog(
     onDismiss: () -> Unit
 ) {
     var transactions by remember(ingredient.id) { mutableStateOf<List<IngredientTransaction>?>(null) }
+    var refresh by remember { mutableStateOf(0) }
+    var pendingVoid by remember { mutableStateOf<IngredientTransaction?>(null) }
     val supplierById = suppliers.associateBy { it.id }
     val formatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
     val dateFormatter = SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault())
 
-    LaunchedEffect(ingredient.id) {
+    LaunchedEffect(ingredient.id, refresh) {
         transactions = viewModel.getTransactionsForIngredient(ingredient.id).first()
     }
 
@@ -1134,6 +1136,14 @@ fun IngredientHistoryDialog(
                                         } else {
                                             Text("No supplier", style = MaterialTheme.typography.labelMedium, color = PosMuted)
                                         }
+                                        if (txn.type == "PURCHASE") {
+                                            TextButton(
+                                                onClick = { pendingVoid = txn },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                            ) {
+                                                Text("Void", color = PosDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -1176,6 +1186,18 @@ fun IngredientHistoryDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp)
     )
+
+    pendingVoid?.let { txn ->
+        AdminPasscodeDialog(
+            viewModel = viewModel,
+            onDismiss = { pendingVoid = null },
+            onAuthorized = {
+                viewModel.voidPurchase(txn)
+                pendingVoid = null
+                refresh++
+            }
+        )
+    }
 }
 
 /** Supplier "page": every ingredient bought from this supplier with latest price

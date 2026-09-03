@@ -1119,7 +1119,66 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         if (supplier.id == 0) dao.insertSupplier(supplier) else dao.updateSupplier(supplier)
     }
 
-    suspend fun deleteSupplier(supplier: Supplier) = dao.deleteSupplier(supplier)
+    suspend fun deleteSupplier(supplier: Supplier) {
+        // Spec 014 / no silent data loss: deleting a supplier must never leave an
+        // ingredient pointing at a missing vendor. Recompute every affected
+        // ingredient's latest supplier from remaining purchase history first.
+        val affected = dao.getAllIngredients().firstOrNull().orEmpty().filter { it.lastSupplierId == supplier.id }
+        dao.deleteSupplier(supplier)
+        for (ingredient in affected) {
+            val latest = dao.latestSupplierIdForIngredient(ingredient.id)
+            if (latest != ingredient.lastSupplierId) {
+                dao.updateIngredient(ingredient.copy(lastSupplierId = latest, updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
+
+    /**
+     * Void a purchase (spec 014 FR-009): appends a compensating VOID_PURCHASE row
+     * (the original purchase is never modified), reverses stock in the same
+     * transaction, and — only when the voided row is the latest non-void
+     * purchase — reverts costPerUnit/lastSupplierId to the previous non-void
+     * purchase. Callers confirm via admin passcode first (mirrors order cancel).
+     */
+    fun voidPurchase(transaction: IngredientTransaction) {
+        if (transaction.type != "PURCHASE") return
+        viewModelScope.launch {
+            try {
+                db.withTransaction {
+                    val ingredient = dao.getIngredientSync(transaction.ingredientId) ?: return@withTransaction
+                    val latestRowId = dao.latestPurchaseRowId(transaction.ingredientId)
+                    val voidedIsLatest = latestRowId != null && latestRowId == transaction.id
+
+                    val stockReverted = ingredient.copy(
+                        currentStock = (ingredient.currentStock - transaction.quantity).coerceAtLeast(0.0),
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    val updated = if (voidedIsLatest) {
+                        val previousCost = dao.previousPurchaseUnitCost(transaction.ingredientId, transaction.id)
+                        val previousSupplier = dao.previousPurchaseSupplierId(transaction.ingredientId, transaction.id)
+                        stockReverted.copy(costPerUnit = previousCost ?: 0.0, lastSupplierId = previousSupplier)
+                    } else {
+                        stockReverted
+                    }
+                    dao.updateIngredient(updated)
+                    dao.insertIngredientTransaction(
+                        IngredientTransaction(
+                            ingredientId = transaction.ingredientId,
+                            type = "VOID_PURCHASE",
+                            quantity = -transaction.quantity,
+                            referenceType = "void-of",
+                            referenceId = transaction.id,
+                            notes = "Void of purchase #${transaction.id}" + if (voidedIsLatest) " (latest — cost/last supplier reverted)" else " (older purchase — stock only)",
+                            createdAt = System.currentTimeMillis()
+                        )
+                    )
+                    logAuditEvent("VOID_PURCHASE", "ingredient_transaction", transaction.id, details = "Voided purchase of ingredient ${ingredient.name}")
+                }
+            } catch (e: Throwable) {
+                android.util.Log.e("VoidPurchase", "Failed to void purchase", e)
+            }
+        }
+    }
 
     fun addCustomer(name: String, contact: String?) {
         viewModelScope.launch { dao.insertCustomer(Customer(name = name, contact = contact)) }
