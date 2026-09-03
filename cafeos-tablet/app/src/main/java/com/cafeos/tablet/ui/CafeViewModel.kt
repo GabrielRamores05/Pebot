@@ -1582,6 +1582,14 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         dao.insertIngredient(ingredient)
                         importedCount++
                     }
+                    for (recipe in data.productIngredients) {
+                        dao.insertProductIngredient(recipe)
+                        importedCount++
+                    }
+                    for (txn in data.ingredientTransactions) {
+                        dao.insertIngredientTransaction(txn.copy(id = 0))
+                        importedCount++
+                    }
                     for (payment in data.payments) {
                         val orderId = orderIdMap[payment.orderId]
                         if (orderId != null && orderImportedNow.contains(payment.orderId)) {
@@ -1759,6 +1767,8 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         val products = dao.getAllProducts().firstOrNull() ?: emptyList()
         val orders = dao.getAllOrders().firstOrNull() ?: emptyList()
         val ingredients = dao.getAllIngredients().firstOrNull() ?: emptyList()
+        val productIngredients = dao.getAllProductIngredientsNow()
+        val ingredientTransactions = dao.getAllIngredientTransactionsNow()
         val payments = dao.getAllPayments().firstOrNull() ?: emptyList()
         val customers = dao.getAllCustomers().firstOrNull() ?: emptyList()
         val suppliers = dao.getAllSuppliers().firstOrNull() ?: emptyList()
@@ -1802,6 +1812,8 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             orders = orders,
             orderItems = allOrderItems,
             ingredients = ingredients,
+            productIngredients = productIngredients,
+            ingredientTransactions = ingredientTransactions,
             payments = payments,
             customers = customers,
             suppliers = suppliers,
@@ -2183,6 +2195,8 @@ data class ExportData(
     val guests: List<Guest> = emptyList(),
     val tableSections: List<TableSection> = emptyList(),
     val productStations: List<ProductStation> = emptyList(),
+    val productIngredients: List<ProductIngredient> = emptyList(),
+    val ingredientTransactions: List<IngredientTransaction> = emptyList(),
     val supplierIngredientPrices: List<SupplierIngredientPrice> = emptyList()
 )
 

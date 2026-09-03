@@ -574,6 +574,12 @@ interface CafeDao {
     @Query("SELECT * FROM ProductOption")
     suspend fun getAllProductOptionsNow(): List<ProductOption>
 
+    @Query("SELECT * FROM ProductIngredient")
+    suspend fun getAllProductIngredientsNow(): List<ProductIngredient>
+
+    @Query("SELECT * FROM IngredientTransaction")
+    suspend fun getAllIngredientTransactionsNow(): List<IngredientTransaction>
+
     // Table Sessions
     @Query("SELECT * FROM TableSession WHERE status = 'OCCUPIED' ORDER BY startedAt DESC")
     fun getActiveTableSessions(): Flow<List<TableSession>>

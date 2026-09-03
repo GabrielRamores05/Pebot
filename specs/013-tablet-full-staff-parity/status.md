@@ -19,6 +19,24 @@ session starting from this file.
 - Both-platform gates green through round 46 (Android lint/tests/APK; web
   lint 0 errors/tsc clean/unit 422). Working tree clean.
 
+## Sample-data verification round (Galaxy Tab A9+)
+
+- Export/import format now carries **recipes (ProductIngredient)** and the
+  **ingredient ledger (IngredientTransaction)** end-to-end (new DAO queries +
+  ExportData fields + import loops).
+- Seeded a clean, internally-consistent 42-row store (products with recipes,
+  stock, 8 usage transactions, 4 orders incl. a CANCELLED one, 3 vouchers,
+  customer + loyalty card). Imported: "Imported: 42. Skipped: 0".
+- Verified on-device: Ingredients stocks exactly 904.0 g / 4310.0 ml /
+  1470.0 ml (post-usage); analytics arithmetic exact on earlier seeded ranges
+  (TODAY ₱412/2/₱206; 7 DAYS ₱1,152/4/₱288; THIS YEAR ₱1,432/5/₱286.40).
+- **Known follow-up (import merge safety):** importing onto an existing store
+  that has children referencing a parent row can hit an FK error because the
+  parent upserts use SQL `REPLACE` (delete+insert). Parent imports should
+  switch to keyed updates/upserts that preserve children. Affects repeated
+  imports and PC↔tablet merges; fix belongs in the import service before sync
+  enablement.
+
 ## Real-device analytics accuracy check (2026-09-04, Galaxy Tab A9+)
 
 Seeded a 26-row snapshot via the in-app JSON import ("Imported: 26. Skipped: 0")
