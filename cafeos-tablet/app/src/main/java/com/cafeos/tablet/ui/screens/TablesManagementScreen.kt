@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 fun TablesManagementScreen(viewModel: CafeViewModel) {
     val tables by viewModel.tables.collectAsState(initial = emptyList())
     val sections by viewModel.allTableSections.collectAsState(initial = emptyList())
+    val allOrders by viewModel.allOrders.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     var searchQuery by remember { mutableStateOf("") }
@@ -89,9 +90,13 @@ fun TablesManagementScreen(viewModel: CafeViewModel) {
         } else {
             LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(filteredTables) { table ->
+                    val occupant = allOrders
+                        .filter { it.tableId == table.id && (it.status == "PENDING" || it.status == "PREPARING") }
+                        .maxByOrNull { it.createdAt }?.customerName
                     TableManagementCard(
                         table = table,
                         sections = sections,
+                        occupantName = occupant,
                         onEdit = { editingTable = table; showTableForm = true },
                         onDelete = { scope.launch { viewModel.deleteTable(table) } },
                         onSetOccupancy = { delta ->
@@ -156,6 +161,7 @@ private fun nextTableStatus(current: String): String = when (current) {
 fun TableManagementCard(
     table: CafeTable,
     sections: List<TableSection>,
+    occupantName: String? = null,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSetOccupancy: (Int) -> Unit,
@@ -191,6 +197,9 @@ fun TableManagementCard(
                     else -> PosInkSoft
                 }
                 Text(table.status, style = MaterialTheme.typography.labelSmall, color = statusColor, fontWeight = FontWeight.Bold)
+                if (!occupantName.isNullOrBlank()) {
+                    Text("Occupant: $occupantName", style = MaterialTheme.typography.bodySmall, color = PosInk, fontWeight = FontWeight.Bold)
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Guests: ${table.currentOccupants}/${table.capacity}", style = MaterialTheme.typography.bodySmall, color = PosInkSoft)
                     TextButton(onClick = { onSetOccupancy(-1) }, contentPadding = PaddingValues(horizontal = 6.dp)) { Text("−", fontWeight = FontWeight.Bold) }

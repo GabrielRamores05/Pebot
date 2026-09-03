@@ -283,6 +283,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setOrderType(type: String) {
         _orderType.value = type
+        if (type == "DINE_IN") _selectedTableId.value?.let { occupyTableIfFree(it) }
     }
 
     fun setDeliveryAddress(address: String) {
@@ -299,6 +300,20 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSelectedTableId(id: Int?) {
         _selectedTableId.value = id
+        // Business rule (owner, 2026-09-04): picking a DINE-IN table at the POS
+        // marks that table occupied immediately, not only after the sale is placed.
+        if (id != null && _orderType.value == "DINE_IN") occupyTableIfFree(id)
+    }
+
+    /** Marks a free table OCCUPIED; never overrides staff-set OCCUPIED/NEEDS_CLEANING. */
+    private fun occupyTableIfFree(tableId: Int) {
+        viewModelScope.launch {
+            dao.getTable(tableId)?.let { t ->
+                if (t.status == "AVAILABLE") {
+                    dao.updateTable(t.copy(status = "OCCUPIED", updatedAt = System.currentTimeMillis()))
+                }
+            }
+        }
     }
 
     fun setScreenshotPath(path: String?) {

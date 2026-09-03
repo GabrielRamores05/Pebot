@@ -5,6 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -22,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.*
 import com.cafeos.tablet.ui.CafeViewModel
@@ -74,8 +79,13 @@ fun InventoryProductsTab(viewModel: CafeViewModel) {
     val products by viewModel.allProducts.collectAsState(initial = emptyList())
     val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(products) { product ->
+    // Product stock cards in a fixed 5-per-row grid.
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(5),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        gridItems(products) { product ->
             val ingredient = ingredients.find { it.name == product.name }
             val stock = ingredient?.currentStock ?: 0.0
             val min = ingredient?.minStock ?: 0.0
@@ -83,31 +93,33 @@ fun InventoryProductsTab(viewModel: CafeViewModel) {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(12.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(product.name, style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                        Text("₱${product.price}", style = MaterialTheme.typography.bodySmall, color = PosMuted)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = if (ingredient != null) "${stock} ${ingredient.baseUnit}" else "No stock",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = if (isLow) PosDanger else PosGold,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (isLow) {
-                            Text("Low Stock", color = PosDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                        }
+                    Text(
+                        product.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = PosPaper,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text("₱${product.price}", style = MaterialTheme.typography.bodySmall, color = PosMuted)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (ingredient != null) "${stock} ${ingredient.baseUnit}" else "No stock",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (isLow) PosDanger else PosGold,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (isLow) {
+                        Text("Low Stock", color = PosDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                 }
             }
