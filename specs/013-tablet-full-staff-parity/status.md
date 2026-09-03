@@ -4,6 +4,11 @@ Last updated: 2026-09-04 (goal rounds 0–18). Gates last verified (round 18):
 Android lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/
 tsc clean/test:unit (422) green.
 
+## Latest increments (rounds 43–44)
+
+- Reviews admin: Reviews / Taste Suggestions toggle + per-product filter + product
+  names on review cards (web parity).
+
 ## Latest increments (rounds 40–42)
 
 - Kitchen station tabs show live per-station order counts (All total too).
