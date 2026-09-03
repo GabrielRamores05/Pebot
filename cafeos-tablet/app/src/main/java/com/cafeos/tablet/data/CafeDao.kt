@@ -300,6 +300,10 @@ interface CafeDao {
     @Query("SELECT unitCost FROM IngredientTransaction WHERE ingredientId = :ingredientId AND type = 'PURCHASE' AND id < :beforeId AND unitCost IS NOT NULL ORDER BY id DESC LIMIT 1")
     suspend fun previousPurchaseUnitCost(ingredientId: Int, beforeId: Int): Double?
 
+    // Spec 014: all purchases from one supplier, ledger order (for the supplier page).
+    @Query("SELECT * FROM IngredientTransaction WHERE type = 'PURCHASE' AND referenceType = 'supplier' AND referenceId = :supplierId ORDER BY id ASC")
+    suspend fun purchasesForSupplier(supplierId: Int): List<IngredientTransaction>
+
     @Query("SELECT * FROM IngredientTransaction WHERE type = 'PURCHASE' ORDER BY createdAt DESC")
     fun getAllPurchases(): Flow<List<IngredientTransaction>>
 

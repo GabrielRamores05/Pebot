@@ -343,6 +343,7 @@ fun InventorySuppliersTab(viewModel: CafeViewModel) {
     val suppliers by viewModel.suppliers.collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
     var editingSupplier by remember { mutableStateOf<Supplier?>(null) }
+    var detailSupplier by remember { mutableStateOf<Supplier?>(null) }
     val scope = rememberCoroutineScope()
 
     Column {
@@ -355,7 +356,9 @@ fun InventorySuppliersTab(viewModel: CafeViewModel) {
             gridItems(suppliers) { supplier ->
                 Column {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { detailSupplier = supplier },
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -434,6 +437,14 @@ fun InventorySuppliersTab(viewModel: CafeViewModel) {
                     editingSupplier = null
                 }
             }
+        )
+    }
+
+    detailSupplier?.let { supplier ->
+        SupplierDetailDialog(
+            supplier = supplier,
+            viewModel = viewModel,
+            onDismiss = { detailSupplier = null }
         )
     }
 }
@@ -1126,6 +1137,83 @@ fun IngredientHistoryDialog(
                                             } else {
                                                 Text("First purchase — no previous price", style = MaterialTheme.typography.bodySmall, color = PosMuted)
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(20.dp)
+    )
+}
+
+/** Supplier "page": every ingredient bought from this supplier with latest price
+ *  and ₱/% change vs the previous price from the same supplier (spec 014, US3). */
+@Composable
+fun SupplierDetailDialog(
+    supplier: Supplier,
+    viewModel: CafeViewModel,
+    onDismiss: () -> Unit
+) {
+    var rows by remember(supplier.id) { mutableStateOf<List<SupplierIngredientTrend>?>(null) }
+    val formatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
+
+    LaunchedEffect(supplier.id) {
+        rows = viewModel.supplierIngredientTrends(supplier.id)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Supplier: ${supplier.name}", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.height(440.dp)) {
+                if (rows == null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = PosAccent)
+                    }
+                } else if (rows!!.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No purchases from this supplier yet.", color = PosMuted)
+                    }
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(rows!!.size) { index ->
+                            val row = rows!![index]
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(row.ingredientName, style = MaterialTheme.typography.bodyLarge, color = PosPaper, fontWeight = FontWeight.SemiBold)
+                                        Text("${row.purchaseCount} purchase(s)", style = MaterialTheme.typography.bodySmall, color = PosMuted)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        row.latestUnitCost?.let {
+                                            Text("${formatter.format(it)} / ${row.baseUnit}", style = MaterialTheme.typography.bodyMedium, color = PosPaper, fontWeight = FontWeight.Bold)
+                                        }
+                                        if (row.change != null) {
+                                            val up = row.change.delta >= 0
+                                            Text(
+                                                "${if (up) "+" else ""}${formatter.format(row.change.delta)} (${if (up) "+" else ""}${"%.2f".format(row.change.percent)}%)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = if (up) PosDanger else PosAccent,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        } else {
+                                            Text("First purchase", style = MaterialTheme.typography.bodySmall, color = PosMuted)
                                         }
                                     }
                                 }

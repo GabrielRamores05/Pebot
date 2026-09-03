@@ -230,8 +230,7 @@ data class Supplier(
 )
 
 @Serializable
-@Entity(
-    tableName = "SupplierIngredientPrice",
+@Entity(tableName = "SupplierIngredientPrice",
     foreignKeys = [
         ForeignKey(entity = Supplier::class, parentColumns = ["id"], childColumns = ["supplierId"], onDelete = ForeignKey.CASCADE),
         ForeignKey(entity = Ingredient::class, parentColumns = ["id"], childColumns = ["ingredientId"], onDelete = ForeignKey.CASCADE)
@@ -714,4 +713,15 @@ data class OutboxEntry(
     val lastError: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
+)
+
+/** One ingredient row on the supplier page (spec 014, US3), not a DB table. */
+data class SupplierIngredientTrend(
+    val ingredientName: String,
+    val baseUnit: String,
+    val latestUnitCost: Double?,
+    val previousUnitCost: Double?,
+    val change: PriceChange?,
+    val purchaseCount: Int,
+    val lastPurchaseDate: Long?
 )

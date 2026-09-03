@@ -968,6 +968,28 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun getIngredientSync(id: Int): Ingredient? = dao.getIngredientSync(id)
 
+    /** Per-ingredient latest price + change vs previous price from ONE supplier (spec 014, US3). */
+    suspend fun supplierIngredientTrends(supplierId: Int): List<SupplierIngredientTrend> {
+        val purchases = dao.purchasesForSupplier(supplierId)
+        val ingredientNames = dao.getAllIngredients().firstOrNull()?.associateBy { it.id } ?: emptyMap()
+        return purchases.groupBy { it.ingredientId }.mapNotNull { (ingredientId, rows) ->
+            val ingredient = ingredientNames[ingredientId] ?: return@mapNotNull null
+            val ordered = rows.sortedBy { it.id }
+            val priced = ordered.filter { it.unitCost != null }
+            val latest = priced.lastOrNull()
+            val previous = if (priced.size >= 2) priced[priced.size - 2].unitCost else null
+            SupplierIngredientTrend(
+                ingredientName = ingredient.name,
+                baseUnit = ingredient.baseUnit,
+                latestUnitCost = latest?.unitCost,
+                previousUnitCost = previous,
+                change = if (latest != null && previous != null) PriceTrends.change(previous, latest.unitCost ?: 0.0) else null,
+                purchaseCount = ordered.size,
+                lastPurchaseDate = ordered.lastOrNull()?.createdAt
+            )
+        }.sortedBy { it.ingredientName }
+    }
+
     private suspend fun consumeRecipeStock(orderItems: List<OrderItem>) {
         val ingredients = dao.getAllIngredients().firstOrNull()?.associateBy { it.id } ?: return
         orderItems.forEach { orderItem ->

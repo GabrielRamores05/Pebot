@@ -88,7 +88,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 **Independent Test**: quickstart QS-2 supplier half â€” two purchases from the same supplier show the correct change; suppliers without purchases show an empty list note.
 
-- [ ] T016 [US3] Tablet data: per-supplier ingredient aggregation (latest + previous same-supplier purchase per ingredient) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt` + ViewModel accessors
+- [X] T016 [US3] Tablet data: DAO `purchasesForSupplier` + ViewModel `supplierIngredientTrends` (latest + previous same-supplier purchase per ingredient)
 - [ ] T017 [US3] Tablet UI: Suppliers page at `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/SuppliersScreen.kt` (new) showing ingredient rows with latest price and â‚±/% change; wire into navigation in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/MainActivity.kt`
 - [ ] T018 [US3] Web: supplier page data (repository/service) and UI in `my-app/app/admin/suppliers/page.tsx` (or existing suppliers area) with the same change figures
 - [ ] T032 [P] [US3] Supplier-deletion safety on both apps: warn when a supplier has purchase history; on delete, recompute-or-clear `lastSupplierId` on every affected ingredient from remaining non-void purchases (tablet: `cafeos-tablet/.../ui/CafeViewModel.kt` + `data/CafeDao.kt`; web: `my-app/modules/inventory/service.ts`)
@@ -219,6 +219,7 @@ Task: "Web UI (T010) in app/admin/inventory/page.tsx"
 - Money and stock writes are append-only and single-transaction (constitution); VOID replaces edit/delete
 - Unit costs are always computed from stored quantity + total â€” never accepted from the client
 - Commit after each task or logical group; stop at checkpoints to validate the story independently
+
 
 
 
