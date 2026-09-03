@@ -427,6 +427,7 @@ fun PaymentSettingsContent(businessSettings: BusinessSettings?, onSave: (Busines
 fun ReceiptSettingsContent(businessSettings: BusinessSettings?, onSave: (BusinessSettings) -> Unit) {
     var receiptPrefix by remember { mutableStateOf(businessSettings?.receiptPrefix ?: "INV") }
     var lastNumber by remember { mutableStateOf((businessSettings?.lastReceiptNumber ?: 0).toString()) }
+var footerText by remember { mutableStateOf(businessSettings?.footerMessage ?: "Thank you for your visit!") }
 
     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
         Card(
@@ -455,10 +456,16 @@ fun ReceiptSettingsContent(businessSettings: BusinessSettings?, onSave: (Busines
                     style = MaterialTheme.typography.bodySmall,
                     color = PosMuted
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = footerText, onValueChange = { footerText = it },
+                    label = { Text("Receipt Footer Message") }, modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { onSave((businessSettings ?: BusinessSettings()).copy(receiptPrefix = receiptPrefix, lastReceiptNumber = lastNumber.toIntOrNull() ?: 0)) },
+                    onClick = { onSave((businessSettings ?: BusinessSettings()).copy(receiptPrefix = receiptPrefix, lastReceiptNumber = lastNumber.toIntOrNull() ?: 0, footerMessage = footerText)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PosAccent)

@@ -144,7 +144,7 @@ class ReceiptPrinter(private val context: Context) {
         }
         paint.textSkewX = 0f
 
-        canvas.drawText("Thank you!", MARGIN.toFloat(), yPosition.toFloat(), paint)
+        canvas.drawText(settings?.footerMessage ?: "Thank you!", MARGIN.toFloat(), yPosition.toFloat(), paint)
 
         pdfDocument.finishPage(page)
 

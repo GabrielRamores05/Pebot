@@ -4,6 +4,19 @@ Last updated: 2026-09-04 (goal rounds 0–18). Gates last verified (round 18):
 Android lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/
 tsc clean/test:unit (422) green.
 
+## Latest increments (rounds 19–31)
+
+- HR module UI completed: Staff now has all eight tabs — Team, Time Clock,
+  Time Off, Training, Documents, Performance Reviews, Schedule (weekly rota),
+  Payroll (generate + Mark Paid). Previously the HR layer had zero screens.
+- Stations management screen (web stations parity) reachable under Management,
+  gated by the tables permission.
+- DINE_IN sales auto-occupy an AVAILABLE table in the same transaction.
+- Tables editor + status colors include NEEDS_CLEANING (web status set).
+- Settings ▸ Receipts: receipt footer message editor; the receipt printer now
+  prints the configured footer.
+- Checkpoint commits: `3cea69c` (rounds 0–15), `dd3bb73` (rounds 16–28).
+
 ## Latest increments (rounds 12–18)
 
 - Audit emission wired into key tablet actions (order status, staff CRUD,
@@ -18,7 +31,6 @@ tsc clean/test:unit (422) green.
   editable and are still mapped by AccessControl).
 - Voucher editor: start/expiry dates are editable (yyyy-MM-dd) with safe
   fallbacks.
-- Checkpoint commit on main: `3cea69c` (round 15) — 40 files, +2,657/−239.
 
 ## Implemented & verified (this program so far)
 

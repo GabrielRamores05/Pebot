@@ -161,7 +161,8 @@ fun TableManagementCard(table: CafeTable, sections: List<TableSection>, onEdit: 
                 val statusColor = when (table.status) {
                     "AVAILABLE" -> PosAccent
                     "OCCUPIED" -> PosDanger
-                    "RESERVED" -> PosGold
+                    "NEEDS_CLEANING" -> PosGold
+                    "RESERVED" -> PosInfo
                     else -> PosInkSoft
                 }
                 Text(table.status, style = MaterialTheme.typography.labelSmall, color = statusColor, fontWeight = FontWeight.Bold)
@@ -305,7 +306,7 @@ fun TableFormDialog(table: CafeTable?, sections: List<TableSection>, onDismiss: 
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
                     )
                     ExposedDropdownMenu(expanded = statusExpanded, onDismissRequest = { statusExpanded = false }) {
-                        listOf("AVAILABLE", "RESERVED", "OCCUPIED").forEach { s ->
+                        listOf("AVAILABLE", "RESERVED", "OCCUPIED", "NEEDS_CLEANING").forEach { s ->
                             DropdownMenuItem(text = { Text(s.replaceFirstChar { it.uppercase() }) }, onClick = { statusText = s; statusExpanded = false })
                         }
                     }
