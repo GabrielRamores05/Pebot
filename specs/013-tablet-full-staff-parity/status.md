@@ -19,6 +19,23 @@ session starting from this file.
 - Both-platform gates green through round 46 (Android lint/tests/APK; web
   lint 0 errors/tsc clean/unit 422). Working tree clean.
 
+## Real-device analytics accuracy check (2026-09-04, Galaxy Tab A9+)
+
+Seeded a 26-row snapshot via the in-app JSON import ("Imported: 26. Skipped: 0")
+with 6 orders of known amounts/status across time ranges. Analytics matched
+exactly: TODAY ₱412 / 2 orders / ₱206 avg; 7 DAYS ₱1,152 / 4 / ₱288 avg;
+THIS YEAR ₱1,432 / 5 / ₱286.40 avg — CANCELLED orders excluded correctly.
+Note: the YESTERDAY and THIS MONTH chips appear to use wider buckets than their
+labels imply (both returned today+yesterday totals) — worth a label/range review.
+
+## Staff page access — now the web permission model
+
+The staff editor previously wrote legacy route-name CSV permissions. It now
+shows the web's 10 flags (Live Orders, New Order, Tables, Analytics, Products,
+Inventory, Kitchen, Loyalty, Staff, Settings), persists the web JSON shape
+`{"liveOrders":true,...}`, migrates legacy CSV rows on edit (blank = full access
+preserved), and new staff default to web semantics (liveOrders only).
+
 ## Real-device verification (Galaxy Tab A9+, SM-X210, Android 16)
 
 Performed via adb over USB (install → cold launch → first-run admin creation →

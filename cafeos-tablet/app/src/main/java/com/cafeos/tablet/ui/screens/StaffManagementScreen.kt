@@ -28,9 +28,69 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+
+/** Web (Windows app) permission flags shown in the staff editor. */
+private val WEB_PERMISSION_OPTIONS: List<Pair<String, String>> = listOf(
+    "liveOrders" to "Live Orders",
+    "terminal" to "New Order",
+    "tables" to "Tables",
+    "analytics" to "Analytics",
+    "products" to "Products",
+    "inventory" to "Inventory",
+    "kitchen" to "Kitchen",
+    "loyalty" to "Loyalty",
+    "staff" to "Staff",
+    "settings" to "Settings"
+)
+
+/** Maps legacy tablet route tokens to their web permission key. */
+private val LEGACY_ROUTE_TO_PERMISSION: Map<String, String> = mapOf(
+    "pos" to "terminal",
+    "live_orders" to "liveOrders",
+    "kitchen" to "kitchen",
+    "analytics" to "analytics",
+    "order_history" to "analytics",
+    "expenses" to "inventory",
+    "vouchers" to "loyalty",
+    "products" to "products",
+    "inventory" to "inventory",
+    "tables" to "tables",
+    "stock_history" to "inventory",
+    "reviews" to "products",
+    "loyalty" to "loyalty",
+    "settings" to "settings",
+    "staff" to "staff",
+    "connection" to "settings"
+)
+
+private val WEB_KEYS = WEB_PERMISSION_OPTIONS.map { it.first }.toSet()
+
+/** Reads web-JSON or legacy CSV permissions into a set of web keys. */
+private fun parseStaffPermissions(raw: String?): Set<String> {
+    val s = raw?.trim().orEmpty()
+    if (s.isEmpty()) return emptySet()
+    return if (s.startsWith("{")) {
+        try {
+            Json { ignoreUnknownKeys = true }.decodeFromString<Map<String, Boolean>>(s)
+                .filterValues { it }.keys.toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    } else {
+        s.split(",").map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { token ->
+            LEGACY_ROUTE_TO_PERMISSION[token] ?: token.takeIf { it in WEB_KEYS }
+        }.toSet()
+    }
+}
+
+/** Serializes web keys to the web JSON shape: {"liveOrders":true,...}. */
+private fun serializeStaffPermissions(perms: Set<String>): String = "{" +
+    WEB_PERMISSION_OPTIONS.joinToString(",") { (key, _) -> "\"$key\":${if (key in perms) "true" else "false"}" } +
+    "}"
 
 private fun staffDayStart(): Long = Calendar.getInstance().apply {
     set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
@@ -1001,8 +1061,15 @@ fun StaffFormDialog(staff: Staff?, onDismiss: () -> Unit, onSave: (Staff) -> Uni
     // means "keep the current one" so saving never silently blanks a login.
     var pin by remember { mutableStateOf("") }
     var profitShareRate by remember { mutableStateOf(staff?.profitShareRate?.toString() ?: "0") }
-    val permissionOptions = listOf("pos" to "POS", "live_orders" to "Live Orders", "kitchen" to "Kitchen", "analytics" to "Analytics", "order_history" to "Order History", "expenses" to "Expenses", "vouchers" to "Vouchers", "products" to "Products", "inventory" to "Inventory", "tables" to "Tables", "connection" to "Connection")
-    var permissions by remember { mutableStateOf(staff?.permissions?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: permissionOptions.map { it.first }.toSet()) }
+    val permissionOptions = WEB_PERMISSION_OPTIONS
+    // Web permission flags. Legacy blank permissions meant "full access" — keep
+    // that meaning by seeding all keys; new staff default to web's liveOrders-only.
+    var permissions by remember {
+        mutableStateOf(
+            if (staff != null && staff.permissions.isNullOrBlank()) WEB_KEYS
+            else parseStaffPermissions(staff?.permissions).ifEmpty { if (staff == null) setOf("liveOrders") else emptySet() }
+        )
+    }
 
     // Windows role vocabulary (ADMIN/STAFF/KITCHEN). Legacy MANAGER/BARISTA rows
     // stay editable but are no longer offered for new staff.
@@ -1065,9 +1132,9 @@ fun StaffFormDialog(staff: Staff?, onDismiss: () -> Unit, onSave: (Staff) -> Uni
                 onClick = {
                     if (name.isNotBlank()) {
                         val saved = if (staff == null) {
-                            Staff(name = name, role = role, email = email.ifBlank { null }, phone = phone.ifBlank { null }, pin = pin.ifBlank { null }, permissions = permissions.joinToString(","), profitShareRate = profitShareRate.toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0)
+                            Staff(name = name, role = role, email = email.ifBlank { null }, phone = phone.ifBlank { null }, pin = pin.ifBlank { null }, permissions = serializeStaffPermissions(permissions), profitShareRate = profitShareRate.toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0)
                         } else {
-                            staff.copy(name = name, role = role, email = email.ifBlank { null }, phone = phone.ifBlank { null }, pin = if (pin.isBlank()) staff.pin else pin, permissions = permissions.joinToString(","), profitShareRate = profitShareRate.toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0)
+                            staff.copy(name = name, role = role, email = email.ifBlank { null }, phone = phone.ifBlank { null }, pin = if (pin.isBlank()) staff.pin else pin, permissions = serializeStaffPermissions(permissions), profitShareRate = profitShareRate.toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0)
                         }
                         onSave(saved)
                     }
