@@ -4,6 +4,11 @@ Last updated: 2026-09-04 (goal rounds 0–18). Gates last verified (round 18):
 Android lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/
 tsc clean/test:unit (422) green.
 
+## Latest increments (rounds 40–42)
+
+- Kitchen station tabs show live per-station order counts (All total too).
+- Full Android gates green at round 40.
+
 ## Latest increments (rounds 37–39)
 
 - Order-detail receipt reprint (Live Orders & Order History) via receipt printer.

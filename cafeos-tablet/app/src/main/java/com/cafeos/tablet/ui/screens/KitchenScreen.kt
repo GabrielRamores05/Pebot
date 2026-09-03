@@ -50,6 +50,11 @@ fun KitchenScreen(viewModel: CafeViewModel) {
     }
 
     val selectedStationType = stationsFromDb.firstOrNull { it.name == selectedStation }?.stationType
+    val countsByStationName = stationsFromDb.associate { station ->
+        station.name to orders.count { order ->
+            itemsByOrder[order.id].orEmpty().any { productStationType[it.productId] == station.stationType }
+        }
+    }
     val filtered = if (selectedStation == "All") {
         orders
     } else {
@@ -72,7 +77,15 @@ fun KitchenScreen(viewModel: CafeViewModel) {
                 Tab(
                     selected = selectedStation == station,
                     onClick = { selectedStation = station },
-                    text = { Text(station) }
+                    text = {
+                        Text(
+                            if (station == "All") {
+                                "All (${orders.size})"
+                            } else {
+                                "${station} (${countsByStationName[station] ?: 0})"
+                            }
+                        )
+                    }
                 )
             }
         }
