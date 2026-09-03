@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.CafeTable
 import com.cafeos.tablet.data.TableSection
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -42,12 +43,7 @@ fun TablesManagementScreen(viewModel: CafeViewModel) {
         tables.filter { it.name.contains(searchQuery, ignoreCase = true) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -91,7 +87,7 @@ fun TablesManagementScreen(viewModel: CafeViewModel) {
                 }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(filteredTables) { table ->
                     TableManagementCard(
                         table = table,

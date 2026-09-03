@@ -77,6 +77,7 @@ data class Order(
     val paymentMethod: String = "CASH", // CASH, GCASH, PAYMAYA
     val orderType: String = "DINE_IN",
     val tableId: Int? = null,
+    val tableLocation: String? = null,
     val barcodeValue: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -152,7 +153,9 @@ data class OrderOption(
     val orderItemId: Int,
     val name: String,        // "Size", "Extra Shot"
     val value: String,       // "Large", "Oat Milk"
-    val priceDelta: Double = 0.0
+    val priceDelta: Double = 0.0,
+    val ingredientId: Int? = null,
+    val ingredientQuantity: Double = 0.0
 )
 
 @Serializable
@@ -265,7 +268,9 @@ data class Option(
     val groupId: Int,
     val name: String,
     val priceDelta: Double = 0.0,
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+    val ingredientId: Int? = null,
+    val ingredientQuantity: Double = 0.0
 )
 
 @Serializable
@@ -299,6 +304,10 @@ data class BusinessSettings(
     val voiceEnabled: Boolean = true,
     val voiceVolume: Float = 1.0f,
     val voiceSpeed: Float = 1.0f,
+    val voiceOrderMessage: String = "New order {order} for {customer} received at {table}.",
+    val voiceQuotaMessage: String = "Congratulations! Daily quota reached: {current} of {target}.",
+    val dailyQuotaMode: String = "ORDERS",
+    val dailyQuotaTarget: Double = 0.0,
     val updatedAt: Long = System.currentTimeMillis()
 )
 
@@ -312,6 +321,8 @@ data class Staff(
     val phone: String? = null,
     val pin: String? = null,
     val active: Boolean = true,
+    val permissions: String = "",
+    val profitShareRate: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -491,6 +502,7 @@ data class Payroll(
     val philhealth: Double = 0.0,
     val pagibig: Double = 0.0,
     val tax: Double = 0.0,
+    val profitShareAmount: Double = 0.0,
     val netPay: Double = 0.0,
     val status: String = "PENDING",
     val createdAt: Long = System.currentTimeMillis()

@@ -10,12 +10,12 @@ class ViewModelBusinessLogicTest {
 
     @Test
     fun testBirPriceCalculation_percentageMargin() {
-        assertEquals(130.0, calculateBirPriceInternal(100.0, "PERCENTAGE", 30.0, false), 0.01)
+        assertEquals(145.6, calculateBirPriceInternal(100.0, "PERCENTAGE", 30.0, false), 0.01)
     }
 
     @Test
     fun testBirPriceCalculation_fixedMargin() {
-        assertEquals(112.0, calculateBirPriceInternal(100.0, "FIXED", 12.0, false), 0.01)
+        assertEquals(125.44, calculateBirPriceInternal(100.0, "FIXED", 12.0, false), 0.01)
     }
 
     @Test
@@ -30,11 +30,11 @@ class ViewModelBusinessLogicTest {
 
     @Test
     fun testLoyaltyTier_calculation() {
-        assertEquals("CASUAL", calculateLoyaltyTier(50.0))
+        assertEquals("AT_RISK", calculateLoyaltyTier(50.0))
         assertEquals("CASUAL", calculateLoyaltyTier(100.0))
-        assertEquals("REGULAR", calculateLoyaltyTier(499.0))
+        assertEquals("CASUAL", calculateLoyaltyTier(499.0))
         assertEquals("REGULAR", calculateLoyaltyTier(500.0))
-        assertEquals("VIP", calculateLoyaltyTier(999.0))
+        assertEquals("REGULAR", calculateLoyaltyTier(999.0))
         assertEquals("VIP", calculateLoyaltyTier(1000.0))
         assertEquals("VIP", calculateLoyaltyTier(1500.0))
         assertEquals("AT_RISK", calculateLoyaltyTier(0.0))
@@ -210,7 +210,7 @@ class ViewModelBusinessLogicTest {
     fun testCurrencyFormatter_PHP() {
         val formatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
         val formatted = formatter.format(1500.50)
-        assertTrue(formatted.contains("1500"))
+        assertTrue(formatted.replace(",", "").contains("1500"))
         assertTrue(formatted.contains("50"))
     }
 }

@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.Product
@@ -42,17 +44,27 @@ import com.cafeos.tablet.data.Order
 fun POSScreen(viewModel: CafeViewModel) {
     val products by viewModel.allProducts.collectAsState(initial = emptyList())
     val categories by viewModel.categories.collectAsState(initial = emptyList())
+    val tables by viewModel.tables.collectAsState(initial = emptyList())
+    val orders by viewModel.allOrders.collectAsState(initial = emptyList())
+    val businessSettings by viewModel.businessSettings.collectAsState(initial = null)
     val cartItems = viewModel.cartItems
     val totalAmount by viewModel.totalAmount.collectAsState()
     val showProductOptions by viewModel.showProductOptions.collectAsState()
     val showCheckout by viewModel.showCheckout.collectAsState()
     val placedOrder by viewModel.placedOrder.collectAsState()
+    val selectedTableId by viewModel.selectedTableId.collectAsState()
 
     var selectedCategoryId by remember { mutableStateOf<Int?>(null) }
     var optionGroups by remember { mutableStateOf<List<com.cafeos.tablet.data.OptionGroup>>(emptyList()) }
     var groupOptions by remember { mutableStateOf<Map<Int, List<com.cafeos.tablet.data.Option>>>(emptyMap()) }
 
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
+    val startOfToday = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+    val todayOrders = orders.filter { it.createdAt >= startOfToday && it.status != "CANCELLED" }
+    val quotaTarget = businessSettings?.dailyQuotaTarget ?: 0.0
+    val quotaMode = businessSettings?.dailyQuotaMode ?: "ORDERS"
+    val todayProductUnits by remember(startOfToday) { viewModel.getProductUnitCount(startOfToday, System.currentTimeMillis()) }.collectAsState(initial = 0)
+    val quotaCurrent = if (quotaMode == "REVENUE") todayOrders.sumOf { it.totalAmount } else todayProductUnits.toDouble()
 
     LaunchedEffect(showProductOptions) {
         showProductOptions?.let { product ->
@@ -79,7 +91,7 @@ fun POSScreen(viewModel: CafeViewModel) {
                 .background(PosCoffee)
                 .padding(16.dp)
         ) {
-            Text("Menu", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
+            Text("Menu", style = MaterialTheme.typography.headlineMedium, color = PosInk)
             Spacer(modifier = Modifier.height(12.dp))
 
             var searchQuery by remember { mutableStateOf("") }
@@ -88,13 +100,14 @@ fun POSScreen(viewModel: CafeViewModel) {
                 onValueChange = { searchQuery = it },
                 label = { Text("Search products") },
                 modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = PosMuted) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = PosInkSoft) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = PosAccent,
                     unfocusedBorderColor = PosBorder,
-                    focusedTextColor = PosPaper,
-                    unfocusedTextColor = PosPaper,
-                    cursorColor = PosAccent
+                    focusedTextColor = PosInk,
+                    unfocusedTextColor = PosInk,
+                    cursorColor = PosAccent,
+                    disabledTextColor = PosInkSoft
                 ),
                 singleLine = true
             )
@@ -152,9 +165,9 @@ fun POSScreen(viewModel: CafeViewModel) {
 
         Column(
             modifier = Modifier
-                .width(380.dp)
+                .widthIn(min = 300.dp, max = 380.dp)
                 .fillMaxHeight()
-                .background(PosCoffeeLight)
+                .background(PosSurface)
                 .padding(16.dp)
         ) {
             Row(
@@ -162,7 +175,7 @@ fun POSScreen(viewModel: CafeViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Current Order", style = MaterialTheme.typography.titleLarge, color = PosPaper)
+                Text("Current Order", style = MaterialTheme.typography.titleLarge, color = PosInk)
                 if (cartItems.isNotEmpty()) {
                     TextButton(onClick = { viewModel.clearCart() }) {
                         Text("Clear", color = PosDanger, style = MaterialTheme.typography.labelMedium)
@@ -170,7 +183,48 @@ fun POSScreen(viewModel: CafeViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (quotaTarget > 0.0) {
+                val quotaProgress = (quotaCurrent / quotaTarget).coerceIn(0.0, 1.0).toFloat()
+                Surface(color = if (quotaProgress >= 1f) PosAccentSoft else PosCoffee, shape = RoundedCornerShape(12.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Daily quota", color = PosInkSoft, style = MaterialTheme.typography.labelMedium)
+                            Text(if (quotaMode == "REVENUE") "${currencyFormatter.format(quotaCurrent)} / ${currencyFormatter.format(quotaTarget)}" else "${quotaCurrent.toInt()} / ${quotaTarget.toInt()} products", color = PosAccent, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                        LinearProgressIndicator(progress = quotaProgress, modifier = Modifier.fillMaxWidth().height(6.dp), color = PosAccent, trackColor = PosBorder)
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            Text("Table", style = MaterialTheme.typography.labelMedium, color = PosInkSoft)
+            Spacer(modifier = Modifier.height(6.dp))
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 92.dp),
+                modifier = Modifier.height(112.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(tables, key = { it.id }) { table ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.setSelectedTableId(table.id) },
+                        color = if (selectedTableId == table.id) PosAccentSoft else PosCoffee,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedTableId == table.id) PosAccent else PosBorder)
+                    ) {
+                        Column(modifier = Modifier.padding(9.dp)) {
+                            Text(table.name, color = PosInk, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text("${table.currentOccupants}/${table.capacity}", color = PosInkSoft, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -247,14 +301,39 @@ fun POSScreen(viewModel: CafeViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductCard(product: Product, formatter: NumberFormat, onClick: () -> Unit) {
+    val context = LocalContext.current
     var bitmap by remember(product.imageUrl) { mutableStateOf<android.graphics.Bitmap?>(null) }
 
     LaunchedEffect(product.imageUrl) {
-        product.imageUrl?.let { path ->
-            val file = java.io.File(path)
-            if (file.exists()) {
-                bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+        bitmap = null
+        val normalizedPath = when {
+            product.imageUrl.isNullOrBlank() -> null
+            product.imageUrl.startsWith("file://") -> android.net.Uri.parse(product.imageUrl).path
+            product.imageUrl.startsWith("content://") -> product.imageUrl
+            else -> product.imageUrl
+        }
+
+        val file = normalizedPath?.let {
+            if (it.startsWith("content://")) {
+                null
+            } else {
+                java.io.File(it)
             }
+        }
+
+        bitmap = when {
+            file != null && file.exists() -> android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+            normalizedPath != null && normalizedPath.startsWith("content://") -> {
+                try {
+                    val input = context.contentResolver.openInputStream(android.net.Uri.parse(normalizedPath))
+                    val decoded = input?.let { android.graphics.BitmapFactory.decodeStream(it) }
+                    input?.close()
+                    decoded
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            else -> null
         }
     }
 
@@ -262,32 +341,33 @@ fun ProductCard(product: Product, formatter: NumberFormat, onClick: () -> Unit) 
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = PosCream),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap!!.asImageBitmap(),
                     contentDescription = product.name,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp),
+                        .height(118.dp),
                     contentScale = ContentScale.Crop
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
             }
             Text(
                 text = product.name,
                 style = MaterialTheme.typography.titleMedium,
                 color = PosInk,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = formatter.format(product.price),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = PosAccent,
                 fontWeight = FontWeight.Bold
             )
@@ -495,19 +575,30 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
     val subtotalAmount by viewModel.subtotalAmount.collectAsState()
     val paymentMethod by viewModel.paymentMethod.collectAsState()
     val amountTendered by viewModel.amountTendered.collectAsState()
+    val customerName by viewModel.customerName.collectAsState()
     val discountType by viewModel.discountType.collectAsState()
     val selectedTableId by viewModel.selectedTableId.collectAsState()
     val tables by viewModel.tables.collectAsState(initial = emptyList())
+    val businessSettings by viewModel.businessSettings.collectAsState(initial = null)
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
     val change = (amountTendered.toDoubleOrNull() ?: 0.0) - totalAmount
+    val canComplete = paymentMethod != "CASH" || (amountTendered.toDoubleOrNull() ?: 0.0) >= totalAmount
 
     var tableExpanded by remember { mutableStateOf(false) }
+    var showInvoiceReview by remember { mutableStateOf(false) }
+    val selectedTable = tables.find { it.id == selectedTableId }
+    val selectedTableLabel = selectedTable?.name ?: "No table selected"
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Checkout", color = MaterialTheme.colorScheme.onSurface) },
         text = {
-            Column {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 580.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -516,78 +607,76 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
                     Text(currencyFormatter.format(totalAmount), style = MaterialTheme.typography.headlineMedium, color = PosGold, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text("Table", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(8.dp))
-                ExposedDropdownMenuBox(expanded = tableExpanded, onExpandedChange = { tableExpanded = it }) {
+                if (showInvoiceReview) {
+                    InvoiceReview(
+                        viewModel = viewModel,
+                        orderTotal = totalAmount,
+                        customerName = customerName,
+                        tableLabel = selectedTableLabel,
+                        paymentMethod = paymentMethod,
+                        discountType = discountType,
+                        amountTendered = amountTendered,
+                        change = change,
+                        currencyFormatter = currencyFormatter
+                    )
+                } else {
                     OutlinedTextField(
-                        value = tables.find { it.id == selectedTableId }?.name ?: "Select table",
-                        onValueChange = {},
-                        readOnly = true,
+                        value = customerName,
+                        onValueChange = { viewModel.setCustomerName(it) },
+                        label = { Text("Customer Name") },
                         modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tableExpanded) },
+                        singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
                     )
-                    ExposedDropdownMenu(expanded = tableExpanded, onDismissRequest = { tableExpanded = false }) {
-                        tables.forEach { table ->
-                            DropdownMenuItem(text = { Text("${table.name} (${table.currentOccupants}/${table.capacity})") }, onClick = { viewModel.setSelectedTableId(table.id); tableExpanded = false })
+
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Table", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(6.dp))
+                            ExposedDropdownMenuBox(expanded = tableExpanded, onExpandedChange = { tableExpanded = it }) {
+                                OutlinedTextField(
+                                    value = selectedTableLabel,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tableExpanded) },
+                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
+                                )
+                                ExposedDropdownMenu(expanded = tableExpanded, onDismissRequest = { tableExpanded = false }) {
+                                    tables.forEach { table ->
+                                        DropdownMenuItem(text = { Text("${table.name} (${table.currentOccupants}/${table.capacity})") }, onClick = { viewModel.setSelectedTableId(table.id); tableExpanded = false })
+                                    }
+                                }
+                            }
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Voucher", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(6.dp))
+                            VoucherApplicationSection(viewModel = viewModel, totalAmount = subtotalAmount)
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text("Discount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("NONE", "PWD", "STUDENT").forEach { type ->
-                        FilterChip(
-                            selected = discountType == type,
-                            onClick = { viewModel.setDiscountType(type) },
-                            label = { Text(if (type == "NONE") "None" else type) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = PosAccentSoft,
-                                selectedLabelColor = PosAccent
-                            )
-                        )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Discount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("NONE", "PWD", "STUDENT").forEach { type ->
+                                    FilterChip(selected = discountType == type, onClick = { viewModel.setDiscountType(type) }, label = { Text(if (type == "NONE") "None" else type) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosAccentSoft, selectedLabelColor = PosAccent))
+                                }
+                            }
+                            if (discountType != "NONE") Text("20% discount applied", style = MaterialTheme.typography.bodySmall, color = PosAccent, fontWeight = FontWeight.Medium)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Payment Method", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("CASH", "GCASH", "PAYMAYA").forEach { method ->
+                                    FilterChip(selected = paymentMethod == method, onClick = { viewModel.setPaymentMethod(method) }, label = { Text(method) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosAccentSoft, selectedLabelColor = PosAccent))
+                                }
+                            }
+                        }
                     }
-                }
-                if (discountType != "NONE") {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "20% discount applied",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = PosAccent,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text("Voucher", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(8.dp))
-                VoucherApplicationSection(viewModel = viewModel, totalAmount = subtotalAmount)
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text("Payment Method", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("CASH", "GCASH", "PAYMAYA").forEach { method ->
-                        FilterChip(
-                            selected = paymentMethod == method,
-                            onClick = { viewModel.setPaymentMethod(method) },
-                            label = { Text(method) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = PosAccentSoft,
-                                selectedLabelColor = PosAccent
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
 
                 if (paymentMethod == "CASH") {
                     OutlinedTextField(
@@ -597,10 +686,12 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = PosAccent,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedTextColor = PosInk,
+                            unfocusedTextColor = PosInk,
+                            cursorColor = PosAccent
                         )
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Change: ${currencyFormatter.format(change.coerceAtLeast(0.0))}",
                         style = MaterialTheme.typography.bodyLarge,
@@ -623,7 +714,25 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
                 }
 
                 if (paymentMethod == "GCASH" || paymentMethod == "PAYMAYA") {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    val accountName = if (paymentMethod == "GCASH") businessSettings?.gcashAccountName else businessSettings?.paymayaAccountName
+                    val qrPath = if (paymentMethod == "GCASH") businessSettings?.gcashQrPath else businessSettings?.paymayaQrPath
+                    Text("${paymentMethod} payment details", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    accountName?.takeIf { it.isNotBlank() }?.let {
+                        Text("Account: $it", color = PosInk, fontWeight = FontWeight.SemiBold)
+                    }
+                    qrPath?.let { path ->
+                        val qrBitmap = remember(path) { BitmapFactory.decodeFile(path) }
+                        qrBitmap?.let {
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = "$paymentMethod QR code",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                    }
                     Text("Payment Proof", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(8.dp))
                     if (screenshotPath != null) {
@@ -652,25 +761,70 @@ fun CheckoutDialog(viewModel: CafeViewModel, onDismiss: () -> Unit) {
                         }
                     }
                 }
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { viewModel.placeOrder() },
+                onClick = { if (showInvoiceReview) viewModel.placeOrder() else showInvoiceReview = true },
+                enabled = canComplete,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PosAccent)
             ) {
-                Text("Complete Order", fontWeight = FontWeight.SemiBold)
+                Text(if (showInvoiceReview) "Confirm & Complete" else "Review Invoice", fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { if (showInvoiceReview) showInvoiceReview = false else onDismiss() }) {
+                Text(if (showInvoiceReview) "Back" else "Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp)
     )
+}
+
+@Composable
+private fun InvoiceReview(
+    viewModel: CafeViewModel,
+    orderTotal: Double,
+    customerName: String,
+    tableLabel: String,
+    paymentMethod: String,
+    discountType: String,
+    amountTendered: String,
+    change: Double,
+    currencyFormatter: NumberFormat
+) {
+    val items = viewModel.cartItems
+    Surface(color = PosCoffee, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, PosBorder)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Invoice review", style = MaterialTheme.typography.titleLarge, color = PosInk, fontWeight = FontWeight.Bold)
+                Text("${items.sumOf { it.quantity }} items", style = MaterialTheme.typography.labelMedium, color = PosInkSoft)
+            }
+            Text(customerName.ifBlank { "Walk-in Customer" }, color = PosInk, fontWeight = FontWeight.SemiBold)
+            Text("Seated at $tableLabel", color = PosAccent, style = MaterialTheme.typography.bodySmall)
+            Divider(color = PosBorder)
+            items.forEach { item ->
+                Column {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${item.quantity} x ${item.product.name}", color = PosInk)
+                        Text(currencyFormatter.format(item.product.price * item.quantity + item.priceDelta * item.quantity), color = PosInk, fontWeight = FontWeight.SemiBold)
+                    }
+                    if (item.selectedOptions.isNotEmpty()) Text(item.selectedOptions.joinToString(", ") { it.second }, color = PosInkSoft, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            if (discountType != "NONE") Text("Discount: $discountType", color = PosAccent, style = MaterialTheme.typography.bodySmall)
+            Divider(color = PosBorder)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Payment", color = PosInkSoft); Text(paymentMethod, color = PosInk, fontWeight = FontWeight.SemiBold) }
+            if (paymentMethod == "CASH") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Tendered", color = PosInkSoft); Text(currencyFormatter.format(amountTendered.toDoubleOrNull() ?: 0.0), color = PosInk) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Change", color = PosInkSoft); Text(currencyFormatter.format(change.coerceAtLeast(0.0)), color = PosAccent, fontWeight = FontWeight.Bold) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Total", style = MaterialTheme.typography.titleMedium, color = PosInk, fontWeight = FontWeight.Bold); Text(currencyFormatter.format(orderTotal), style = MaterialTheme.typography.titleMedium, color = PosGold, fontWeight = FontWeight.Bold) }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -759,6 +913,11 @@ fun VoucherApplicationSection(viewModel: CafeViewModel, totalAmount: Double) {
 fun OrderConfirmationDialog(viewModel: CafeViewModel, order: Order, onDismiss: () -> Unit) {
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
     val context = LocalContext.current
+    var paymentProofPath by remember(order.id) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(order.id) {
+        paymentProofPath = viewModel.getPaymentsForOrder(order.id).firstOrNull()?.screenshotPath
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -777,6 +936,21 @@ fun OrderConfirmationDialog(viewModel: CafeViewModel, order: Order, onDismiss: (
                 Text("Total", style = MaterialTheme.typography.labelMedium, color = PosMuted)
                 Text(currencyFormatter.format(order.totalAmount), style = MaterialTheme.typography.titleMedium, color = PosGold, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
+
+                paymentProofPath?.let { path ->
+                    val proofBitmap = remember(path) { BitmapFactory.decodeFile(path) }
+                    proofBitmap?.let {
+                        Text("Payment proof", style = MaterialTheme.typography.labelMedium, color = PosInkSoft, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Image(
+                            bitmap = it.asImageBitmap(),
+                            contentDescription = "Payment proof image",
+                            modifier = Modifier.fillMaxWidth().height(160.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
 
                 Box(
                     modifier = Modifier
@@ -811,7 +985,11 @@ fun OrderConfirmationDialog(viewModel: CafeViewModel, order: Order, onDismiss: (
                 OutlinedButton(onClick = {
                     scope.launch {
                         val items = viewModel.getOrderItemsSync(order.id)
-                        viewModel.receiptPrinter.printReceipt(order, items, products, businessSettings)
+                        val optionsByItem = items.associate { item ->
+                            item.id to viewModel.getOrderOptionsForItemSync(item.id)
+                        }
+                        val payment = viewModel.getPaymentsForOrder(order.id).firstOrNull()
+                        viewModel.receiptPrinter.printReceipt(order, items, products, businessSettings, optionsByItem, payment)
                     }
                 }, shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, PosGold)) {
                     Icon(Icons.Default.Print, contentDescription = null, tint = PosGold)

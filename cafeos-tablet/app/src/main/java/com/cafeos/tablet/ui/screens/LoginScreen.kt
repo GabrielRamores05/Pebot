@@ -32,75 +32,137 @@ fun LoginScreen(viewModel: CafeViewModel, onLoginSuccess: (Staff) -> Unit) {
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(PosCoffee)
             .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        contentAlignment = Alignment.Center
     ) {
-        Text("Pebot Staff Login", style = MaterialTheme.typography.headlineMedium, color = PosPaper, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(48.dp))
-
-        OutlinedTextField(
-            value = pin,
-            onValueChange = { newPin ->
-                if (newPin.length <= 6) pin = newPin
-            },
-            label = { Text("Enter 6-digit PIN") },
-            modifier = Modifier.width(280.dp),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PosGold,
-                unfocusedBorderColor = PosBorder,
-                focusedTextColor = PosPaper,
-                cursorColor = PosGold
-            ),
-            isError = error != null
-        )
-
-        if (error != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(error!!, style = MaterialTheme.typography.bodySmall, color = PosDanger)
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = {
-                focusManager.clearFocus()
-                if (pin.isBlank()) {
-                    error = "Please enter your PIN"
-                    return@Button
+        Card(
+            modifier = Modifier.width(420.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = PosSurface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(PosCoffee)
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = PosGold,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.padding(12.dp),
+                        tint = PosCoffee
+                    )
                 }
-                loggingIn = true
-                scope.launch {
-                    val staff = viewModel.authenticateStaff(pin)
-                    if (staff != null && staff.active) {
-                        delay(300)
-                        onLoginSuccess(staff)
+                Spacer(modifier = Modifier.width(14.dp))
+                Column {
+                    Text(
+                        text = "PEBOT",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = PosPaper,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Staff Access",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PosMuted
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Welcome back",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = PosInk,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Sign in with your 6-digit staff PIN",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = PosInkSoft
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { newPin ->
+                        if (newPin.length <= 6) pin = newPin
+                    },
+                    label = { Text("Enter 6-digit PIN") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PosAccent,
+                        unfocusedBorderColor = PosBorder,
+                        focusedTextColor = PosInk,
+                        unfocusedTextColor = PosInk,
+                        cursorColor = PosAccent,
+                        errorBorderColor = PosDanger
+                    ),
+                    isError = error != null
+                )
+
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(error!!, style = MaterialTheme.typography.bodySmall, color = PosDanger)
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        if (pin.isBlank()) {
+                            error = "Please enter your PIN"
+                            return@Button
+                        }
+                        loggingIn = true
+                        scope.launch {
+                            val staff = viewModel.authenticateStaff(pin)
+                            if (staff != null && staff.active) {
+                                delay(300)
+                                onLoginSuccess(staff)
+                            } else {
+                                error = "Invalid PIN or inactive staff"
+                                loggingIn = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loggingIn,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PosAccent)
+                ) {
+                    if (loggingIn) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = PosPaper)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Signing in...", color = PosPaper, fontWeight = FontWeight.SemiBold)
                     } else {
-                        error = "Invalid PIN or inactive staff"
-                        loggingIn = false
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = PosPaper, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Login", color = PosPaper, fontWeight = FontWeight.SemiBold)
                     }
                 }
-            },
-            modifier = Modifier.width(280.dp),
-            enabled = !loggingIn,
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PosGold)
-        ) {
-            if (loggingIn) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = PosCoffee)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Signing in...", color = PosCoffee, fontWeight = FontWeight.SemiBold)
-            } else {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = PosCoffee, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Login", color = PosCoffee, fontWeight = FontWeight.SemiBold)
             }
         }
     }

@@ -103,6 +103,8 @@ cafeos-tablet/
 │   │       ├── TablesManagementScreen.kt      # CREATED (Phase 6)
 │   │       ├── GuestManagementScreen.kt        # CREATED (Phase 6)
 │   │       ├── StationAssignmentScreen.kt      # CREATED (Phase 6)
+│   │       ├── StockHistoryScreen.kt          # CREATED (Windows parity)
+│   │       ├── LoyaltyScreen.kt               # CREATED (consolidated Customers+Vouchers+Settings)
 │   │       ├── AuditLogScreen.kt             # CREATED
 │   │       ├── AIConsultantScreen.kt         # CREATED
 │   │       └── ReviewsScreen.kt              # CREATED
@@ -182,14 +184,15 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 - [x] **Training** — training program tracking ✅
 
 ### Phase 3: Customer/Loyalty & AI Module <span style="color:green">(COMPLETED)</span>
-- [x] **Customer Management** (list, add, loyalty points) ✅
-- [x] **Loyalty Voucher Management** (CRUD) ✅
+- [x] **Customer Management** (list, add, loyalty points) ✅ (integrated in LoyaltyScreen)
+- [x] **Loyalty Voucher Management** (CRUD) ✅ (integrated in LoyaltyScreen)
 - [x] **Loyalty Card Management** — card CRUD ✅
-- [x] **Loyalty Settings** — global config, milestone mode ✅
+- [x] **Loyalty Settings** — global config, milestone mode ✅ (LoyaltySettingsTab in LoyaltyScreen)
 - [x] **Loyalty Redemption** — addLoyaltyPoints, redeemLoyaltyPoints with tier calc ✅
 - [x] **AI Conversations** — chat interface ✅
 - [x] **Customer Analytics** — tiers, LTV, spending percentiles ✅ (CustomerAnalyticsScreen.kt created, customer/voucher analytics sections in AnalyticsScreen)
 - [x] **Loyalty Redemption UI** — voucher selection dropdown with discount preview in CheckoutDialog ✅ (VoucherApplicationSection in POSScreen.kt + setSelectedVoucher in CafeViewModel)
+- [x] **Loyalty Navigation** — consolidated Customers + Vouchers into single Loyalty screen ✅ (LoyaltyScreen.kt)
 
 ### Phase 4: Inventory & Finance <span style="color:green">(COMPLETED)</span>
 - [x] **Ingredient Management** (CRUD, adjustments) ✅
@@ -201,7 +204,7 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 - [x] **Low-stock alerts** — visual indicators in InventoryScreen "Alerts" tab ✅ (Phase 5 deliverable)
 - [x] **Supplier pricing** — per-supplier ingredient costs ✅ (SupplierIngredientPrice entity + DAO methods)
 
-### Phase 5: Analytics & Reporting
+### Phase 5: Analytics & Reporting <span style="color:green">(COMPLETED)</span>
 - [x] **Revenue Charts** (bar chart, time filters) ✅
 - [x] **Payment Method Breakdown** ✅
 - [x] **Category Revenue** ✅
@@ -210,6 +213,7 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 - [ ] **Fulfillment Analytics** — order prep time, queue length (future)
 - [x] **Voucher Analytics** — redemption rates, savings ✅ (VoucherApplicationSection tracks voucher codes in discountReason)
 - [x] **Export to CSV/PDF** — report generation (CSV export added to AnalyticsScreen) ✅
+- [x] **Stock History** — dedicated screen with search/filter ✅ (StockHistoryScreen.kt + DAO getAllVouchersNow/getAllLoyaltySettingsNow)
 
 ### Phase 6: Tables & Stations <span style="color:green">(COMPLETED)</span>
 - [x] **Table Management** (DAO methods exist) ✅
@@ -269,7 +273,7 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 | Phase 2 | 2-3 days | Staff/HR management | Done |
 | Phase 3 | 1-2 days | Customer/Loyalty | Completed |
 | Phase 4 | 2-3 days | Inventory & Finance | Completed |
-| Phase 5 | 2-3 days | Analytics & Reporting | Partial (CSV export, low-stock alerts, customer/voucher analytics done) |
+| Phase 5 | 2-3 days | Analytics & Reporting | Completed |
 | Phase 6 | 1-2 days | Tables & Stations | Completed |
 | Phase 7 | 2-3 days | Order Management | Mostly done |
 | Phase 8 | 1-2 days | Settings & Configuration | Completed |
@@ -284,5 +288,6 @@ in `data/Entities.kt`, all queries in `data/CafeDao.kt`.
 3. ✅ Phase 11 completed: Unit tests written, image cache added, duplicate bug fixed
 4. ✅ Phase 3 completed: Loyalty Redemption UI integrated - VoucherApplicationSection with voucher selection dropdown in CheckoutDialog
 5. ✅ Phase 4 completed: Supplier pricing - SupplierIngredientPrice entity + DAO methods
-6. ⚠️ Phase 9: Cross-device sync test and print testing require physical Android device (no SDK in this environment)
-7. ⚠️ Future items: Fulfillment Analytics, Order Follow-up, Invoice Download, Branding Settings
+6. ✅ Navigation alignment: NavigationRail scrollable, Stock History + Loyalty screens added, nav items match Windows order
+7. ⚠️ Phase 9: Cross-device sync test and print testing require physical Android device (no SDK in this environment)
+8. ⚠️ Future items: Fulfillment Analytics, Order Follow-up, Invoice Download, Branding Settings

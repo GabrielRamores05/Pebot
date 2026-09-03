@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.LoyaltyVoucher
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -32,12 +33,7 @@ fun VoucherManagementScreen(viewModel: CafeViewModel) {
     var editingVoucher by remember { mutableStateOf<LoyaltyVoucher?>(null) }
     val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -57,7 +53,7 @@ fun VoucherManagementScreen(viewModel: CafeViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(vouchers) { voucher ->
                 VoucherCard(
                     voucher = voucher,

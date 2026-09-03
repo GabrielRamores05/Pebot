@@ -13,8 +13,8 @@ android {
         applicationId = "com.cafeos.tablet"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -22,13 +22,27 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../pebot-release-key.jks")
+            storePassword = "Pebot2026!"
+            keyAlias = "pebotsign"
+            keyPassword = "Pebot2026!"
+        }
+    }
+
     buildTypes {
-        release {
+        debug {
             isMinifyEnabled = false
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -73,6 +87,9 @@ dependencies {
 
     // Socket.IO
     implementation("io.socket:socket.io-client:2.1.2")
+    implementation("org.java-websocket:Java-WebSocket:1.5.7")
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+    implementation("com.google.zxing:core:3.5.3")
 
     // Printing
     implementation("androidx.print:print:1.1.0-beta01")

@@ -21,6 +21,8 @@ import com.cafeos.tablet.data.Customer
 import com.cafeos.tablet.data.LoyaltyCard
 import com.cafeos.tablet.data.Order
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumHeader
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import java.text.NumberFormat
 import java.util.*
@@ -54,18 +56,14 @@ fun CustomerAnalyticsScreen(viewModel: CafeViewModel) {
 
     val tierCounts = loyaltyCards.groupBy { it.tier }.mapValues { it.value.size }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
+        PremiumHeader("Customer Analytics", "Understand loyalty and repeat visits")
         Text("Customer Analytics", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
         Text("Insights into customer behavior and loyalty", style = MaterialTheme.typography.bodyMedium, color = PosMuted, modifier = Modifier.padding(top = 4.dp))
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricCard(

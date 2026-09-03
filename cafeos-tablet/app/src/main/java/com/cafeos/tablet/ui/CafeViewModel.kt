@@ -2,9 +2,11 @@ package com.cafeos.tablet.ui
 
 import android.app.Application
 import android.content.Context
+import android.os.Bundle
 import android.net.Uri
 import android.os.Environment
 import android.provider.Settings
+import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -31,18 +34,85 @@ import okio.use
 class CafeViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = CafeDatabase.getDatabase(application).cafeDao()
     private val syncManager = SocketSyncManager(application)
+    private val webServer = LocalWebServer(dao) { order -> announceOrder(order) }
+    private val textToSpeech = TextToSpeech(application) { status ->
+        if (status == TextToSpeech.SUCCESS) textToSpeechReady = true
+    }
+    private var textToSpeechReady = false
+    private var lastQuotaAnnouncementDay: String? = null
+    private var webServerStarted = false
+    private val _webHostAddress = MutableStateFlow<String?>(null)
+    val webHostAddress: StateFlow<String?> = _webHostAddress.asStateFlow()
     val receiptPrinter = ReceiptPrinter(application)
 
     val isConnectedToSync: StateFlow<Boolean> = syncManager.isConnected
+    val syncHostAddress: StateFlow<String?> = syncManager.hostAddress
     val orderSyncEvent: StateFlow<OrderSyncEvent?> = syncManager.orderUpdates
     val inventorySyncEvent: StateFlow<InventorySyncEvent?> = syncManager.inventoryUpdates
+    val discoveredSyncHosts: StateFlow<List<String>> = syncManager.discoveredHosts
+
+    init {
+        if (savedSyncMode == "host") startSyncHost()
+        viewModelScope.launch {
+            syncManager.orderUpdates.collectLatest { event ->
+                event?.let { applyIncomingOrder(it) }
+            }
+        }
+    }
+
+    private suspend fun applyIncomingOrder(event: OrderSyncEvent) {
+        val existingOrders = dao.getAllOrders().firstOrNull() ?: emptyList()
+        val existing = existingOrders.firstOrNull {
+            it.id == event.order.id || it.orderNumber == event.order.orderNumber
+        }
+        if (existing != null) {
+            if (existing.status != event.order.status) dao.updateOrder(existing.copy(status = event.order.status))
+            syncManager.clearOrderUpdate()
+            return
+        }
+        val newOrderId = dao.insertOrder(event.order.copy(id = 0)).toInt()
+        announceOrder(event.order)
+        val availableProducts = dao.getAllProducts().firstOrNull()?.map { it.id }?.toSet() ?: emptySet()
+        event.items.filter { it.productId in availableProducts }.forEach { item ->
+            dao.insertOrderItem(item.copy(id = 0, orderId = newOrderId))
+        }
+        syncManager.clearOrderUpdate()
+    }
+
+    val savedSyncMode: String
+        get() = getApplication<Application>().getSharedPreferences("pebot_sync", Context.MODE_PRIVATE)
+            .getString("mode", "host") ?: "host"
+
+    val savedSyncUrl: String
+        get() = getApplication<Application>().getSharedPreferences("pebot_sync", Context.MODE_PRIVATE)
+            .getString("url", "") ?: ""
 
     fun initializeSync(serverUrl: String) {
         syncManager.connect(serverUrl)
     }
 
+    fun startSyncDiscovery() = syncManager.startDiscovery()
+
+    fun stopSyncDiscovery() = syncManager.stopDiscovery()
+
+    fun startSyncHost() {
+        syncManager.startHost()
+        if (!webServerStarted) {
+            try {
+                webServer.start()
+                webServerStarted = true
+            } catch (error: Exception) {
+                error.printStackTrace()
+            }
+        }
+        _webHostAddress.value = "http://${LocalWebServer.getLocalAddress()}:${LocalWebServer.PORT}"
+    }
+
     fun disconnectSync() {
         syncManager.disconnect()
+        try { webServer.stop() } catch (_: Exception) { }
+        webServerStarted = false
+        _webHostAddress.value = null
     }
 
     fun clearOrderSyncEvent() { syncManager.clearOrderUpdate() }
@@ -50,6 +120,12 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestFullSync() {
         syncManager.requestFullSync()
+    }
+
+    override fun onCleared() {
+        textToSpeech.stop()
+        textToSpeech.shutdown()
+        super.onCleared()
     }
 
     val categories = dao.getAllCategories()
@@ -344,6 +420,8 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         if (_cartItems.isEmpty()) return
         viewModelScope.launch {
             val total = _finalTotal.value
+            val tendered = if (_paymentMethod.value == "CASH") _amountTendered.value.toDoubleOrNull() else total
+            if (tendered == null || tendered < total) return@launch
             val subtotal = _subtotalAmount.value
             val nextReceipt = getNextReceiptNumber()
             val order = Order(
@@ -362,10 +440,21 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                 paymentMethod = _paymentMethod.value,
                 orderType = _orderType.value,
                 tableId = _selectedTableId.value,
+                tableLocation = _selectedTableId.value?.let { tableId ->
+                    val table = dao.getTable(tableId)
+                    dao.getAllTableSectionsNow().firstOrNull { section ->
+                        section.tableIds.split(',').mapNotNull { it.trim().toIntOrNull() }.contains(tableId)
+                    }?.let { section -> "${section.name} / ${table?.name ?: tableId}" } ?: table?.name
+                },
                 barcodeValue = nextReceipt
             )
             val orderId = dao.insertOrder(order).toInt()
 
+            val allOptions = dao.getAllOptionsNow()
+            val optionGroups = dao.getAllTableSectionsNow()
+            val groupNames = allOptions.mapNotNull { option ->
+                dao.getOptionGroupName(option.groupId)?.let { option.groupId to it }
+            }.toMap()
             val orderItems = _cartItems.map { cartItem ->
                 val orderItem = OrderItem(
                     orderId = orderId,
@@ -377,18 +466,24 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                 val orderItemId = dao.insertOrderItem(orderItem).toInt()
 
                 val options = cartItem.selectedOptions.map { (name, value) ->
+                    val option = allOptions.firstOrNull { candidate ->
+                        candidate.name == value && groupNames[candidate.groupId] == name
+                    }
                     OrderOption(
                         orderItemId = orderItemId,
                         name = name,
                         value = value,
-                        priceDelta = 0.0
+                        priceDelta = option?.priceDelta ?: 0.0,
+                        ingredientId = option?.ingredientId,
+                        ingredientQuantity = option?.ingredientQuantity ?: 0.0
                     )
                 }
                 dao.insertOrderOptions(options)
-                orderItem
+                orderItem.copy(id = orderItemId)
             }
 
-            val tendered = _amountTendered.value.toDoubleOrNull() ?: total
+            consumeRecipeStock(orderItems)
+
             val change = (tendered - total).coerceAtLeast(0.0)
             dao.insertPayment(
                 Payment(
@@ -399,9 +494,13 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                     screenshotPath = _screenshotPath.value
                 )
             )
+            _selectedVoucher.value?.let { voucher ->
+                dao.updateVoucher(voucher.copy(usedCount = voucher.usedCount + 1))
+            }
 
-            _placedOrder.value = order
-            syncManager.handleOrderPlaced(order)
+            _placedOrder.value = order.copy(id = orderId)
+            syncManager.handleOrderPlaced(order.copy(id = orderId), orderItems)
+            announceOrder(order.copy(id = orderId))
             _cartItems.clear()
             _totalAmount.value = 0.0
             _subtotalAmount.value = 0.0
@@ -419,7 +518,52 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateOrderStatus(orderId: Int, newStatus: String) {
+    private fun announceOrder(order: Order) {
+        if (!textToSpeechReady) return
+        viewModelScope.launch {
+            val settings = dao.getBusinessSettingsSync() ?: BusinessSettings()
+            if (!settings.voiceEnabled) return@launch
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+            val ordersToday = dao.getAllOrders().firstOrNull()?.filter {
+                it.createdAt >= startOfToday() && it.status != "CANCELLED"
+            } ?: emptyList()
+            val current = if (settings.dailyQuotaMode == "REVENUE") ordersToday.sumOf { it.totalAmount }.toString() else dao.getProductUnitCountNow(startOfToday(), System.currentTimeMillis()).toString()
+            val table = order.tableLocation ?: order.tableId?.let { "Table $it" } ?: "Takeaway"
+            val message = settings.voiceOrderMessage
+                .replace("{order}", order.orderNumber)
+                .replace("{customer}", order.customerName)
+                .replace("{table}", table)
+                .replace("{current}", current)
+                .replace("{target}", settings.dailyQuotaTarget.toString())
+            textToSpeech.setSpeechRate(settings.voiceSpeed)
+            val speechParams = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, settings.voiceVolume)
+            }
+            textToSpeech.speak(message, TextToSpeech.QUEUE_ADD, speechParams, "order-${order.orderNumber}")
+            val achieved = if (settings.dailyQuotaMode == "REVENUE") ordersToday.sumOf { it.totalAmount } else current.toDouble()
+            if (settings.dailyQuotaTarget > 0.0 && achieved >= settings.dailyQuotaTarget && lastQuotaAnnouncementDay != today) {
+                lastQuotaAnnouncementDay = today
+                textToSpeech.speak(
+                    settings.voiceQuotaMessage
+                        .replace("{current}", current)
+                        .replace("{target}", settings.dailyQuotaTarget.toString()),
+                    TextToSpeech.QUEUE_ADD,
+                    speechParams,
+                    "quota-$today"
+                )
+            }
+        }
+    }
+
+    private fun startOfToday(): Long = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    fun updateOrderStatus(orderId: Int, newStatus: String, adminAuthorized: Boolean = false) {
+        if (newStatus == "CANCELLED" && !adminAuthorized) return
         viewModelScope.launch {
             val order = dao.getOrderById(orderId)
             order?.let {
@@ -432,6 +576,16 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun getOrderById(orderId: Int) = dao.getOrderById(orderId)
 
     suspend fun getOrderItemsSync(orderId: Int): List<OrderItem> = dao.getOrderItems(orderId)
+
+    suspend fun getOrderOptionsForItemSync(orderItemId: Int): List<OrderOption> = dao.getOrderOptions(orderItemId)
+
+    suspend fun getPaymentsForOrder(orderId: Int): List<Payment> = dao.getPaymentsForOrder(orderId)
+
+    suspend fun getAllVouchersNow(): List<LoyaltyVoucher> = dao.getAllVouchersNow()
+
+    val loyaltySettings = dao.getAllLoyaltySettings()
+
+    suspend fun deleteLoyaltySetting(setting: LoyaltySetting) = dao.deleteLoyaltySetting(setting)
 
     fun adjustStock(ingredient: Ingredient, delta: Double, notes: String) {
         viewModelScope.launch {
@@ -473,6 +627,8 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getOrderCount() = dao.getOrderCount(System.currentTimeMillis())
 
+    fun getProductUnitCount(start: Long, end: Long): Flow<Int> = dao.getProductUnitCount(start, end)
+
     fun getAverageOrderValue() = dao.getAverageOrderValue(System.currentTimeMillis())
 
     fun getSalesByPaymentMethod() = dao.getSalesByPaymentMethod(System.currentTimeMillis())
@@ -486,6 +642,22 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 dao.updateProduct(product)
             }
+        }
+    }
+
+    suspend fun saveProductAndReturnId(product: Product): Int {
+        return if (product.id == 0) dao.insertProduct(product).toInt() else {
+            dao.updateProduct(product)
+            product.id
+        }
+    }
+
+    suspend fun clearProductRecipe(productId: Int) = dao.clearProductIngredients(productId)
+
+    suspend fun saveProductOptionGroups(productId: Int, groupIds: List<Int>) {
+        dao.deleteProductOptionGroupsByProduct(productId)
+        groupIds.forEach { groupId ->
+            dao.insertProductOptionGroup(ProductOptionGroup(productId = productId, groupId = groupId))
         }
     }
 
@@ -648,6 +820,40 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun getIngredientSync(id: Int): Ingredient? = dao.getIngredientSync(id)
 
+    private suspend fun consumeRecipeStock(orderItems: List<OrderItem>) {
+        val ingredients = dao.getAllIngredients().firstOrNull()?.associateBy { it.id } ?: return
+        orderItems.forEach { orderItem ->
+            dao.getProductIngredients(orderItem.productId).forEach { recipe ->
+                val ingredient = ingredients[recipe.ingredientId] ?: return@forEach
+                val consumed = recipe.quantity * orderItem.quantity
+                dao.updateIngredient(ingredient.copy(currentStock = ingredient.currentStock - consumed))
+                dao.insertIngredientTransaction(
+                    IngredientTransaction(
+                        ingredientId = ingredient.id,
+                        type = "USAGE",
+                        quantity = -consumed,
+                        notes = "Order consumption"
+                    )
+                )
+            }
+            dao.getOrderOptions(orderItem.id).forEach { option ->
+                val ingredientId = option.ingredientId ?: return@forEach
+                val ingredient = ingredients[ingredientId] ?: return@forEach
+                val consumed = option.ingredientQuantity * orderItem.quantity
+                if (consumed <= 0.0) return@forEach
+                dao.updateIngredient(ingredient.copy(currentStock = ingredient.currentStock - consumed))
+                dao.insertIngredientTransaction(
+                    IngredientTransaction(
+                        ingredientId = ingredientId,
+                        type = "USAGE",
+                        quantity = -consumed,
+                        notes = "Add-on: ${option.value}"
+                    )
+                )
+            }
+        }
+    }
+
     suspend fun saveSupplier(supplier: Supplier) {
         if (supplier.id == 0) dao.insertSupplier(supplier) else dao.updateSupplier(supplier)
     }
@@ -698,6 +904,10 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             return admin
         }
         return null
+    }
+
+    suspend fun authenticateAdminPasscode(pin: String): Boolean {
+        return authenticateStaff(pin)?.role?.equals("ADMIN", ignoreCase = true) == true
     }
 
     fun saveVoucher(voucher: LoyaltyVoucher) {
@@ -787,15 +997,23 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     // HR: Payroll
     fun generatePayroll(staffId: Int, periodStart: Long, periodEnd: Long, baseSalary: Double,
                         overtimePay: Double = 0.0, sss: Double = 0.0, philhealth: Double = 0.0,
-                        pagibig: Double = 0.0, tax: Double = 0.0, deductions: Double = 0.0) {
+                       pagibig: Double = 0.0, tax: Double = 0.0, deductions: Double = 0.0,
+                       profitShareRate: Double = 0.0) {
         viewModelScope.launch {
             val totalDeductions = sss + philhealth + pagibig + tax + deductions
-            val netPay = baseSalary + overtimePay - totalDeductions
+            val periodOrders = (dao.getAllOrders().firstOrNull() ?: emptyList()).filter {
+                it.createdAt in periodStart..periodEnd && it.status != "CANCELLED"
+            }
+            val profitShare = if (profitShareRate > 0.0 && periodOrders.isNotEmpty()) {
+                (calculatePeriodMetrics(periodOrders).netProfit.coerceAtLeast(0.0) * profitShareRate / 100.0)
+            } else 0.0
+            val netPay = baseSalary + overtimePay + profitShare - totalDeductions
             dao.insertPayroll(
                 Payroll(
                     staffId = staffId, periodStart = periodStart, periodEnd = periodEnd,
                     baseSalary = baseSalary, overtimePay = overtimePay, deductions = deductions,
                     sss = sss, philhealth = philhealth, pagibig = pagibig, tax = tax,
+                    profitShareAmount = profitShare,
                     netPay = netPay
                 )
             )
@@ -1485,7 +1703,290 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
         return file.absolutePath
     }
+
+    suspend fun exportOrderHistoryCsv(uri: Uri) {
+        val orders = dao.getAllOrders().firstOrNull() ?: emptyList()
+        val csv = buildString {
+            appendLine(orderHistoryCsvHeader)
+            orders.sortedByDescending { it.createdAt }.forEach { order ->
+                appendLine(listOf(
+                    order.orderNumber,
+                    order.customerName,
+                    order.status,
+                    order.totalAmount.toString(),
+                    order.discountAmount.toString(),
+                    order.discountRate.toString(),
+                    order.discountReason.orEmpty(),
+                    order.paymentMethod,
+                    order.orderType,
+                    order.tableId?.toString().orEmpty(),
+                    order.createdAt.toString()
+                ).joinToString(",", transform = ::escapeCsv))
+            }
+        }
+        getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
+            output.write(csv.toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    suspend fun writeOrderHistoryTemplate(uri: Uri) {
+        getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
+            output.write((orderHistoryCsvHeader + "\n").toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    suspend fun writeIngredientsTemplate(uri: Uri) {
+        getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
+            output.write((ingredientCsvHeader + "\n").toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    suspend fun exportIngredientsCsv(uri: Uri) {
+        val ingredients = dao.getAllIngredients().firstOrNull() ?: emptyList()
+        val csv = buildString {
+            appendLine(ingredientCsvHeader)
+            ingredients.sortedBy { it.name }.forEach { ingredient ->
+                appendLine(listOf(
+                    ingredient.name,
+                    ingredient.category,
+                    ingredient.baseUnit,
+                    ingredient.currentStock.toString(),
+                    ingredient.minStock.toString(),
+                    ingredient.costPerUnit.toString()
+                ).joinToString(",", transform = ::escapeCsv))
+            }
+        }
+        getApplication<Application>().contentResolver.openOutputStream(uri)?.use { output ->
+            output.write(csv.toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    suspend fun importIngredientsCsv(uri: Uri): String {
+        val input = getApplication<Application>().contentResolver.openInputStream(uri)
+            ?: return "Could not open the selected file."
+        val rows = input.bufferedReader(Charsets.UTF_8).use { it.readLines() }
+        if (rows.isEmpty()) return "The file is empty."
+        val headers = parseCsvLine(rows.first()).map { it.trim() }
+        if (headers != ingredientCsvHeader.split(',')) {
+            return "Invalid format. Download the ingredient template first."
+        }
+        val existing = (dao.getAllIngredients().firstOrNull() ?: emptyList()).associateBy { it.name.trim().lowercase() }
+        var imported = 0
+        var skipped = 0
+        rows.drop(1).filter { it.isNotBlank() }.forEach { line ->
+            val values = parseCsvLine(line)
+            if (values.size != headers.size) {
+                skipped++
+                return@forEach
+            }
+            val name = values[0].trim()
+            val baseUnit = values[2].trim()
+            val currentStock = values[3].toDoubleOrNull()
+            val minStock = values[4].toDoubleOrNull()
+            val costPerUnit = values[5].toDoubleOrNull()
+            if (name.isBlank() || baseUnit.isBlank() || currentStock == null || minStock == null || costPerUnit == null) {
+                skipped++
+                return@forEach
+            }
+            val old = existing[name.lowercase()]
+            dao.insertIngredient(Ingredient(
+                id = old?.id ?: 0,
+                name = name,
+                category = values[1].ifBlank { "General" },
+                baseUnit = baseUnit,
+                currentStock = currentStock,
+                minStock = minStock,
+                costPerUnit = costPerUnit,
+                updatedAt = System.currentTimeMillis()
+            ))
+            imported++
+        }
+        return "Imported $imported ingredient(s); skipped $skipped row(s)."
+    }
+
+    suspend fun importOrderHistoryCsv(uri: Uri): String {
+        val input = getApplication<Application>().contentResolver.openInputStream(uri)
+            ?: return "Could not open the selected file."
+        val rows = input.bufferedReader(Charsets.UTF_8).use { reader -> reader.readLines() }
+        if (rows.isEmpty()) return "The file is empty."
+        val headers = parseCsvLine(rows.first()).map { it.trim() }
+        if (headers != orderHistoryCsvHeader.split(',')) {
+            return "Invalid format. Download the order history template first."
+        }
+        val existingNumbers = (dao.getAllOrders().firstOrNull() ?: emptyList()).map { it.orderNumber }.toMutableSet()
+        var imported = 0
+        var skipped = 0
+        rows.drop(1).filter { it.isNotBlank() }.forEach { line ->
+            val values = parseCsvLine(line)
+            if (values.size != headers.size) {
+                skipped++
+                return@forEach
+            }
+            val orderNumber = values[0].trim()
+            val total = values[3].toDoubleOrNull()
+            val createdAt = values[10].toLongOrNull()
+            if (orderNumber.isBlank() || total == null || createdAt == null || existingNumbers.contains(orderNumber)) {
+                skipped++
+                return@forEach
+            }
+            dao.insertOrder(Order(
+                orderNumber = orderNumber,
+                customerName = values[1].ifBlank { "Walk-in Customer" },
+                status = values[2].ifBlank { "COMPLETED" },
+                totalAmount = total,
+                discountAmount = values[4].toDoubleOrNull() ?: 0.0,
+                discountRate = values[5].toDoubleOrNull() ?: 0.0,
+                discountReason = values[6].ifBlank { null },
+                paymentMethod = values[7].ifBlank { "CASH" },
+                orderType = values[8].ifBlank { "DINE_IN" },
+                tableId = values[9].toIntOrNull(),
+                createdAt = createdAt
+            ))
+            existingNumbers.add(orderNumber)
+            imported++
+        }
+        return "Imported $imported order(s); skipped $skipped row(s)."
+    }
+
+    private fun escapeCsv(value: String): String {
+        return if (value.contains(',') || value.contains('"') || value.contains('\n')) {
+            "\"${value.replace("\"", "\"\"")}\""
+        } else value
+    }
+
+    private fun parseCsvLine(line: String): List<String> {
+        val values = mutableListOf<String>()
+        val value = StringBuilder()
+        var quoted = false
+        var index = 0
+        while (index < line.length) {
+            val character = line[index]
+            when {
+                character == '"' && quoted && index + 1 < line.length && line[index + 1] == '"' -> {
+                    value.append('"')
+                    index++
+                }
+                character == '"' -> quoted = !quoted
+                character == ',' && !quoted -> {
+                    values.add(value.toString())
+                    value.clear()
+                }
+                else -> value.append(character)
+            }
+            index++
+        }
+        values.add(value.toString())
+        return values
+    }
+
+
+    suspend fun calculateOrderCOGS(orderId: Int): Double {
+        val items = dao.getOrderItems(orderId)
+        val ingredients = dao.getAllIngredients().firstOrNull() ?: emptyList()
+        val ingredientMap = ingredients.associateBy { it.id }
+        var totalCOGS = 0.0
+        items.forEach { item ->
+            val recipeItems = dao.getProductIngredients(item.productId)
+            val itemCOGS = recipeItems.sumOf { recipe ->
+                ingredientMap[recipe.ingredientId]?.costPerUnit?.times(recipe.quantity) ?: 0.0
+            }
+            totalCOGS += itemCOGS * item.quantity
+        }
+        return totalCOGS
+    }
+
+    suspend fun calculateOrderProfit(orderId: Int): Double {
+        val order = dao.getOrderById(orderId) ?: return 0.0
+        return order.totalAmount - calculateOrderCOGS(orderId)
+    }
+
+    suspend fun calculatePeriodMetrics(orders: List<Order>, periodStart: Long? = null, periodEnd: Long? = null): PeriodMetrics {
+        val totalRevenue = orders.sumOf { it.totalAmount }
+        val totalCOGS = orders.sumOf { calculateOrderCOGS(it.id) }
+        val expenseStart = periodStart ?: orders.minOfOrNull { it.createdAt } ?: 0L
+        val expenseEnd = periodEnd ?: orders.maxOfOrNull { it.createdAt } ?: System.currentTimeMillis()
+        val expenses = dao.getAllExpenses().firstOrNull()?.filter { it.createdAt in expenseStart..expenseEnd }?.sumOf { it.amount } ?: 0.0
+        val grossProfit = totalRevenue - totalCOGS
+        return PeriodMetrics(totalRevenue, totalCOGS, expenses, grossProfit, grossProfit - expenses)
+    }
+
+    suspend fun calculateProductProfitability(orders: List<Order>): List<ProductProfitInfo> {
+        val products = dao.getAllProducts().firstOrNull()?.associateBy { it.id } ?: emptyMap()
+        val ingredients = dao.getAllIngredients().firstOrNull()?.associateBy { it.id } ?: emptyMap()
+        val totals = mutableMapOf<Int, ProductProfitInfo>()
+        orders.forEach { order ->
+            dao.getOrderItems(order.id).forEach { item ->
+                val product = products[item.productId] ?: return@forEach
+                val recipeCost = dao.getProductIngredients(item.productId).sumOf { recipe ->
+                    ingredients[recipe.ingredientId]?.costPerUnit?.times(recipe.quantity) ?: 0.0
+                }
+                val unitCost = if (recipeCost > 0.0) recipeCost else product.capitalCost
+                val cost = unitCost * item.quantity
+                val current = totals[item.productId]
+                totals[item.productId] = if (current == null) {
+                    ProductProfitInfo(product.name, item.quantity, item.subtotal, cost, unitCost = unitCost)
+                } else {
+                    current.copy(quantity = current.quantity + item.quantity, revenue = current.revenue + item.subtotal, cogs = current.cogs + cost)
+                }
+            }
+        }
+        return totals.values.map { info ->
+            val profit = info.revenue - info.cogs
+            info.copy(profit = profit, marginPercent = if (info.revenue > 0.0) profit / info.revenue * 100.0 else 0.0)
+        }.sortedByDescending { it.profit }
+    }
+
+    suspend fun calculateIngredientSpend(orders: List<Order>): List<IngredientSpendInfo> {
+        val ingredients = dao.getAllIngredients().firstOrNull()?.associateBy { it.id } ?: emptyMap()
+        val spend = mutableMapOf<Int, Double>()
+        orders.forEach { order ->
+            dao.getOrderItems(order.id).forEach { item ->
+                dao.getProductIngredients(item.productId).forEach { recipe ->
+                    spend[recipe.ingredientId] = (spend[recipe.ingredientId] ?: 0.0) +
+                        (ingredients[recipe.ingredientId]?.costPerUnit ?: 0.0) * recipe.quantity * item.quantity
+                }
+            }
+        }
+        return spend.mapNotNull { (ingredientId, amount) ->
+            ingredients[ingredientId]?.let { IngredientSpendInfo(it.name, amount, it.baseUnit) }
+        }.sortedByDescending { it.amount }
+    }
+
+    suspend fun calculateIngredientSpendTrend(orders: List<Order>): List<IngredientSpendTrendPoint> {
+        return orders.groupBy { order ->
+            Calendar.getInstance().apply {
+                timeInMillis = order.createdAt
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        }.toSortedMap().map { (day, dayOrders) ->
+            IngredientSpendTrendPoint(day, calculateIngredientSpend(dayOrders).sumOf { it.amount })
+        }
+    }
+
+    suspend fun getPeakHour(orders: List<Order>): Pair<String, Int>? {
+        if (orders.isEmpty()) return null
+        val hourCounts = orders.groupingBy { order ->
+            Calendar.getInstance().apply { timeInMillis = order.createdAt }.get(Calendar.HOUR_OF_DAY)
+        }.eachCount()
+        val peak = hourCounts.maxByOrNull { it.value } ?: return null
+        return "${String.format("%02d", peak.key)}:00" to peak.value
+    }
+
+    suspend fun getPeakProduct(orders: List<Order>): Pair<String, Double>? {
+        if (orders.isEmpty()) return null
+        val products = dao.getAllProducts().firstOrNull()?.associateBy { it.id } ?: emptyMap()
+        val sales = orders.flatMap { dao.getOrderItems(it.id) }.groupBy { it.productId }
+            .mapValues { (_, items) -> items.sumOf { it.subtotal } }
+        val peak = sales.maxByOrNull { it.value } ?: return null
+        return (products[peak.key]?.name ?: "Unknown") to peak.value
+    }
 }
+
+private const val orderHistoryCsvHeader = "orderNumber,customerName,status,totalAmount,discountAmount,discountRate,discountReason,paymentMethod,orderType,tableId,createdAt"
+private const val ingredientCsvHeader = "name,category,baseUnit,currentStock,minStock,costPerUnit"
 
 @Serializable
 data class ExportData(
@@ -1572,4 +2073,39 @@ data class CartItem(
     var quantity: Int,
     val selectedOptions: List<Pair<String, String>> = emptyList(),
     val priceDelta: Double = 0.0
+)
+
+data class PeriodMetrics(
+    val totalRevenue: Double,
+    val totalCOGS: Double,
+    val totalExpenses: Double,
+    val grossProfit: Double,
+    val netProfit: Double
+)
+
+data class ProductProfitInfo(
+    val name: String,
+    val quantity: Int,
+    val revenue: Double,
+    val cogs: Double,
+    val unitCost: Double = 0.0,
+    val profit: Double = 0.0,
+    val marginPercent: Double = 0.0
+)
+
+data class IngredientSpendInfo(
+    val name: String,
+    val amount: Double,
+    val unit: String
+)
+
+data class IngredientSpendTrendPoint(
+    val day: Long,
+    val amount: Double
+)
+
+data class ProductCapacityInfo(
+    val productName: String,
+    val producibleUnits: Int,
+    val limitingIngredient: String
 )

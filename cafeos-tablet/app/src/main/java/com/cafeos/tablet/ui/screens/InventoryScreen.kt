@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.*
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.ProductCapacityInfo
+import com.cafeos.tablet.ui.components.PremiumHeader
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -34,15 +39,8 @@ fun InventoryScreen(viewModel: CafeViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Products", "Ingredients", "Suppliers", "Capacity", "History", "Purchases", "Alerts")
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
-        Text("Inventory", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
-        Spacer(modifier = Modifier.height(16.dp))
-
+    PremiumScreen {
+        PremiumHeader("Inventory", "Keep stock levels accurate and calm")
         TabRow(
             selectedTabIndex = selectedTab,
             containerColor = PosCoffeeLight,
@@ -126,8 +124,27 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showPurchaseDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    var importMessage by remember { mutableStateOf<String?>(null) }
+    val templateLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        uri?.let { scope.launch { viewModel.writeIngredientsTemplate(it) } }
+    }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        uri?.let { scope.launch { viewModel.exportIngredientsCsv(it) } }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { scope.launch { importMessage = viewModel.importIngredientsCsv(it) } }
+    }
 
     Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(onClick = { templateLauncher.launch("ingredients-template.csv") }, modifier = Modifier.weight(1f)) { Text("Template") }
+            OutlinedButton(onClick = { importLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel")) }, modifier = Modifier.weight(1f)) { Text("Import") }
+            Button(onClick = { exportLauncher.launch("ingredients.csv") }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = PosAccent)) { Text("Export") }
+        }
+        importMessage?.let { Text(it, color = PosAccent, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(ingredients) { ingredient ->
                 val isLow = ingredient.currentStock <= ingredient.minStock
@@ -316,11 +333,25 @@ fun InventorySuppliersTab(viewModel: CafeViewModel) {
 
 @Composable
 fun InventoryCapacityTab(viewModel: CafeViewModel) {
-    val capacity by viewModel.productionCapacity.collectAsState(initial = emptyList())
+    val products by viewModel.allProducts.collectAsState(initial = emptyList())
+    val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
+    var capacity by remember { mutableStateOf<List<ProductCapacityInfo>>(emptyList()) }
+
+    LaunchedEffect(products, ingredients) {
+        capacity = products.mapNotNull { product ->
+            val recipe = viewModel.getProductIngredients(product.id)
+            if (recipe.isEmpty()) return@mapNotNull null
+            val limits = recipe.mapNotNull { item ->
+                ingredients.find { it.id == item.ingredientId }?.let { ingredient ->
+                    if (item.quantity > 0.0) ingredient.currentStock / item.quantity to ingredient.name else null
+                }
+            }
+            if (limits.isEmpty()) null else ProductCapacityInfo(product.name, limits.minOf { it.first }.toInt(), limits.minByOrNull { it.first }?.second ?: "")
+        }
+    }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(capacity) { cap ->
-            val remaining = (cap.currentStock ?: 0.0) - (cap.totalDemand ?: 0.0)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -328,24 +359,24 @@ fun InventoryCapacityTab(viewModel: CafeViewModel) {
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(cap.name, style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.SemiBold)
+                    Text(cap.productName, style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Stock: ${cap.currentStock} ${cap.baseUnit}", style = MaterialTheme.typography.bodyMedium, color = PosPaper)
-                        Text("Demand: ${cap.totalDemand ?: 0.0} ${cap.baseUnit}", style = MaterialTheme.typography.bodyMedium, color = PosMuted)
+                        Text("Can produce: ${cap.producibleUnits} units", style = MaterialTheme.typography.bodyMedium, color = PosPaper)
+                        Text("Limited by: ${cap.limitingIngredient}", style = MaterialTheme.typography.bodyMedium, color = PosMuted)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(
-                        progress = if (cap.currentStock > 0) ((cap.currentStock - (cap.totalDemand ?: 0.0)) / cap.currentStock).coerceIn(0.0, 1.0).toFloat() else 0f,
+                        progress = (cap.producibleUnits / 100.0).coerceIn(0.0, 1.0).toFloat(),
                         modifier = Modifier.fillMaxWidth(),
-                        color = if (remaining >= 0) PosAccent else PosDanger,
+                        color = if (cap.producibleUnits > 0) PosAccent else PosDanger,
                         trackColor = PosMuted
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (remaining >= 0) "Remaining: ${remaining} ${cap.baseUnit}" else "Shortfall: ${-remaining} ${cap.baseUnit}",
+                        text = "Inventory capacity: ${cap.producibleUnits} product(s)",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (remaining >= 0) PosAccent else PosDanger,
+                        color = if (cap.producibleUnits > 0) PosAccent else PosDanger,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -469,7 +500,7 @@ fun AdjustStockDialog(ingredient: Ingredient, onDismiss: () -> Unit, onConfirm: 
 fun StockHistoryTab(viewModel: CafeViewModel) {
     val transactions by viewModel.allTransactions.collectAsState(initial = emptyList())
     val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
-    val dateFormatter = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+    val dateFormatter = SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault())
     val ingrMap = ingredients.associateBy { it.id }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -679,11 +710,12 @@ fun PurchaseIngredientDialog(
 ) {
     var selectedIngredientId by remember { mutableStateOf<Int?>(null) }
     var quantityText by remember { mutableStateOf("") }
-    var costText by remember { mutableStateOf("") }
+    var totalCostText by remember { mutableStateOf("") }
     var selectedSupplierId by remember { mutableStateOf<Int?>(null) }
     var notes by remember { mutableStateOf("") }
     var ingredientExpanded by remember { mutableStateOf(false) }
     var supplierExpanded by remember { mutableStateOf(false) }
+    var validationError by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -728,21 +760,37 @@ fun PurchaseIngredientDialog(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedTextField(value = quantityText, onValueChange = { quantityText = it }, label = { Text("Quantity") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
+                OutlinedTextField(value = quantityText, onValueChange = { quantityText = it }, label = { Text("Quantity received (${ingredients.find { it.id == selectedIngredientId }?.baseUnit ?: "units"})") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(value = costText, onValueChange = { costText = it }, label = { Text("Cost per Unit (₱)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
+                OutlinedTextField(value = totalCostText, onValueChange = { totalCostText = it }, label = { Text("Total purchase cost (₱)") }, supportingText = { Text("Unit cost is calculated automatically") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
+                val calculatedUnitCost = totalCostText.toDoubleOrNull()?.div(quantityText.toDoubleOrNull() ?: 0.0)
+                if (calculatedUnitCost != null && calculatedUnitCost.isFinite()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Calculated cost per ${ingredients.find { it.id == selectedIngredientId }?.baseUnit ?: "unit"}: ₱${"%.2f".format(calculatedUnitCost)}", color = PosAccent, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                }
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
+                validationError?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(it, color = PosDanger, style = MaterialTheme.typography.bodySmall)
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
                     val qty = quantityText.toDoubleOrNull()
-                    val cost = costText.toDoubleOrNull()
-                    if (selectedIngredientId != null && qty != null && cost != null) {
+                    val totalCost = totalCostText.toDoubleOrNull()
+                    val cost = if (qty != null && qty > 0.0 && totalCost != null) totalCost / qty else null
+                    validationError = when {
+                        selectedIngredientId == null -> "Select an ingredient."
+                        qty == null || qty <= 0.0 -> "Enter a quantity greater than zero."
+                        totalCost == null || totalCost < 0.0 -> "Enter a valid total purchase cost."
+                        cost == null -> "Quantity must be greater than zero."
+                        else -> null
+                    }
+                    if (validationError == null && selectedIngredientId != null && qty != null && cost != null) {
                         onConfirm(selectedIngredientId!!, qty, cost, selectedSupplierId, notes.ifBlank { null })
-                        onDismiss()
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PosAccent),

@@ -25,9 +25,16 @@ class ReceiptPrinter(private val context: Context) {
     }
 
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-    fun printReceipt(order: Order, orderItems: List<OrderItem>, products: List<Product>, businessSettings: BusinessSettings?) {
+    fun printReceipt(
+        order: Order,
+        orderItems: List<OrderItem>,
+        products: List<Product>,
+        businessSettings: BusinessSettings?,
+        orderOptionsByItem: Map<Int, List<OrderOption>> = emptyMap(),
+        payment: Payment? = null
+    ) {
         try {
-            val pdfFile = generateReceiptPdf(order, orderItems, products, businessSettings)
+            val pdfFile = generateReceiptPdf(order, orderItems, products, businessSettings, orderOptionsByItem, payment)
             val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
             val printAttributes = PrintAttributes.Builder()
                 .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
@@ -46,9 +53,17 @@ class ReceiptPrinter(private val context: Context) {
     }
 
         @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
-        private fun generateReceiptPdf(order: Order, orderItems: List<OrderItem>, products: List<Product>, settings: BusinessSettings?): File {
+        private fun generateReceiptPdf(
+            order: Order,
+            orderItems: List<OrderItem>,
+            products: List<Product>,
+            settings: BusinessSettings?,
+            orderOptionsByItem: Map<Int, List<OrderOption>> = emptyMap(),
+            payment: Payment? = null
+        ): File {
         val pdfDocument = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(RECEIPT_WIDTH, RECEIPT_HEIGHT, 1).create()
+        val calculatedHeight = (RECEIPT_HEIGHT + orderItems.size * LINE_HEIGHT + orderOptionsByItem.values.sumOf { it.size } * LINE_HEIGHT + 100).coerceAtMost(1600)
+        val pageInfo = PdfDocument.PageInfo.Builder(RECEIPT_WIDTH, calculatedHeight, 1).create()
         val page = pdfDocument.startPage(pageInfo)
         val canvas = page.canvas
         val paint = Paint().apply {
@@ -76,7 +91,9 @@ class ReceiptPrinter(private val context: Context) {
 
         yPosition += 5
 
-        canvas.drawText("Order #${order.orderNumber}", MARGIN.toFloat(), yPosition.toFloat(), paint)
+        canvas.drawText("Receipt #${order.orderNumber}", MARGIN.toFloat(), yPosition.toFloat(), paint)
+        yPosition += LINE_HEIGHT
+        canvas.drawText(java.text.SimpleDateFormat("MMM dd, yyyy hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(order.createdAt)), MARGIN.toFloat(), yPosition.toFloat(), paint)
         yPosition += LINE_HEIGHT
         canvas.drawText("Table: ${order.tableId ?: "N/A"}", MARGIN.toFloat(), yPosition.toFloat(), paint)
         yPosition += LINE_HEIGHT
@@ -92,6 +109,15 @@ class ReceiptPrinter(private val context: Context) {
                 paint
             )
             yPosition += LINE_HEIGHT
+
+            val optionLines = orderOptionsByItem[item.id].orEmpty()
+            if (optionLines.isNotEmpty()) {
+                optionLines.forEach { option ->
+                    val optionText = "  + ${option.name}: ${option.value}${if (option.priceDelta > 0) " (${formatter.format(option.priceDelta)})" else ""}"
+                    canvas.drawText(optionText, MARGIN.toFloat() + 10f, yPosition.toFloat(), paint)
+                    yPosition += LINE_HEIGHT
+                }
+            }
         }
 
         yPosition += 5
@@ -108,6 +134,14 @@ class ReceiptPrinter(private val context: Context) {
         paint.textSkewX = -0.25f
         canvas.drawText("TOTAL: ${formatter.format(order.totalAmount)}", MARGIN.toFloat(), yPosition.toFloat(), paint)
         yPosition += LINE_HEIGHT
+        payment?.let {
+            canvas.drawText("Payment: ${it.method}", MARGIN.toFloat(), yPosition.toFloat(), paint)
+            yPosition += LINE_HEIGHT
+            canvas.drawText("Tendered: ${formatter.format(it.amountTendered)}", MARGIN.toFloat(), yPosition.toFloat(), paint)
+            yPosition += LINE_HEIGHT
+            canvas.drawText("Change: ${formatter.format(it.change)}", MARGIN.toFloat(), yPosition.toFloat(), paint)
+            yPosition += LINE_HEIGHT
+        }
         paint.textSkewX = 0f
 
         canvas.drawText("Thank you!", MARGIN.toFloat(), yPosition.toFloat(), paint)

@@ -1,228 +1,312 @@
 package com.cafeos.tablet.data
 
 import android.content.Context
-import android.util.Log
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.provider.Settings
-import io.socket.client.IO
-import io.socket.client.Socket
-import io.socket.client.Ack
-import io.socket.emitter.Emitter
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.java_websocket.WebSocket
+import org.java_websocket.client.WebSocketClient
+import org.java_websocket.handshake.ClientHandshake
+import org.java_websocket.handshake.ServerHandshake
+import org.java_websocket.server.WebSocketServer
 import org.json.JSONObject
-import java.net.URISyntaxException
-import java.util.*
+import java.net.Inet4Address
+import java.net.InetSocketAddress
+import java.net.NetworkInterface
+import java.net.URI
+import java.util.Collections
 
 class SocketSyncManager(private val context: Context) {
     companion object {
         private const val TAG = "SocketSyncManager"
-        private const val KEY_SERVER_URL = "serverUrl"
+        const val HOST_PORT = 3001
+        private const val PREFS = "pebot_sync"
+        private const val MODE_KEY = "mode"
+        private const val URL_KEY = "url"
     }
 
-    private var socket: Socket? = null
+    private var client: WebSocketClient? = null
+    private var host: LocalSyncServer? = null
+    private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    private var discoveryListener: NsdManager.DiscoveryListener? = null
+    private var registrationListener: NsdManager.RegistrationListener? = null
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
-
+    private val _hostAddress = MutableStateFlow<String?>(null)
+    val hostAddress: StateFlow<String?> = _hostAddress.asStateFlow()
     private val _orderUpdates = MutableStateFlow<OrderSyncEvent?>(null)
     val orderUpdates: StateFlow<OrderSyncEvent?> = _orderUpdates.asStateFlow()
-
     private val _inventoryUpdates = MutableStateFlow<InventorySyncEvent?>(null)
     val inventoryUpdates: StateFlow<InventorySyncEvent?> = _inventoryUpdates.asStateFlow()
+    private val _discoveredHosts = MutableStateFlow<List<String>>(emptyList())
+    val discoveredHosts: StateFlow<List<String>> = _discoveredHosts.asStateFlow()
+
+    private val serviceType = "_pebot._tcp."
+
+    init {
+        val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        when (preferences.getString(MODE_KEY, null)) {
+            "host" -> startHost()
+            "client" -> preferences.getString(URL_KEY, null)?.let { connect(it) }
+        }
+    }
+
+    @Synchronized
+    fun startHost() {
+        if (host != null) return
+        val address = getLocalAddress() ?: return
+        host = LocalSyncServer(InetSocketAddress("0.0.0.0", HOST_PORT), this)
+        _hostAddress.value = "http://$address:$HOST_PORT"
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(MODE_KEY, "host")
+            .remove(URL_KEY)
+            .apply()
+        host?.start()
+        registerService()
+        stopDiscovery()
+    }
+
+    fun startDiscovery() {
+        if (discoveryListener != null) return
+        val listener = object : NsdManager.DiscoveryListener {
+            override fun onDiscoveryStarted(serviceType: String) = Unit
+            override fun onDiscoveryStopped(serviceType: String) = Unit
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) { discoveryListener = null }
+            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) { discoveryListener = null }
+            override fun onServiceFound(serviceInfo: NsdServiceInfo) {
+                if (serviceInfo.serviceType == this@SocketSyncManager.serviceType) nsdManager.resolveService(serviceInfo, resolveListener)
+            }
+            override fun onServiceLost(serviceInfo: NsdServiceInfo) {
+                _discoveredHosts.value = _discoveredHosts.value.filterNot { it.endsWith(":${serviceInfo.port}") }
+            }
+        }
+        discoveryListener = listener
+        nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, listener)
+    }
+
+    fun stopDiscovery() {
+        discoveryListener?.let { runCatching { nsdManager.stopServiceDiscovery(it) } }
+        discoveryListener = null
+        _discoveredHosts.value = emptyList()
+    }
+
+    private val resolveListener = object : NsdManager.ResolveListener {
+        override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) = Unit
+        override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+            val address = serviceInfo.host?.hostAddress ?: return
+            val url = "http://$address:${serviceInfo.port}"
+            if (url !in _discoveredHosts.value) _discoveredHosts.value = _discoveredHosts.value + url
+        }
+    }
+
+    private fun registerService() {
+        val info = NsdServiceInfo().apply {
+            serviceName = "Pebot POS"
+            serviceType = this@SocketSyncManager.serviceType
+            port = HOST_PORT
+        }
+        val listener = object : NsdManager.RegistrationListener {
+            override fun onServiceRegistered(serviceInfo: NsdServiceInfo) = Unit
+            override fun onRegistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) { registrationListener = null }
+            override fun onServiceUnregistered(serviceInfo: NsdServiceInfo) = Unit
+            override fun onUnregistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) = Unit
+        }
+        registrationListener = listener
+        nsdManager.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener)
+    }
 
     @Synchronized
     fun connect(serverUrl: String) {
-        if (socket != null) return
+        if (client != null || host != null) return
         try {
-            val opts = IO.Options()
-            socket = IO.socket(serverUrl, opts)
-            setupListeners()
-            socket?.connect()
-        } catch (e: URISyntaxException) {
-            Log.e(TAG, "Failed to connect to socket server: $serverUrl", e)
+            val normalizedUrl = normalizeUrl(serverUrl)
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(MODE_KEY, "client")
+                .putString(URL_KEY, normalizedUrl)
+                .apply()
+            val websocketUrl = normalizedUrl
+                .replaceFirst("http://", "ws://")
+                .replaceFirst("https://", "wss://")
+            client = object : WebSocketClient(URI("$websocketUrl/pebot-sync")) {
+                override fun onOpen(handshakedata: ServerHandshake?) {
+                    _isConnected.value = true
+                    sendIdentity()
+                }
+                override fun onMessage(message: String) { handleIncoming(JSONObject(message)) }
+                override fun onClose(code: Int, reason: String?, remote: Boolean) { _isConnected.value = false }
+                override fun onError(ex: Exception?) {
+                    Log.e(TAG, "Sync connection error", ex)
+                    _isConnected.value = false
+                }
+            }
+            client?.connect()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to connect to $serverUrl", e)
+            _isConnected.value = false
         }
     }
 
     @Synchronized
     fun disconnect() {
-        socket?.disconnect()
-        socket?.close()
-        socket = null
+        client?.close()
+        client = null
+        host?.stop()
+        host = null
+        _hostAddress.value = null
         _isConnected.value = false
+        stopDiscovery()
+        registrationListener?.let { runCatching { nsdManager.unregisterService(it) } }
+        registrationListener = null
     }
 
-    private fun setupListeners() {
-        socket?.on(Socket.EVENT_CONNECT) {
-            Log.d(TAG, "Socket connected")
-            _isConnected.value = true
-            emitDeviceIdentity()
-        }
+    internal fun hostStarted() { _isConnected.value = true }
 
-        socket?.on(Socket.EVENT_DISCONNECT) {
-            Log.d(TAG, "Socket disconnected")
-            _isConnected.value = false
-        }
-
-        socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
-            Log.e(TAG, "Socket connection error: ${args.firstOrNull()}")
-            _isConnected.value = false
-        }
-
-        socket?.on("order_update") { args ->
-            val json = args.firstOrNull() as? JSONObject
-            json?.let {
-                val orderId = it.optInt("orderId", -1)
-                val status = it.optString("status", "")
-                val tableNumber = it.optInt("tableNumber", 0)
-                val orderNumber = it.optString("orderNumber", "")
-                _orderUpdates.value = OrderSyncEvent(orderId, status, tableNumber, orderNumber)
-            }
-        }
-
-        socket?.on("inventory_update") { args ->
-            val json = args.firstOrNull() as? JSONObject
-            json?.let {
-                val productId = it.optInt("productId", -1)
-                val newQuantity = it.optDouble("quantity", 0.0)
-                _inventoryUpdates.value = InventorySyncEvent(productId, newQuantity)
-            }
-        }
-
-        socket?.on("sync_request") { args ->
-            val json = args.firstOrNull() as? JSONObject
-            json?.optString("type")?.let { type ->
-                when (type) {
-                    "orders" -> syncOrders()
-                    "inventory" -> syncInventory()
-                    "products" -> syncProducts()
+    fun handleOrderPlaced(order: Order, items: List<OrderItem> = emptyList()) {
+        send(JSONObject().apply {
+            put("event", "order_placed")
+            put("orderId", order.id)
+            put("orderNumber", order.orderNumber)
+            put("customerName", order.customerName)
+            put("totalAmount", order.totalAmount)
+            put("discountAmount", order.discountAmount)
+            put("discountRate", order.discountRate)
+            put("discountReason", order.discountReason ?: "")
+            put("paymentMethod", order.paymentMethod)
+            put("orderType", order.orderType)
+            put("tableNumber", order.tableId ?: 0)
+            put("status", order.status)
+            put("createdAt", order.createdAt)
+            put("items", org.json.JSONArray().apply {
+                items.forEach { item ->
+                    put(JSONObject().apply {
+                        put("productId", item.productId)
+                        put("quantity", item.quantity)
+                        put("unitPrice", item.unitPrice)
+                        put("subtotal", item.subtotal)
+                    })
                 }
-            }
-        }
-    }
-
-    private fun emitDeviceIdentity() {
-        try {
-            val deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-            val payload = JSONObject().apply {
-                put("deviceId", deviceId)
-                put("deviceType", "tablet" as Any)
-                put("locationId", getSavedLocationId())
-                put("timestamp", System.currentTimeMillis())
-            }
-            socket?.emit("register_device", payload)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to emit device identity", e)
-        }
-    }
-
-    private fun getSavedLocationId(): String {
-        val prefs = context.getSharedPreferences("pebot_prefs", Context.MODE_PRIVATE)
-        return prefs.getString("server_url", "") ?: ""
-    }
-
-    private fun syncOrders() {
-        try {
-            val payload = JSONObject().apply {
-                put("type", "orders")
-                put("timestamp", System.currentTimeMillis())
-            }
-            socket?.emit("sync_data", payload, Ack { args ->
-                Log.d(TAG, "Orders sync acknowledged: ${args.firstOrNull()}")
             })
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync orders", e)
-        }
-    }
-
-    private fun syncInventory() {
-        try {
-            val payload = JSONObject().apply {
-                put("type", "inventory")
-                put("timestamp", System.currentTimeMillis())
-            }
-            socket?.emit("sync_data", payload, Ack { args ->
-                Log.d(TAG, "Inventory sync acknowledged: ${args.firstOrNull()}")
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync inventory", e)
-        }
-    }
-
-    private fun syncProducts() {
-        try {
-            val payload = JSONObject().apply {
-                put("type", "products")
-                put("timestamp", System.currentTimeMillis())
-            }
-            socket?.emit("sync_data", payload, Ack { args ->
-                Log.d(TAG, "Products sync acknowledged: ${args.firstOrNull()}")
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync products", e)
-        }
-    }
-
-    fun handleOrderPlaced(order: Order) {
-        try {
-            val payload = JSONObject().apply {
-                put("orderId", order.id)
-                put("orderNumber", order.orderNumber ?: "")
-                put("tableId", order.tableId ?: 0)
-                put("totalAmount", order.totalAmount)
-                put("status", order.status)
-                put("paymentMethod", order.paymentMethod ?: "")
-                put("discountAmount", order.discountAmount ?: 0.0)
-                put("discountRate", order.discountRate ?: 0.0)
-                put("discountReason", order.discountReason ?: "")
-                put("timestamp", System.currentTimeMillis())
-            }
-            socket?.emit("order_placed", payload, Ack { args ->
-                Log.d(TAG, "Order placed event acknowledged")
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to broadcast order placed", e)
-        }
+        })
     }
 
     fun handleInventoryChanged(productId: Int, newQuantity: Double) {
+        send(JSONObject().apply {
+            put("event", "inventory_changed")
+            put("productId", productId)
+            put("quantity", newQuantity)
+        })
+    }
+
+    fun requestFullSync() = send(JSONObject().put("event", "sync_request"))
+
+    private fun sendIdentity() {
+        send(JSONObject().apply {
+            put("event", "register_device")
+            put("deviceId", Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID))
+            put("deviceType", "tablet")
+        })
+    }
+
+    private fun send(message: JSONObject) {
         try {
-            val payload = JSONObject().apply {
-                put("productId", productId)
-                put("quantity", newQuantity)
-                put("timestamp", System.currentTimeMillis())
-            }
-            socket?.emit("inventory_changed", payload, Ack { args ->
-                Log.d(TAG, "Inventory change acknowledged")
-            })
+            client?.send(message.toString())
+            host?.broadcast(message.toString())
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to broadcast inventory change", e)
+            Log.e(TAG, "Failed to send sync message", e)
         }
     }
 
-    fun requestFullSync() {
-        try {
-            val payload = JSONObject().apply {
-                put("type", "full_sync")
-                put("timestamp", System.currentTimeMillis())
+    internal fun handleIncoming(message: JSONObject) {
+        when (message.optString("event")) {
+            "order_placed", "order_update" -> {
+                val order = Order(
+                    id = message.optInt("orderId", 0),
+                    orderNumber = message.optString("orderNumber", ""),
+                    customerName = message.optString("customerName", "Walk-in Customer"),
+                    status = message.optString("status", "PENDING"),
+                    totalAmount = message.optDouble("totalAmount", 0.0),
+                    discountAmount = message.optDouble("discountAmount", 0.0),
+                    discountRate = message.optDouble("discountRate", 0.0),
+                    discountReason = message.optString("discountReason", "").ifBlank { null },
+                    paymentMethod = message.optString("paymentMethod", "CASH"),
+                    orderType = message.optString("orderType", "DINE_IN"),
+                    tableId = message.optInt("tableNumber", 0).takeIf { it > 0 },
+                    createdAt = message.optLong("createdAt", System.currentTimeMillis())
+                )
+                val items = message.optJSONArray("items")?.let { array ->
+                    (0 until array.length()).map { index ->
+                        val item = array.getJSONObject(index)
+                        OrderItem(
+                            orderId = order.id,
+                            productId = item.optInt("productId"),
+                            quantity = item.optInt("quantity"),
+                            unitPrice = item.optDouble("unitPrice"),
+                            subtotal = item.optDouble("subtotal")
+                        )
+                    }
+                } ?: emptyList()
+                _orderUpdates.value = OrderSyncEvent(order, items)
             }
-            socket?.emit("sync_request", payload)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to request full sync", e)
+            "inventory_changed", "inventory_update" -> _inventoryUpdates.value = InventorySyncEvent(
+                message.optInt("productId", -1),
+                message.optDouble("quantity", 0.0)
+            )
         }
+    }
+
+    private fun getLocalAddress(): String? {
+        return try {
+            Collections.list(NetworkInterface.getNetworkInterfaces()).asSequence()
+                .flatMap { Collections.list(it.inetAddresses).asSequence() }
+                .filterIsInstance<Inet4Address>()
+                .firstOrNull { !it.isLoopbackAddress && it.isSiteLocalAddress }
+                ?.hostAddress
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun normalizeUrl(value: String): String {
+        val trimmed = value.trim().trimEnd('/')
+        val withScheme = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) trimmed else "http://$trimmed"
+        return if (withScheme.substringAfter("://").contains(":")) withScheme else "$withScheme:$HOST_PORT"
     }
 
     fun clearOrderUpdate() { _orderUpdates.value = null }
     fun clearInventoryUpdate() { _inventoryUpdates.value = null }
 }
 
-data class OrderSyncEvent(
-    val orderId: Int,
-    val status: String,
-    val tableNumber: Int,
-    val orderNumber: String
-)
+private class LocalSyncServer(
+    address: InetSocketAddress,
+    private val manager: SocketSyncManager
+) : WebSocketServer(address) {
+    private val clients = Collections.synchronizedSet(mutableSetOf<WebSocket>())
 
-data class InventorySyncEvent(
-    val productId: Int,
-    val quantity: Double
-)
+    override fun onOpen(conn: WebSocket, handshake: ClientHandshake?) { clients.add(conn) }
+    override fun onClose(conn: WebSocket, code: Int, reason: String?, remote: Boolean) { clients.remove(conn) }
+    override fun onMessage(conn: WebSocket, message: String) {
+        val incoming = JSONObject(message)
+        manager.handleIncoming(incoming)
+        val event = incoming.optString("event")
+        if (event == "order_placed" || event == "inventory_changed") {
+            val outgoing = JSONObject(incoming.toString()).apply {
+                put("event", if (event == "order_placed") "order_update" else "inventory_update")
+            }
+            synchronized(clients) {
+                clients.filter { it != conn && it.isOpen }.forEach { it.send(outgoing.toString()) }
+            }
+        }
+    }
+    override fun onError(conn: WebSocket?, ex: Exception?) { Log.e("LocalSyncServer", "Host error", ex) }
+    override fun onStart() {
+        manager.hostStarted()
+        Log.i("LocalSyncServer", "Host started on port ${SocketSyncManager.HOST_PORT}")
+    }
+}
+
+data class OrderSyncEvent(val order: Order, val items: List<OrderItem>)
+data class InventorySyncEvent(val productId: Int, val quantity: Double)

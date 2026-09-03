@@ -25,6 +25,7 @@ import com.cafeos.tablet.data.CafeTable
 import com.cafeos.tablet.data.Guest
 import com.cafeos.tablet.data.TableSession
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -49,12 +50,7 @@ fun GuestManagementScreen(viewModel: CafeViewModel) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Text("Guest Management", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
         Text("Manage guests at occupied tables", style = MaterialTheme.typography.bodyMedium, color = PosMuted, modifier = Modifier.padding(top = 4.dp))
 
@@ -74,7 +70,7 @@ fun GuestManagementScreen(viewModel: CafeViewModel) {
             }
         } else {
             if (selectedSessionId == null) {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(activeSessions) { session ->
                         val table = tables.find { it.id == session.tableId }
                         SessionCard(
@@ -179,7 +175,7 @@ fun SessionCard(session: TableSession, table: CafeTable?, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "${session.guestCount} guests • Opened: ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(session.startedAt))}",
+                    "${session.guestCount} guests • Opened: ${java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(session.startedAt))}",
                     style = MaterialTheme.typography.bodySmall,
                     color = PosMuted
                 )

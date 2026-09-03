@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.BusinessSettings
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumHeader
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -55,26 +57,23 @@ fun SettingsScreen(viewModel: CafeViewModel) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
-        Text("Settings", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
+    PremiumScreen {
+        PremiumHeader("Settings", "Workspace preferences and data controls")
         Spacer(modifier = Modifier.height(16.dp))
 
         ScrollableTabRow(
             selectedTabIndex = selectedTab,
             edgePadding = 0.dp,
-            containerColor = PosCoffeeLight,
-            contentColor = PosGold
+            containerColor = PosMuted,
+            contentColor = PosInk
         ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTab == index,
                     onClick = { selectedTab = index },
-                    text = { Text(title) }
+                    text = { Text(title) },
+                    selectedContentColor = PosAccent,
+                    unselectedContentColor = PosInkSoft
                 )
             }
         }
@@ -126,6 +125,8 @@ fun VoiceSettingsContent(businessSettings: BusinessSettings?, onSave: (BusinessS
     var voiceEnabled by remember { mutableStateOf(businessSettings?.voiceEnabled ?: true) }
     var voiceVolume by remember { mutableStateOf(businessSettings?.voiceVolume ?: 1.0f) }
     var voiceSpeed by remember { mutableStateOf(businessSettings?.voiceSpeed ?: 1.0f) }
+    var orderMessage by remember { mutableStateOf(businessSettings?.voiceOrderMessage ?: "New order {order} for {customer} received at {table}.") }
+    var quotaMessage by remember { mutableStateOf(businessSettings?.voiceQuotaMessage ?: "Congratulations! Daily quota reached: {current} of {target}.") }
 
     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
         Card(
@@ -150,9 +151,14 @@ fun VoiceSettingsContent(businessSettings: BusinessSettings?, onSave: (BusinessS
                 Text("Speed: ${"%.1f".format(voiceSpeed)}x", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Slider(value = voiceSpeed, onValueChange = { voiceSpeed = it }, valueRange = 0.5f..2.0f, colors = SliderDefaults.colors(thumbColor = PosGold, activeTrackColor = PosGold))
 
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(value = orderMessage, onValueChange = { orderMessage = it }, label = { Text("Order notification") }, supportingText = { Text("Use {order}, {customer}, and {table}") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(value = quotaMessage, onValueChange = { quotaMessage = it }, label = { Text("Quota notification") }, supportingText = { Text("Use {current} and {target}") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
-                    onClick = { onSave((businessSettings ?: BusinessSettings()).copy(voiceEnabled = voiceEnabled, voiceVolume = voiceVolume, voiceSpeed = voiceSpeed)) },
+                    onClick = { onSave((businessSettings ?: BusinessSettings()).copy(voiceEnabled = voiceEnabled, voiceVolume = voiceVolume, voiceSpeed = voiceSpeed, voiceOrderMessage = orderMessage, voiceQuotaMessage = quotaMessage)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PosAccent)
@@ -251,11 +257,14 @@ fun SystemSettingsContent(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun BusinessSettingsContent(businessSettings: BusinessSettings?, onSave: (BusinessSettings) -> Unit) {
     var shopName by remember { mutableStateOf(businessSettings?.shopName ?: "Pebot") }
     var tin by remember { mutableStateOf(businessSettings?.tin ?: "") }
     var branchCode by remember { mutableStateOf(businessSettings?.branchCode ?: "") }
     var vatRate by remember { mutableStateOf((businessSettings?.vatRate ?: 12.0).toString()) }
+    var quotaMode by remember { mutableStateOf(businessSettings?.dailyQuotaMode ?: "ORDERS") }
+    var quotaTarget by remember { mutableStateOf((businessSettings?.dailyQuotaTarget ?: 0.0).toString()) }
 
     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
         Card(
@@ -292,8 +301,23 @@ fun BusinessSettingsContent(businessSettings: BusinessSettings?, onSave: (Busine
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
+                Text("Daily Quota", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("ORDERS", "REVENUE").forEach { mode ->
+                        FilterChip(selected = quotaMode == mode, onClick = { quotaMode = mode }, label = { Text(if (mode == "ORDERS") "Products" else "Revenue") })
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = quotaTarget, onValueChange = { quotaTarget = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text(if (quotaMode == "ORDERS") "Daily product target" else "Daily revenue target (₱)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { onSave((businessSettings ?: BusinessSettings()).copy(shopName = shopName, tin = tin.ifBlank { null }, branchCode = branchCode.ifBlank { null }, vatRate = vatRate.toDoubleOrNull() ?: 12.0)) },
+                    onClick = { onSave((businessSettings ?: BusinessSettings()).copy(shopName = shopName, tin = tin.ifBlank { null }, branchCode = branchCode.ifBlank { null }, vatRate = vatRate.toDoubleOrNull() ?: 12.0, dailyQuotaMode = quotaMode, dailyQuotaTarget = quotaTarget.toDoubleOrNull() ?: 0.0)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PosAccent)

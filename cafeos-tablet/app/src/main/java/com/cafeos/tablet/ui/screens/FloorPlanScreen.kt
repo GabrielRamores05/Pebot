@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.CafeTable
 import com.cafeos.tablet.data.TableSession
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -42,12 +43,7 @@ fun FloorPlanScreen(viewModel: CafeViewModel) {
     var showTableForm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -74,7 +70,8 @@ fun FloorPlanScreen(viewModel: CafeViewModel) {
                 }
             }
         } else {
-            LazyVerticalGrid(
+                LazyVerticalGrid(
+                    modifier = Modifier.weight(1f),
                 columns = GridCells.Adaptive(140.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)

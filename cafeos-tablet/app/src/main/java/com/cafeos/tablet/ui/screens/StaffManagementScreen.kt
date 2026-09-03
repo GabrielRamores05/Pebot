@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.Staff
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -28,12 +29,7 @@ fun StaffManagementScreen(viewModel: CafeViewModel) {
     var editingStaff by remember { mutableStateOf<Staff?>(null) }
     val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -53,7 +49,7 @@ fun StaffManagementScreen(viewModel: CafeViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(staff) { member ->
                 StaffCard(
                     staff = member,
@@ -119,6 +115,9 @@ fun StaffFormDialog(staff: Staff?, onDismiss: () -> Unit, onSave: (Staff) -> Uni
     var email by remember { mutableStateOf(staff?.email ?: "") }
     var phone by remember { mutableStateOf(staff?.phone ?: "") }
     var pin by remember { mutableStateOf(staff?.pin ?: "") }
+    var profitShareRate by remember { mutableStateOf(staff?.profitShareRate?.toString() ?: "0") }
+    val permissionOptions = listOf("pos" to "POS", "live_orders" to "Live Orders", "kitchen" to "Kitchen", "analytics" to "Analytics", "order_history" to "Order History", "expenses" to "Expenses", "vouchers" to "Vouchers", "products" to "Products", "inventory" to "Inventory", "tables" to "Tables", "connection" to "Connection")
+    var permissions by remember { mutableStateOf(staff?.permissions?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: permissionOptions.map { it.first }.toSet()) }
 
     val roles = listOf("ADMIN", "MANAGER", "STAFF", "KITCHEN", "BARISTA")
 
@@ -135,6 +134,8 @@ fun StaffFormDialog(staff: Staff?, onDismiss: () -> Unit, onSave: (Staff) -> Uni
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(value = pin, onValueChange = { pin = it.filter { c -> c.isDigit() } }, label = { Text("PIN (6 digits)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline), singleLine = true)
                 Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(value = profitShareRate, onValueChange = { profitShareRate = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Profit share (%)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline), supportingText = { Text("Applied to positive net profit during payroll") })
+                Spacer(modifier = Modifier.height(12.dp))
                 Text("Role", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -150,6 +151,18 @@ fun StaffFormDialog(staff: Staff?, onDismiss: () -> Unit, onSave: (Staff) -> Uni
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Page access", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                permissionOptions.chunked(2).forEach { row ->
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        row.forEach { (key, label) ->
+                            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = key in permissions, onCheckedChange = { checked -> permissions = if (checked) permissions + key else permissions - key })
+                                Text(label, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -157,9 +170,9 @@ fun StaffFormDialog(staff: Staff?, onDismiss: () -> Unit, onSave: (Staff) -> Uni
                 onClick = {
                     if (name.isNotBlank()) {
                         val saved = if (staff == null) {
-                            Staff(name = name, role = role, email = email.ifBlank { null }, phone = phone.ifBlank { null }, pin = pin.ifBlank { null })
+                            Staff(name = name, role = role, email = email.ifBlank { null }, phone = phone.ifBlank { null }, pin = pin.ifBlank { null }, permissions = permissions.joinToString(","), profitShareRate = profitShareRate.toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0)
                         } else {
-                            staff.copy(name = name, role = role, email = email.ifBlank { null }, phone = phone.ifBlank { null }, pin = pin.ifBlank { null })
+                            staff.copy(name = name, role = role, email = email.ifBlank { null }, phone = phone.ifBlank { null }, pin = pin.ifBlank { null }, permissions = permissions.joinToString(","), profitShareRate = profitShareRate.toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0)
                         }
                         onSave(saved)
                     }

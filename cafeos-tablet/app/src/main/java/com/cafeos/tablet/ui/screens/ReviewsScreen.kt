@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.Review
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -25,12 +26,7 @@ fun ReviewsScreen(viewModel: CafeViewModel) {
     val reviews by viewModel.allReviews.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Text("Product Reviews", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
         Text("${reviews.size} total reviews", style = MaterialTheme.typography.bodyMedium, color = PosMuted, modifier = Modifier.padding(top = 4.dp))
 
@@ -46,7 +42,7 @@ fun ReviewsScreen(viewModel: CafeViewModel) {
                 Text("No reviews yet", style = MaterialTheme.typography.bodyLarge, color = PosMuted)
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(reviews, key = { it.id }) { review ->
                     ReviewCard(
                         review = review,

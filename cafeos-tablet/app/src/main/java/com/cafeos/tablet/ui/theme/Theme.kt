@@ -25,11 +25,11 @@ private val DarkColorScheme = darkColorScheme(
     onSecondary = PosCoffee,
     tertiary = PosCream,
     background = PosCoffee,
-    onBackground = PosPaper,
+    onBackground = PosInk,
     surface = PosCoffeeLight,
-    onSurface = PosPaper,
+    onSurface = PosInk,
     surfaceVariant = PosCoffeeLight,
-    onSurfaceVariant = PosMuted,
+    onSurfaceVariant = PosInkSoft,
     error = PosDanger,
     onError = Color.White,
     errorContainer = PosDangerSoft,
@@ -46,7 +46,7 @@ private val LightColorScheme = lightColorScheme(
     secondary = PosGold,
     onSecondary = PosCoffee,
     tertiary = PosCream,
-    background = PosPaper,
+    background = PosCoffee,
     onBackground = PosInk,
     surface = PosSurface,
     onSurface = PosInk,
@@ -62,7 +62,7 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun PebotTheme(
-    darkTheme: Boolean = true,
+    darkTheme: Boolean = false,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -78,7 +78,8 @@ fun PebotTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
+            window.statusBarColor = colorScheme.background.toArgb()
+            window.navigationBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }

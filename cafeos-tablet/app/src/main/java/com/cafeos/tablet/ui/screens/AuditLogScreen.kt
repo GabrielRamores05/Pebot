@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -23,14 +24,9 @@ import java.util.*
 @Composable
 fun AuditLogScreen(viewModel: CafeViewModel) {
     val auditEvents by viewModel.recentAuditEvents.collectAsState(initial = emptyList())
-    val dateFormatter = SimpleDateFormat("MMM dd, yyyy HH:mm:ss", Locale.getDefault())
+    val dateFormatter = SimpleDateFormat("MMM dd, yyyy hh:mm:ss a", Locale.getDefault())
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Text("Audit Logs", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
         Text("Append-only event history", style = MaterialTheme.typography.bodyMedium, color = PosMuted, modifier = Modifier.padding(top = 4.dp))
 
@@ -49,7 +45,7 @@ fun AuditLogScreen(viewModel: CafeViewModel) {
                 }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(auditEvents, key = { it.id }) { event ->
                     AuditEventCard(event = event, dateFormatter = dateFormatter)
                 }

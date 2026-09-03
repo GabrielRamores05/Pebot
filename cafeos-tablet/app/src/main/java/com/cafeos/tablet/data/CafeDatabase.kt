@@ -52,7 +52,7 @@ import androidx.room.RoomDatabase
         ProductStation::class,
         SupplierIngredientPrice::class
     ],
-    version = 13,
+    version = 17,
     exportSchema = false
 )
 abstract class CafeDatabase : RoomDatabase() {

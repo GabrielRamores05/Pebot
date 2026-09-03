@@ -22,6 +22,7 @@ import com.cafeos.tablet.data.Product
 import com.cafeos.tablet.data.ProductStation
 import com.cafeos.tablet.data.Station
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -58,12 +59,7 @@ fun StationAssignmentScreen(viewModel: CafeViewModel) {
 
     val productMap = products.associateBy { it.id }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -90,7 +86,7 @@ fun StationAssignmentScreen(viewModel: CafeViewModel) {
                 }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(stations) { station ->
                     StationAssignmentCard(
                         station = station,

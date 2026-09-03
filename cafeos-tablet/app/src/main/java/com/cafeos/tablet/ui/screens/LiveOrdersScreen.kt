@@ -2,6 +2,7 @@ package com.cafeos.tablet.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,14 +14,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.*
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumHeader
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 @Composable
 fun LiveOrdersScreen(viewModel: CafeViewModel) {
@@ -28,20 +33,13 @@ fun LiveOrdersScreen(viewModel: CafeViewModel) {
     val tables by viewModel.tables.collectAsState(initial = emptyList())
     val stations by viewModel.stations.collectAsState(initial = emptyList())
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
-    val dateFormatter = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+    val dateFormatter = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
 
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Kanban", "Tables", "Stations")
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
-        Text("Live Orders", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
-        Spacer(modifier = Modifier.height(16.dp))
-
+    PremiumScreen {
+        PremiumHeader("Live Orders", "Monitor preparation across the floor")
         TabRow(
             selectedTabIndex = selectedTab,
             containerColor = PosCoffeeLight,
@@ -56,8 +54,6 @@ fun LiveOrdersScreen(viewModel: CafeViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         when (selectedTab) {
             0 -> KanbanBoard(orders, currencyFormatter, dateFormatter, viewModel)
             1 -> TablesTab(tables, viewModel)
@@ -71,7 +67,7 @@ fun KanbanBoard(orders: List<Order>, currencyFormatter: NumberFormat, dateFormat
     val columns = listOf("PENDING", "PREPARING", "COMPLETED", "CANCELLED")
     val columnColors = mapOf(
         "PENDING" to PosGold,
-        "PREPARING" to Color(0xFF60A5FA),
+        "PREPARING" to PosInfo,
         "COMPLETED" to PosAccent,
         "CANCELLED" to PosDanger
     )
@@ -83,6 +79,12 @@ fun KanbanBoard(orders: List<Order>, currencyFormatter: NumberFormat, dateFormat
     )
 
     var selectedOrder by remember { mutableStateOf<Order?>(null) }
+    var pendingCancellation by remember { mutableStateOf<Order?>(null) }
+
+    fun requestStatusChange(order: Order, newStatus: String) {
+        if (newStatus == "CANCELLED") pendingCancellation = order
+        else viewModel.updateOrderStatus(order.id, newStatus)
+    }
 
     Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         columns.forEach { status ->
@@ -131,7 +133,7 @@ fun KanbanBoard(orders: List<Order>, currencyFormatter: NumberFormat, dateFormat
                                     currencyFormatter = currencyFormatter,
                                     dateFormatter = dateFormatter,
                                     onStatusChange = { newStatus ->
-                                        viewModel.updateOrderStatus(order.id, newStatus)
+                                        requestStatusChange(order, newStatus)
                                     },
                                     onClick = { selectedOrder = order }
                                 )
@@ -149,20 +151,58 @@ fun KanbanBoard(orders: List<Order>, currencyFormatter: NumberFormat, dateFormat
             viewModel = viewModel,
             onDismiss = { selectedOrder = null },
             onStatusChange = { newStatus ->
-                viewModel.updateOrderStatus(order.id, newStatus)
+                requestStatusChange(order, newStatus)
                 if (newStatus == "CANCELLED" || newStatus == "COMPLETED") {
                     selectedOrder = null
                 }
             }
         )
     }
+
+    pendingCancellation?.let { order ->
+        AdminPasscodeDialog(
+            viewModel = viewModel,
+            onDismiss = { pendingCancellation = null },
+            onAuthorized = {
+                viewModel.updateOrderStatus(order.id, "CANCELLED", adminAuthorized = true)
+                pendingCancellation = null
+                if (selectedOrder?.id == order.id) selectedOrder = null
+            }
+        )
+    }
 }
 
 @Composable
-fun KanbanOrderCard(order: Order, currencyFormatter: NumberFormat, dateFormatter: SimpleDateFormat, onStatusChange: (String) -> Unit, onClick: () -> Unit) {
+fun KanbanOrderCard(
+    order: Order,
+    currencyFormatter: NumberFormat,
+    dateFormatter: SimpleDateFormat,
+    onStatusChange: (String) -> Unit,
+    onClick: () -> Unit
+) {
+    val statusOrder = listOf("PENDING", "PREPARING", "COMPLETED", "CANCELLED")
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .pointerInput(order.id) {
+                var dragX = 0f
+                detectDragGestures(
+                    onDragStart = { dragX = 0f },
+                    onDrag = { _, dragAmount ->
+                        dragX += dragAmount.x
+                    },
+                    onDragEnd = {
+                        val index = statusOrder.indexOf(order.status)
+                        val target = when {
+                            dragX > 110f && index < statusOrder.lastIndex -> statusOrder[index + 1]
+                            dragX < -110f && index > 0 -> statusOrder[index - 1]
+                            else -> order.status
+                        }
+                        if (target != order.status) onStatusChange(target)
+                    }
+                )
+            }
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
@@ -174,11 +214,17 @@ fun KanbanOrderCard(order: Order, currencyFormatter: NumberFormat, dateFormatter
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(order.orderNumber, style = MaterialTheme.typography.labelMedium, color = PosPaper, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.DragHandle, contentDescription = null, tint = PosMuted, modifier = Modifier.size(16.dp))
+                    Column {
+                        Text(order.orderNumber, style = MaterialTheme.typography.labelMedium, color = PosPaper, fontWeight = FontWeight.Bold)
+                        Text(order.tableLocation ?: order.tableId?.let { "Table $it" } ?: "Takeaway", style = MaterialTheme.typography.labelSmall, color = PosAccent, fontWeight = FontWeight.Bold)
+                    }
+                }
                 Surface(
                     color = when (order.status) {
                         "PENDING" -> PosGold
-                        "PREPARING" -> Color(0xFF60A5FA)
+                        "PREPARING" -> PosInfo
                         "COMPLETED" -> PosAccent
                         "CANCELLED" -> PosDanger
                         else -> PosMuted
@@ -195,7 +241,8 @@ fun KanbanOrderCard(order: Order, currencyFormatter: NumberFormat, dateFormatter
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
-            Text(order.customerName, style = MaterialTheme.typography.bodySmall, color = PosPaper, fontWeight = FontWeight.Medium)
+            Text(if (order.customerName.isBlank()) "Walk-in Customer" else order.customerName, style = MaterialTheme.typography.bodySmall, color = PosPaper, fontWeight = FontWeight.Medium)
+            Text("Drag left/right to move", style = MaterialTheme.typography.labelSmall, color = PosMuted)
             Text(dateFormatter.format(Date(order.createdAt)), style = MaterialTheme.typography.labelSmall, color = PosMuted)
             Spacer(modifier = Modifier.height(8.dp))
             Text(currencyFormatter.format(order.totalAmount), style = MaterialTheme.typography.labelMedium, color = PosGold, fontWeight = FontWeight.Bold)
@@ -208,7 +255,7 @@ fun KanbanOrderCard(order: Order, currencyFormatter: NumberFormat, dateFormatter
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (order.status == "PENDING") Color(0xFF60A5FA) else PosAccent
+                        containerColor = if (order.status == "PENDING") PosGold else PosAccent
                     )
                 ) {
                     Text(if (order.status == "PENDING") "Start Preparing" else "Mark Ready", fontWeight = FontWeight.SemiBold)
@@ -221,12 +268,16 @@ fun KanbanOrderCard(order: Order, currencyFormatter: NumberFormat, dateFormatter
 @Composable
 fun OrderDetailDialog(order: Order, viewModel: CafeViewModel, onDismiss: () -> Unit, onStatusChange: (String) -> Unit) {
     var items by remember { mutableStateOf<List<OrderItem>>(emptyList()) }
+    var optionMap by remember { mutableStateOf<Map<Int, List<OrderOption>>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
     val products by viewModel.allProducts.collectAsState(initial = emptyList())
     val productMap = products.associateBy { it.id }
 
     LaunchedEffect(order.id) {
         items = viewModel.getOrderItemsSync(order.id)
+        optionMap = items.associate { item ->
+            item.id to viewModel.getOrderOptionsForItemSync(item.id)
+        }
         loading = false
     }
 
@@ -242,7 +293,7 @@ fun OrderDetailDialog(order: Order, viewModel: CafeViewModel, onDismiss: () -> U
                 Surface(
                     color = when (order.status) {
                         "PENDING" -> PosGold
-                        "PREPARING" -> Color(0xFF60A5FA)
+                        "PREPARING" -> PosInfo
                         "COMPLETED" -> PosAccent
                         "CANCELLED" -> PosDanger
                         else -> PosMuted
@@ -270,6 +321,11 @@ fun OrderDetailDialog(order: Order, viewModel: CafeViewModel, onDismiss: () -> U
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Seated at:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(order.tableLocation ?: order.tableId?.let { "Table $it" } ?: "Takeaway", color = PosAccent, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                                 Text("Total:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("₱${"%.2f".format(order.totalAmount)}", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             }
@@ -291,7 +347,7 @@ fun OrderDetailDialog(order: Order, viewModel: CafeViewModel, onDismiss: () -> U
                         Divider()
                         Text("Items", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     }
-                    
+
                     if (loading) {
                         item {
                             Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -301,9 +357,17 @@ fun OrderDetailDialog(order: Order, viewModel: CafeViewModel, onDismiss: () -> U
                     } else {
                         items(items) { item ->
                             val product = productMap[item.productId]
+                            val selectedOptions = optionMap[item.id].orEmpty()
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(product?.name ?: "Unknown Product", color = MaterialTheme.colorScheme.onSurface)
+                                    if (selectedOptions.isNotEmpty()) {
+                                        Text(
+                                            selectedOptions.joinToString(", ") { "${it.name}: ${it.value}" },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = PosAccent
+                                        )
+                                    }
                                     if (!item.notes.isNullOrBlank()) {
                                         Text(item.notes, style = MaterialTheme.typography.bodySmall, color = PosInkSoft)
                                     }
@@ -318,18 +382,28 @@ fun OrderDetailDialog(order: Order, viewModel: CafeViewModel, onDismiss: () -> U
             }
         },
         confirmButton = {
-            when (order.status) {
-                "PENDING" -> Button(
-                    onClick = { onStatusChange("PREPARING") },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF60A5FA)),
-                    shape = RoundedCornerShape(12.dp)
-                ) { Text("Start Preparing", fontWeight = FontWeight.SemiBold) }
-                "PREPARING" -> Button(
-                    onClick = { onStatusChange("COMPLETED") },
-                    colors = ButtonDefaults.buttonColors(containerColor = PosAccent),
-                    shape = RoundedCornerShape(12.dp)
-                ) { Text("Mark Ready", fontWeight = FontWeight.SemiBold) }
-                else -> {}
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (order.status == "PENDING") {
+                    Button(
+                        onClick = { onStatusChange("PREPARING") },
+                        colors = ButtonDefaults.buttonColors(containerColor = PosInfo),
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text("Start Preparing", fontWeight = FontWeight.SemiBold) }
+                }
+                if (order.status == "PREPARING") {
+                    Button(
+                        onClick = { onStatusChange("COMPLETED") },
+                        colors = ButtonDefaults.buttonColors(containerColor = PosAccent),
+                        shape = RoundedCornerShape(12.dp)
+                    ) { Text("Mark Ready", fontWeight = FontWeight.SemiBold) }
+                }
+                if (order.status != "CANCELLED") {
+                    TextButton(
+                        onClick = { onStatusChange("CANCELLED") },
+                    ) {
+                        Text("Cancel", color = PosDanger)
+                    }
+                }
             }
         },
         dismissButton = {
@@ -370,7 +444,7 @@ fun TablesTab(tables: List<CafeTable>, viewModel: CafeViewModel) {
                             color = when (table.status) {
                                 "AVAILABLE" -> PosAccent
                                 "OCCUPIED" -> PosGold
-                                "RESERVED" -> Color(0xFF60A5FA)
+                                "RESERVED" -> PosInfo
                                 else -> PosMuted
                             },
                             fontWeight = FontWeight.Bold

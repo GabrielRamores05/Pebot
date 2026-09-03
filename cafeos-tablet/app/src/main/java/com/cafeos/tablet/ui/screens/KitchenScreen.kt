@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.data.*
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumHeader
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -27,7 +29,8 @@ fun KitchenScreen(viewModel: CafeViewModel) {
     val orders by viewModel.allOrders.collectAsState(initial = emptyList())
     val stationsFromDb by viewModel.stations.collectAsState(initial = emptyList())
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
-    val dateFormatter = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+    val dateFormatter = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
+    var pendingCancellation by remember { mutableStateOf<Order?>(null) }
 
     var selectedStation by remember { mutableStateOf("All") }
     var showCompleted by remember { mutableStateOf(false) }
@@ -42,15 +45,8 @@ fun KitchenScreen(viewModel: CafeViewModel) {
     }
     val displayOrders = if (showCompleted) filtered else filtered.filter { it.status != "COMPLETED" && it.status != "CANCELLED" }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
-        Text("Kitchen Display", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
-        Spacer(modifier = Modifier.height(16.dp))
-
+    PremiumScreen {
+        PremiumHeader("Kitchen Display", "Keep the line moving")
         ScrollableTabRow(
             selectedTabIndex = stationNames.indexOf(selectedStation).coerceAtLeast(0),
             edgePadding = 0.dp,
@@ -67,8 +63,6 @@ fun KitchenScreen(viewModel: CafeViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
                 checked = showCompleted,
@@ -79,9 +73,7 @@ fun KitchenScreen(viewModel: CafeViewModel) {
             Text("Show completed", color = MaterialTheme.colorScheme.onSurface)
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (displayOrders.isEmpty()) {
                 item {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -96,27 +88,43 @@ fun KitchenScreen(viewModel: CafeViewModel) {
                     currencyFormatter = currencyFormatter,
                     dateFormatter = dateFormatter,
                     onStatusChange = { newStatus ->
-                        viewModel.updateOrderStatus(order.id, newStatus)
+                        if (newStatus == "CANCELLED") pendingCancellation = order
+                        else viewModel.updateOrderStatus(order.id, newStatus)
                     }
                 )
             }
         }
+    }
+
+    pendingCancellation?.let { order ->
+        AdminPasscodeDialog(
+            viewModel = viewModel,
+            onDismiss = { pendingCancellation = null },
+            onAuthorized = {
+                viewModel.updateOrderStatus(order.id, "CANCELLED", adminAuthorized = true)
+                pendingCancellation = null
+            }
+        )
     }
 }
 
 @Composable
 fun KitchenOrderCard(order: Order, viewModel: CafeViewModel, currencyFormatter: NumberFormat, dateFormatter: SimpleDateFormat, onStatusChange: (String) -> Unit) {
     var items by remember { mutableStateOf<List<OrderItem>>(emptyList()) }
+    var optionMap by remember { mutableStateOf<Map<Int, List<OrderOption>>>(emptyMap()) }
     val products by viewModel.allProducts.collectAsState(initial = emptyList())
     val productMap = products.associateBy { it.id }
 
     LaunchedEffect(order.id) {
         items = viewModel.getOrderItemsSync(order.id)
+        optionMap = items.associate { item ->
+            item.id to viewModel.getOrderOptionsForItemSync(item.id)
+        }
     }
 
     val statusColor = when (order.status) {
         "PENDING" -> PosGold
-        "PREPARING" -> Color(0xFF60A5FA)
+        "PREPARING" -> PosInfo
         "COMPLETED" -> PosAccent
         "CANCELLED" -> PosDanger
         else -> PosInkSoft
@@ -137,6 +145,7 @@ fun KitchenOrderCard(order: Order, viewModel: CafeViewModel, currencyFormatter: 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(order.orderNumber, style = MaterialTheme.typography.titleMedium, color = PosPaper, fontWeight = FontWeight.Bold)
                     Text(order.customerName, style = MaterialTheme.typography.bodyMedium, color = PosMuted)
+                    Text(order.tableLocation ?: order.tableId?.let { "Table $it" } ?: "Takeaway", style = MaterialTheme.typography.labelMedium, color = PosAccent, fontWeight = FontWeight.Bold)
                 }
                 Surface(
                     color = statusColor.copy(alpha = 0.15f),
@@ -158,19 +167,30 @@ fun KitchenOrderCard(order: Order, viewModel: CafeViewModel, currencyFormatter: 
 
             items.forEach { item ->
                 val product = productMap[item.productId]
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        text = "${item.quantity}x ${product?.name ?: "Unknown"}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = PosPaper,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (!item.notes.isNullOrBlank()) {
+                val selectedOptions = optionMap[item.id].orEmpty()
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(
-                            text = item.notes,
+                            text = "${item.quantity}x ${product?.name ?: "Unknown"}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = PosPaper,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (!item.notes.isNullOrBlank()) {
+                            Text(
+                                text = item.notes,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = PosGold,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+                    if (selectedOptions.isNotEmpty()) {
+                        Text(
+                            text = selectedOptions.joinToString(", ") { "${it.name}: ${it.value}" },
                             style = MaterialTheme.typography.bodySmall,
                             color = PosGold,
-                            modifier = Modifier.padding(start = 8.dp)
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
                 }
@@ -195,7 +215,7 @@ fun KitchenOrderCard(order: Order, viewModel: CafeViewModel, currencyFormatter: 
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (order.status == "PENDING") Color(0xFF60A5FA) else PosAccent
+                        containerColor = if (order.status == "PENDING") PosGold else PosAccent
                     )
                 ) {
                     Text(if (order.status == "PENDING") "Start Preparing" else "Mark Ready", fontWeight = FontWeight.SemiBold)

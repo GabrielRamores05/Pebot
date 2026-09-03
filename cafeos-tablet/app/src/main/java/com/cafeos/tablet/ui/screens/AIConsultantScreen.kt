@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 
 @Composable
@@ -29,12 +30,7 @@ fun AIConsultantScreen(viewModel: CafeViewModel) {
     val conversations by viewModel.allAIConversations.collectAsState(initial = emptyList())
     val currentConversationId by remember { mutableStateOf<Int?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
+    PremiumScreen {
         Text("AI Consultant", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
         Text("Ask questions about orders, inventory, sales", style = MaterialTheme.typography.bodyMedium, color = PosMuted, modifier = Modifier.padding(top = 4.dp))
 
@@ -98,8 +94,8 @@ fun ChatView(viewModel: CafeViewModel, conversationId: Int, messages: List<com.c
             .background(PosCoffee)
     ) {
         LazyColumn(
-            state = listState,
             modifier = Modifier.weight(1f),
+            state = listState,
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {

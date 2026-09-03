@@ -1,0 +1,33 @@
+{
+  "categories": [
+    {
+      "name": "Coffee",
+      "items": ["Americano", "Cappuccino"]
+    }
+  ],
+  "products": [
+    {
+      "name": "Americano",
+      "category": "Coffee",
+      "price": 120,
+      "ingredients": [
+        { "name": "coffee beans", "quantity": 18, "unit": "g", "required": true },
+        { "name": "water", "quantity": 180, "unit": "ml", "required": true }
+      ]
+    },
+    {
+      "name": "Cappuccino",
+      "category": "Coffee",
+      "price": 160,
+      "ingredients": [
+        { "name": "coffee beans", "quantity": 18, "unit": "g", "required": true },
+        { "name": "milk", "quantity": 120, "unit": "ml", "required": true },
+        { "name": "foam", "quantity": 30, "unit": "ml", "required": true }
+      ]
+    }
+  ],
+  "addOns": [
+    { "name": "Oat Milk", "priceDelta": 20 },
+    { "name": "Extra Shot", "priceDelta": 25 }
+  ]
+}

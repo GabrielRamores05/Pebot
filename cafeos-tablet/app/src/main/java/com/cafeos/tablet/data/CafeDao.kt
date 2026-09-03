@@ -29,10 +29,10 @@ interface CafeDao {
     fun getAllProducts(): Flow<List<Product>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertProduct(product: Product)
+    suspend fun insertProduct(product: Product): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertProducts(products: List<Product>)
+    suspend fun insertProducts(products: List<Product>): List<Long>
 
     @Update
     suspend fun updateProduct(product: Product)
@@ -55,6 +55,9 @@ interface CafeDao {
 
     @Query("DELETE FROM ProductIngredient WHERE productId = :productId")
     suspend fun deleteProductIngredientsByProduct(productId: Int)
+
+    @Query("DELETE FROM ProductIngredient WHERE productId = :productId")
+    suspend fun clearProductIngredients(productId: Int)
 
     // Option Groups
     @Query("SELECT * FROM OptionGroup ORDER BY sortOrder ASC")
@@ -94,6 +97,18 @@ interface CafeDao {
 
     @Query("SELECT * FROM Option WHERE groupId = :groupId ORDER BY sortOrder ASC")
     suspend fun getOptionsByGroup(groupId: Int): List<Option>
+
+    @Query("SELECT * FROM OptionGroup WHERE name = :name")
+    suspend fun getOptionGroupsByName(name: String): List<OptionGroup>
+
+    @Query("SELECT * FROM OptionGroup WHERE id = :groupId")
+    suspend fun getOptionGroup(groupId: Int): OptionGroup?
+
+    @Query("SELECT * FROM Option ORDER BY groupId ASC, sortOrder ASC")
+    suspend fun getAllOptionsNow(): List<Option>
+
+    @Query("SELECT name FROM OptionGroup WHERE id = :groupId")
+    suspend fun getOptionGroupName(groupId: Int): String?
 
     // Orders
     @Insert
@@ -254,6 +269,12 @@ interface CafeDao {
     @Query("SELECT COUNT(*) FROM Orders WHERE createdAt >= :startOfDay")
     fun getOrderCount(startOfDay: Long): Flow<Int>
 
+    @Query("SELECT COALESCE(SUM(oi.quantity), 0) FROM OrderItem oi JOIN Orders o ON oi.orderId = o.id WHERE o.createdAt >= :start AND o.createdAt <= :end AND o.status != 'CANCELLED'")
+    fun getProductUnitCount(start: Long, end: Long): Flow<Int>
+
+    @Query("SELECT COALESCE(SUM(oi.quantity), 0) FROM OrderItem oi JOIN Orders o ON oi.orderId = o.id WHERE o.createdAt >= :start AND o.createdAt <= :end AND o.status != 'CANCELLED'")
+    suspend fun getProductUnitCountNow(start: Long, end: Long): Int
+
     @Query("SELECT AVG(totalAmount) FROM Orders WHERE createdAt >= :startOfDay")
     fun getAverageOrderValue(startOfDay: Long): Flow<Double>
 
@@ -339,11 +360,14 @@ interface CafeDao {
     @Query("SELECT * FROM Staff ORDER BY name ASC")
     suspend fun getAllStaffNow(): List<Staff>
 
-    @Query("SELECT * FROM LoyaltyVoucher WHERE active = 1 AND endDate >= :now ORDER BY createdAt DESC")
+    @Query("SELECT * FROM LoyaltyVoucher WHERE active = 1 AND endDate >= :now AND (usageLimit <= 0 OR usedCount < usageLimit) ORDER BY createdAt DESC")
     fun getActiveVouchers(now: Long = System.currentTimeMillis()): Flow<List<LoyaltyVoucher>>
 
-    @Query("SELECT * FROM LoyaltyVoucher WHERE active = 1 AND endDate >= :now ORDER BY createdAt DESC")
+    @Query("SELECT * FROM LoyaltyVoucher WHERE active = 1 AND endDate >= :now AND (usageLimit <= 0 OR usedCount < usageLimit) ORDER BY createdAt DESC")
     suspend fun getActiveVouchersNow(now: Long = System.currentTimeMillis()): List<LoyaltyVoucher>
+
+    @Query("SELECT * FROM LoyaltyVoucher ORDER BY createdAt DESC")
+    suspend fun getAllVouchersNow(): List<LoyaltyVoucher>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVoucher(voucher: LoyaltyVoucher)
@@ -613,6 +637,12 @@ interface CafeDao {
 
     @Query("SELECT * FROM LoyaltySetting ORDER BY key ASC")
     suspend fun getAllLoyaltySettingsNow(): List<LoyaltySetting>
+
+    @Query("SELECT * FROM LoyaltySetting ORDER BY key ASC")
+    fun getAllLoyaltySettings(): Flow<List<LoyaltySetting>>
+
+    @Delete
+    suspend fun deleteLoyaltySetting(setting: LoyaltySetting)
 
     // AI Conversations
     @Query("SELECT * FROM AIConversation ORDER BY updatedAt DESC")

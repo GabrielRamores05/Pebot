@@ -4,603 +4,401 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import com.cafeos.tablet.data.Order
 import com.cafeos.tablet.ui.CafeViewModel
+import com.cafeos.tablet.ui.IngredientSpendInfo
+import com.cafeos.tablet.ui.IngredientSpendTrendPoint
+import com.cafeos.tablet.ui.ProductProfitInfo
 import com.cafeos.tablet.ui.theme.*
-import java.io.File
-import java.io.FileWriter
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.io.File
 import java.util.*
+import android.os.Environment
+import android.widget.Toast
+import android.content.ContentValues
+import android.provider.MediaStore
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.view.View
+import com.cafeos.tablet.ui.components.PremiumHeader
+import com.cafeos.tablet.ui.components.PremiumScreen
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun AnalyticsScreen(viewModel: CafeViewModel) {
     val orders by viewModel.allOrders.collectAsState(initial = emptyList())
-    val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
-    val dateFormatter = java.text.SimpleDateFormat("MMM dd", Locale.getDefault())
-
-    var selectedRange by remember { mutableStateOf("TODAY") }
-    val ranges = listOf("TODAY", "WEEK", "MONTH", "QUARTER", "YEAR", "ALL")
-
+    val expenses by viewModel.allExpenses.collectAsState(initial = emptyList())
+    val products by viewModel.allProducts.collectAsState(initial = emptyList())
+    val categories by viewModel.categories.collectAsState(initial = emptyList())
+    val settings by viewModel.businessSettings.collectAsState(initial = null)
+    val lowStockIngredients by viewModel.lowStockIngredients.collectAsState(initial = emptyList())
+    var range by remember { mutableStateOf("TODAY") }
+    var metrics by remember { mutableStateOf<com.cafeos.tablet.ui.PeriodMetrics?>(null) }
+    var productProfit by remember { mutableStateOf<List<ProductProfitInfo>>(emptyList()) }
+    var ingredientSpend by remember { mutableStateOf<List<IngredientSpendInfo>>(emptyList()) }
+    var ingredientSpendTrend by remember { mutableStateOf<List<IngredientSpendTrendPoint>>(emptyList()) }
+    var salesByHour by remember { mutableStateOf(List(24) { 0.0 }) }
+    var paymentMix by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
+    var categoryMix by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
+    var orderStatusMix by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
+    var peakDays by remember { mutableStateOf<List<Pair<String, Double>>>(emptyList()) }
+    var salesTrend by remember { mutableStateOf<List<IngredientSpendTrendPoint>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val formatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
     val now = System.currentTimeMillis()
-    val startOfDay = when (selectedRange) {
-        "TODAY" -> {
-            val cal = Calendar.getInstance().apply { clear(); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-            cal.timeInMillis
-        }
-        "WEEK" -> now - 7 * 24 * 3600_000L
-        "MONTH" -> now - 30 * 24 * 3600_000L
-        "QUARTER" -> now - 90 * 24 * 3600_000L
-        "YEAR" -> now - 365 * 24 * 3600_000L
+    val start = when (range) {
+        "TODAY" -> Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+        "YESTERDAY" -> Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+        "7 DAYS" -> now - 7 * 86400000L
+        "THIS MONTH" -> Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+        "THIS YEAR" -> Calendar.getInstance().apply { set(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
         else -> 0L
     }
-
-    val filteredOrders = if (selectedRange == "ALL") {
-        orders
-    } else {
-        orders.filter { it.createdAt >= startOfDay }
+    val visibleOrders = orders.filter { it.createdAt >= start && it.createdAt <= now && it.status != "CANCELLED" }
+    val rangeProductUnits by remember(range) { viewModel.getProductUnitCount(start, now) }.collectAsState(initial = 0)
+    val context = LocalContext.current
+    val dateFormatter = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+    val rangeLabel = when (range) {
+        "TODAY" -> "Today, ${dateFormatter.format(Date())}"
+        "YESTERDAY" -> "Yesterday, ${dateFormatter.format(Date(start))}"
+        else -> "${dateFormatter.format(Date(start))} to ${dateFormatter.format(Date(now))}"
     }
 
-    val totalSales = filteredOrders.sumOf { it.totalAmount }
-    val orderCount = filteredOrders.size
-    val avgOrderValue = if (orderCount > 0) totalSales / orderCount else 0.0
-    val salesByPaymentMethod = filteredOrders.groupBy { it.paymentMethod }.mapValues { it.value.sumOf { o -> o.totalAmount } }
-
-    var salesByDay by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
-    var dayLabels by remember { mutableStateOf<List<String>>(emptyList()) }
-    var salesByCategory by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
-    var topProducts by remember { mutableStateOf<List<ProductSalesInfo>>(emptyList()) }
-    var customerMetrics by remember { mutableStateOf<CustomerMetrics?>(null) }
-    var voucherMetrics by remember { mutableStateOf<VoucherMetrics?>(null) }
-
-    val productsState by viewModel.allProducts.collectAsState(initial = emptyList())
-    val categoriesState by viewModel.categories.collectAsState(initial = emptyList())
-    val customers by viewModel.allCustomers.collectAsState(initial = emptyList())
-    val vouchers by viewModel.activeVouchers.collectAsState(initial = emptyList())
-
-    LaunchedEffect(selectedRange, orders.size) {
-        val cal = Calendar.getInstance()
-        val newDayLabels = mutableListOf<String>()
-        val newSalesByDay = mutableMapOf<String, Double>()
-        when (selectedRange) {
-            "TODAY" -> {
-                for (h in 0..23) {
-                    val dayCal = Calendar.getInstance().apply { clear(); set(Calendar.HOUR_OF_DAY, h); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                    val label = String.format("%02d:00", h)
-                    newDayLabels.add(label)
-                    val hourMs = dayCal.timeInMillis
-                    newSalesByDay[label] = filteredOrders.filter { it.createdAt >= hourMs && it.createdAt < hourMs + 3600_000L }.sumOf { it.totalAmount }
-                }
-            }
-            "WEEK" -> {
-                for (d in 6 downTo 0) {
-                    cal.timeInMillis = now - d * 24 * 3600_000L
-                    val label = dateFormatter.format(Date(cal.timeInMillis))
-                    newDayLabels.add(label)
-                    val dayStart = cal.apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
-                    newSalesByDay[label] = filteredOrders.filter { it.createdAt >= dayStart && it.createdAt < dayStart + 24 * 3600_000L }.sumOf { it.totalAmount }
-                }
-            }
-            "MONTH", "QUARTER", "YEAR" -> {
-                filteredOrders.groupBy { dateFormatter.format(Date(it.createdAt)) }.forEach { (k, v) ->
-                    newDayLabels.add(k)
-                    newSalesByDay[k] = v.sumOf { it.totalAmount }
-                }
-            }
-            "ALL" -> {
-                val months = linkedMapOf<String, Double>()
-                val monthFmt = java.text.SimpleDateFormat("MMM yyyy", Locale.getDefault())
-                filteredOrders.groupBy { monthFmt.format(Date(it.createdAt)) }.forEach { (k, v) ->
-                    months[k] = v.sumOf { it.totalAmount }
-                }
-                newDayLabels.addAll(months.keys.toList())
-                months.forEach { (k, v) -> newSalesByDay[k] = v }
-            }
-        }
-        dayLabels = newDayLabels
-        salesByDay = newSalesByDay
-
-        val catMap = categoriesState.associateBy { it.id }
-        val prodMap = productsState.associateBy { it.id }
-        val newCatSales = mutableMapOf<String, Double>()
-        filteredOrders.forEach { order ->
+    LaunchedEffect(range, orders, expenses, products, categories) {
+        metrics = viewModel.calculatePeriodMetrics(visibleOrders, start, now)
+        productProfit = viewModel.calculateProductProfitability(visibleOrders)
+        ingredientSpend = viewModel.calculateIngredientSpend(visibleOrders).take(8)
+        ingredientSpendTrend = viewModel.calculateIngredientSpendTrend(visibleOrders)
+        salesByHour = List(24) { hour -> visibleOrders.filter { Calendar.getInstance().apply { timeInMillis = it.createdAt }.get(Calendar.HOUR_OF_DAY) == hour }.sumOf { it.totalAmount } }
+        paymentMix = visibleOrders.groupBy { it.paymentMethod }.mapValues { (_, values) -> values.sumOf { it.totalAmount } }
+        orderStatusMix = visibleOrders.groupBy { it.status }.mapValues { (_, values) -> values.size.toDouble() }
+        val weekdayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+        val weekdaySales = visibleOrders.groupBy { order ->
+            val day = Calendar.getInstance().apply { timeInMillis = order.createdAt }.get(Calendar.DAY_OF_WEEK)
+            weekdayNames[(day + 5) % 7]
+        }.mapValues { (_, dayOrders) -> dayOrders.sumOf { it.totalAmount } }
+        val dailySales = visibleOrders.groupBy { order ->
+            Calendar.getInstance().apply {
+                timeInMillis = order.createdAt
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        }.toSortedMap()
+        salesTrend = dailySales.map { (day, dayOrders) -> IngredientSpendTrendPoint(day, dayOrders.sumOf { it.totalAmount }) }
+        peakDays = weekdayNames.map { it to (weekdaySales[it] ?: 0.0) }
+        val categoryMap = categories.associateBy { it.id }
+        val mix = mutableMapOf<String, Double>()
+        visibleOrders.forEach { order ->
             viewModel.getOrderItemsSync(order.id).forEach { item ->
-                val prod = prodMap[item.productId]
-                val cat = prod?.let { catMap[it.categoryId] }
-                if (cat != null) {
-                    newCatSales[cat.name] = (newCatSales[cat.name] ?: 0.0) + item.subtotal
-                }
+                categoryMap[products.find { it.id == item.productId }?.categoryId]?.name?.let { name -> mix[name] = (mix[name] ?: 0.0) + item.subtotal }
             }
         }
-        salesByCategory = newCatSales
-
-        val productSales = mutableMapOf<Int, ProductSalesInfo>()
-        filteredOrders.forEach { order ->
-            viewModel.getOrderItemsSync(order.id).forEach { item ->
-                val prod = prodMap[item.productId]
-                if (prod != null) {
-                    val existing = productSales[prod.id]
-                    productSales[prod.id] = existing?.let {
-                        it.copy(quantity = it.quantity + item.quantity, revenue = it.revenue + item.subtotal)
-                    } ?: ProductSalesInfo(name = prod.name, quantity = item.quantity, revenue = item.subtotal)
-                }
-            }
-        }
-        topProducts = productSales.values.sortedByDescending { it.revenue }.take(5)
-
-        val customerNames = filteredOrders.mapNotNull { it.customerName }.toSet()
-        val customerOrderCounts = mutableMapOf<String, Int>()
-        val customerTotalSpents = mutableMapOf<String, Double>()
-        filteredOrders.forEach { order ->
-            val name = order.customerName
-            if (name.isNotBlank()) {
-                customerOrderCounts[name] = (customerOrderCounts[name] ?: 0) + 1
-                customerTotalSpents[name] = (customerTotalSpents[name] ?: 0.0) + order.totalAmount
-            }
-        }
-        val totalCustomerRevenue = customerTotalSpents.values.sum()
-        val avgCustomerSpent = if (customerTotalSpents.isNotEmpty()) totalCustomerRevenue / customerTotalSpents.size else 0.0
-        customerMetrics = CustomerMetrics(
-            totalCustomers = customerNames.size,
-            avgSpentPerCustomer = avgCustomerSpent,
-            topCustomers = customerTotalSpents.entries.sortedByDescending { it.value }.take(5).map { CustomerSpending(it.key, it.value, customerOrderCounts[it.key] ?: 0) }
-        )
-
-        val totalVoucherUses = vouchers.sumOf { it.usedCount }
-        val totalVoucherSavings = vouchers.sumOf { it.discountValue * it.usedCount }
-        voucherMetrics = VoucherMetrics(
-            totalVouchers = vouchers.size,
-            totalUses = totalVoucherUses,
-            totalSavings = totalVoucherSavings,
-            redemptionRates = vouchers.map { it.code to if (it.usageLimit > 0) (it.usedCount.toDouble() / it.usageLimit * 100.0) else 0.0 }
-        )
+        categoryMix = mix
+        isLoading = false
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PosCoffee)
-            .padding(20.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Default.BarChart, contentDescription = null, tint = PosGold, modifier = Modifier.size(28.dp))
-                Text("Analytics", style = MaterialTheme.typography.headlineMedium, color = PosPaper)
+    PremiumScreen {
+        PremiumHeader(
+            "Business Analytics",
+            rangeLabel,
+            action = {
+                IconButton(onClick = {
+                    val savedName = captureAnalyticsScreen(context)
+                    Toast.makeText(context, savedName ?: "Unable to capture Analytics", Toast.LENGTH_SHORT).show()
+                }) {
+                    Icon(Icons.Default.PhotoCamera, contentDescription = "Capture Analytics", tint = PosAccent)
+                }
             }
-            TextButton(onClick = {
-                selectedRange = "ALL"
-            }) { Text("Reset", color = PosMuted) }
-            TextButton(onClick = {
-                exportReport(
-                    filteredOrders,
-                    currencyFormatter,
-                    android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS).absolutePath + "/Pebot_Analytics_" + java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date()) + ".csv"
-                )
-            }) {
-                Icon(Icons.Default.FileDownload, contentDescription = "Export CSV", tint = PosGold, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Export CSV", color = PosGold)
-            }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-
-        ScrollableTabRow(
-            selectedTabIndex = ranges.indexOf(selectedRange),
-            edgePadding = 0.dp,
-            divider = {},
-            containerColor = PosCoffeeLight,
-            contentColor = PosGold
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            ranges.forEach { range ->
-                Tab(
-                    selected = selectedRange == range,
-                    onClick = { selectedRange = range },
-                    text = { Text(range) }
-                )
+            listOf("TODAY", "YESTERDAY", "7 DAYS", "THIS MONTH", "THIS YEAR").forEach { option ->
+                FilterChip(selected = range == option, onClick = { range = option }, label = { Text(option, style = MaterialTheme.typography.labelSmall) }, shape = RoundedCornerShape(50.dp), colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PosCoffeeDeep, selectedLabelColor = Color.White, containerColor = PosSurface, labelColor = PosInkSoft))
             }
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = PosAccent),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text("Gross Sales", style = MaterialTheme.typography.titleMedium, color = PosPaper.copy(alpha = 0.9f))
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            currencyFormatter.format(totalSales),
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = PosPaper,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Orders", style = MaterialTheme.typography.labelMedium, color = PosMuted)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "$orderCount", style = MaterialTheme.typography.headlineMedium, color = PosPaper, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Avg Order", style = MaterialTheme.typography.labelMedium, color = PosMuted)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = currencyFormatter.format(avgOrderValue), style = MaterialTheme.typography.headlineMedium, color = PosGold, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            item {
-                if (dayLabels.isNotEmpty()) {
-                    Text("Sales Trend", style = MaterialTheme.typography.titleLarge, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.BottomEnd
-                    ) {
-                        val animatedProgress by animateFloatAsState(targetValue = 1f, animationSpec = androidx.compose.animation.core.tween(durationMillis = 800))
-                        Canvas(modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 24.dp, end = 8.dp, bottom = 24.dp)
-                        ) {
-                            val maxVal = salesByDay.values.maxOrNull() ?: 1.0
-                            val actualMax = if (maxVal > 0) maxVal else 1.0
-                            val barWidth = size.width / (dayLabels.size * 2)
-                            val chartHeight = size.height
-
-                            dayLabels.forEachIndexed { index, label ->
-                                val barHeight = (salesByDay[label] ?: 0.0) / actualMax * chartHeight * 0.8f * animatedProgress
-                                val left = index * (barWidth * 2) + 4
-                                val top = chartHeight - barHeight
-                                drawRoundRect(
-                                    color = PosGold,
-                                    topLeft = Offset(left.toFloat(), top.toFloat()),
-                                    size = Size(barWidth - 4, barHeight.toFloat()),
-                                    cornerRadius = CornerRadius(8f)
-                                )
-                            }
-
-                            drawLine(
-                                color = PosMuted,
-                                strokeWidth = 2f,
-                                start = Offset(0f, chartHeight),
-                                end = Offset(size.width, chartHeight)
-                            )
-                            drawLine(
-                                color = PosMuted,
-                                strokeWidth = 1f,
-                                start = Offset(0f, chartHeight * 0.5f),
-                                end = Offset(size.width, chartHeight * 0.5f)
-                            )
-                            drawContext.canvas.nativeCanvas.apply {
-                                drawText(
-                                    currencyFormatter.format(actualMax).takeIf { it.isNotBlank() } ?: "",
-                                    0f,
-                                    chartHeight * 0.5f - 16,
-                                    android.text.TextPaint().apply { textSize = 24f; color = android.graphics.Color.parseColor("#FFFFFF"); typeface = android.graphics.Typeface.DEFAULT_BOLD; isAntiAlias = true }
-                                )
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            dayLabels.forEach { label ->
-                                Text(label, style = MaterialTheme.typography.bodySmall, color = PosMuted)
-                            }
-                        }
-                    }
-                }
-            }
-
-            customerMetrics?.let { metrics ->
-                if (metrics.totalCustomers > 0) {
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Customer Analytics", style = MaterialTheme.typography.titleLarge, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                    item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Card(
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Customers", style = MaterialTheme.typography.labelMedium, color = PosMuted)
-                                    Text("${metrics.totalCustomers}", style = MaterialTheme.typography.headlineMedium, color = PosPaper, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Card(
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Avg Spent", style = MaterialTheme.typography.labelMedium, color = PosMuted)
-                                    Text(currencyFormatter.format(metrics.avgSpentPerCustomer), style = MaterialTheme.typography.headlineMedium, color = PosGold, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                    items(metrics.topCustomers, key = { it.name }) { customer ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(customer.name, style = MaterialTheme.typography.bodyLarge, color = PosPaper, fontWeight = FontWeight.Medium)
-                                    Text("${customer.orders} orders", style = MaterialTheme.typography.bodySmall, color = PosMuted)
-                                }
-                                Text(currencyFormatter.format(customer.totalSpent), style = MaterialTheme.typography.titleMedium, color = PosGold, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-
-            voucherMetrics?.let { metrics ->
-                if (metrics.totalVouchers > 0) {
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Voucher Analytics", style = MaterialTheme.typography.titleLarge, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                    item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Card(
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Active Vouchers", style = MaterialTheme.typography.labelMedium, color = PosMuted)
-                                    Text("${metrics.totalVouchers}", style = MaterialTheme.typography.headlineMedium, color = PosPaper, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Card(
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Total Savings", style = MaterialTheme.typography.labelMedium, color = PosMuted)
-                                    Text(currencyFormatter.format(metrics.totalSavings), style = MaterialTheme.typography.headlineMedium, color = PosGold, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                    items(metrics.redemptionRates, key = { it.first }) { (code, rate) ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(code, style = MaterialTheme.typography.bodyLarge, color = PosPaper, fontWeight = FontWeight.Medium)
-                                    Text("${metrics.totalUses} uses", style = MaterialTheme.typography.bodySmall, color = PosMuted)
-                                }
-                                Text("${"%.1f".format(rate)}%", style = MaterialTheme.typography.titleMedium, color = PosGold, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (salesByPaymentMethod.isNotEmpty()) {
+        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (isLoading) {
                 item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Payment Method Breakdown", style = MaterialTheme.typography.titleLarge, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    PieChart(data = salesByPaymentMethod)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    LoadingPanel()
                 }
-                items(salesByPaymentMethod.entries.toList()) { (method, total) ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(method, style = MaterialTheme.typography.bodyLarge, color = PosPaper, fontWeight = FontWeight.Medium)
-                            Text(currencyFormatter.format(total), style = MaterialTheme.typography.titleMedium, color = PosGold, fontWeight = FontWeight.Bold)
-                        }
-                    }
+            } else if (visibleOrders.isEmpty()) {
+                item {
+                    EmptyAnalyticsPanel(range)
                 }
             }
-
-            if (salesByCategory.isNotEmpty()) {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Category Breakdown", style = MaterialTheme.typography.titleLarge, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-                items(salesByCategory.entries.toList()) { (cat, total) ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(cat, style = MaterialTheme.typography.bodyLarge, color = PosPaper, fontWeight = FontWeight.Medium)
-                            Text(currencyFormatter.format(total), style = MaterialTheme.typography.titleMedium, color = PosGold, fontWeight = FontWeight.Bold)
-                        }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    KpiCard(Modifier.weight(1f), "Total Sales", metrics?.totalRevenue ?: 0.0, formatter, Icons.Default.AttachMoney, PosAccent)
+                            KpiCard(Modifier.weight(1f), "Gross Profit", metrics?.grossProfit ?: 0.0, formatter, Icons.Default.TrendingUp, PosAccent)
+                            KpiCard(Modifier.weight(1f), "Net Profit", metrics?.netProfit ?: 0.0, formatter, Icons.Default.AccountBalance, PosGold)
                     }
-                }
-            }
-
-            if (topProducts.isNotEmpty()) {
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Top Products", style = MaterialTheme.typography.titleLarge, color = PosPaper, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-                items(topProducts) { prod ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = PosCoffeeLight),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(prod.name, style = MaterialTheme.typography.bodyLarge, color = PosPaper, fontWeight = FontWeight.Medium)
-                                Text("${prod.quantity} sold", style = MaterialTheme.typography.bodySmall, color = PosMuted)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            KpiCard(Modifier.weight(1f), "COGS", metrics?.totalCOGS ?: 0.0, formatter, Icons.Default.Inventory, PosDanger)
+                            KpiCard(Modifier.weight(1f), "Total Orders", visibleOrders.size.toDouble(), NumberFormat.getIntegerInstance(), Icons.Default.ReceiptLong, PosGold)
+                            KpiCard(Modifier.weight(1f), "Avg Order", if (visibleOrders.isEmpty()) 0.0 else visibleOrders.sumOf { it.totalAmount } / visibleOrders.size, formatter, Icons.Default.TrendingUp, PosAccent)
+                            if (settings?.dailyQuotaTarget ?: 0.0 > 0.0) {
+                                val achieved = if (settings?.dailyQuotaMode == "REVENUE") visibleOrders.sumOf { it.totalAmount } else rangeProductUnits.toDouble()
+                                KpiCard(Modifier.weight(1f), "Daily Quota", achieved, if (settings?.dailyQuotaMode == "REVENUE") formatter else NumberFormat.getIntegerInstance(), Icons.Default.Flag, PosGold)
                             }
-                            Text(currencyFormatter.format(prod.revenue), style = MaterialTheme.typography.titleMedium, color = PosGold, fontWeight = FontWeight.Bold)
-                        }
                     }
+                }
+            }
+            item {
+                val quotaTarget = settings?.dailyQuotaTarget ?: 0.0
+                val quotaMode = settings?.dailyQuotaMode ?: "ORDERS"
+                val quotaValue = if (quotaMode == "REVENUE") visibleOrders.sumOf { it.totalAmount } else rangeProductUnits.toDouble()
+                AnalyticsQuotaPanel(quotaValue, quotaTarget, quotaMode, formatter)
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    KpiCard(Modifier.weight(1f), "Operating Expenses", metrics?.totalExpenses ?: 0.0, formatter, Icons.Default.Receipt, PosDanger)
+                    KpiCard(Modifier.weight(1f), "Profit Margin", if ((metrics?.totalRevenue ?: 0.0) > 0.0) ((metrics?.netProfit ?: 0.0) / (metrics?.totalRevenue ?: 1.0) * 100.0) else 0.0, NumberFormat.getNumberInstance().apply { maximumFractionDigits = 1 }, Icons.Default.Percent, PosAccent)
+                }
+            }
+            item {
+                        ReportPanel("Sales Trend", onExport = {
+                    val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "CafeOS_Analytics_${range.replace(' ', '-')}.csv")
+                    exportReport(visibleOrders, formatter, file.absolutePath)
+                    Toast.makeText(context, "Exported ${file.name}", Toast.LENGTH_SHORT).show()
+                }) { TrendChart(salesTrend, PosGold) }
+            }
+            item {
+                ReportPanel("Order Status") { HorizontalBarChart(orderStatusMix.toList(), NumberFormat.getIntegerInstance(), PosAccent) }
+            }
+            item {
+                ReportPanel("Peak Hours") { BarChart(values = salesByHour, color = PosGold) }
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ReportPanel(Modifier.weight(1f), "Mode of Payment") { HorizontalBarChart(paymentMix.toList(), formatter, PosAccent) }
+                    ReportPanel(Modifier.weight(1f), "Peak Days") { HorizontalBarChart(peakDays, formatter, PosGold) }
+                }
+            }
+            item {
+                ReportPanel("Sales by Category") { HorizontalBarChart(categoryMix.toList(), formatter, PosAccent) }
+            }
+            item {
+                ReportPanel("Best Sellers: Top 5") { HorizontalBarChart(productProfit.take(5).map { it.name to it.revenue }, formatter, PosGold) }
+            }
+            item {
+                ReportPanel("Profit by Product: All Products") { HorizontalBarChart(productProfit.map { it.name to it.profit }, formatter, PosAccent) }
+            }
+            if (ingredientSpend.isNotEmpty()) {
+                item {
+                    ReportPanel("Ingredient Spend Trend") {
+                        TrendChart(ingredientSpendTrend, PosDanger)
+                    }
+                }
+                item { ReportPanel("Ingredient Spend by Item") { ingredientSpend.forEach { item -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(item.name, color = PosInk); Text(formatter.format(item.amount), color = PosDanger, fontWeight = FontWeight.Bold) } } } }
+            }
+            item {
+                ReportPanel("Low Stock Ingredients") {
+                    if (lowStockIngredients.isEmpty()) Text("All ingredients are above minimum stock.", color = PosInkSoft)
+                    else lowStockIngredients.forEach { ingredient -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(ingredient.name, color = PosInk); Text("${ingredient.currentStock} ${ingredient.baseUnit}", color = PosDanger, fontWeight = FontWeight.Bold) } }
                 }
             }
         }
     }
 }
-
-fun exportReport(orders: List<Order>, formatter: NumberFormat, filePath: String) {
-    try {
-        val file = File(filePath)
-        val writer = FileWriter(file)
-        writer.append("Order Number,Customer,Date,Total Amount,Payment Method,Order Type,Status\n")
-        val dateFmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-        orders.forEach { order ->
-            writer.append("${order.orderNumber},")
-            writer.append("${order.customerName},")
-            writer.append("${dateFmt.format(Date(order.createdAt))},")
-            writer.append("${formatter.format(order.totalAmount).replace(",", "")},")
-            writer.append("${order.paymentMethod},")
-            writer.append("${order.orderType},")
-            writer.append("${order.status}\n")
-        }
-        writer.flush()
-        writer.close()
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-}
-
-data class ProductSalesInfo(val name: String, val quantity: Int, val revenue: Double)
-
-data class CustomerMetrics(
-    val totalCustomers: Int,
-    val avgSpentPerCustomer: Double,
-    val topCustomers: List<CustomerSpending>
-)
-
-data class CustomerSpending(
-    val name: String,
-    val totalSpent: Double,
-    val orders: Int
-)
-
-data class VoucherMetrics(
-    val totalVouchers: Int,
-    val totalUses: Int,
-    val totalSavings: Double,
-    val redemptionRates: List<Pair<String, Double>>
-)
 
 @Composable
-fun PieChart(data: Map<String, Double>, modifier: Modifier = Modifier, colors: List<Color> = listOf(PosAccent, PosGold, Color(0xFF60A5FA), PosDanger, PosInkSoft)) {
-    if (data.isEmpty()) return
-    val total = data.values.sum()
-    if (total <= 0) return
-    val animatedProgress by animateFloatAsState(targetValue = 1f, animationSpec = androidx.compose.animation.core.tween(durationMillis = 1000))
-    Card(modifier = modifier.fillMaxWidth().height(200.dp), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)) {
-        Box(modifier = Modifier.padding(16.dp)) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = Offset(size.width / 2, size.height / 2)
-                val radius = minOf(size.width, size.height) / 2 * 0.8f
-                var startAngle = -90f
-                val sweepAngles = data.values.map { (it / total * 360f * animatedProgress).toFloat() }
-                sweepAngles.forEachIndexed { index, sweep ->
-                    drawArc(
-                        color = colors[index % colors.size],
-                        startAngle = startAngle,
-                        sweepAngle = sweep,
-                        useCenter = true,
-                        topLeft = Offset(center.x - radius, center.y - radius),
-                        size = Size(radius * 2, radius * 2)
-                    )
-                    startAngle += sweep
+private fun KpiCard(modifier: Modifier, label: String, value: Double, formatter: NumberFormat, icon: androidx.compose.ui.graphics.vector.ImageVector, accent: Color) {
+    Card(modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(PosSurface), elevation = CardDefaults.cardElevation(2.dp)) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(color = accent.copy(alpha = .13f), shape = RoundedCornerShape(8.dp)) { Icon(icon, null, tint = accent, modifier = Modifier.padding(7.dp).size(16.dp)) }
+            Spacer(Modifier.width(8.dp))
+            Column { Text(formatter.format(value), color = PosInk, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Text(label, color = PosInkSoft, style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+}
+
+@Composable
+private fun AnalyticsQuotaPanel(current: Double, target: Double, mode: String, formatter: NumberFormat) {
+    ReportPanel("Daily Quota") {
+        if (target <= 0.0) {
+            Text("No daily quota configured. Set one in Settings > Business.", color = PosInkSoft, style = MaterialTheme.typography.bodyMedium)
+        } else {
+            val progress = (current / target).coerceIn(0.0, 1.0).toFloat()
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text(if (mode == "REVENUE") formatter.format(current) else "${current.toInt()} products", color = PosInk, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("of ${if (mode == "REVENUE") formatter.format(target) else "${target.toInt()} products"}", color = PosInkSoft, style = MaterialTheme.typography.bodySmall)
+                }
+                Text(if (progress >= 1f) "Reached" else "${(progress * 100).toInt()}%", color = if (progress >= 1f) PosAccent else PosGold, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(progress = progress, modifier = Modifier.fillMaxWidth().height(8.dp), color = if (progress >= 1f) PosAccent else PosGold, trackColor = PosBorder)
+            Text(if (progress >= 1f) "Daily target reached." else "${if (mode == "REVENUE") formatter.format((target - current).coerceAtLeast(0.0)) else "${(target - current).coerceAtLeast(0.0).toInt()} products"} remaining", color = PosInkSoft, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+}
+
+@Composable
+private fun ReportPanel(title: String, onExport: () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) = ReportPanel(Modifier.fillMaxWidth(), title, onExport, content)
+
+@Composable
+private fun ReportPanel(modifier: Modifier, title: String, onExport: () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
+    Card(modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(PosSurface), elevation = CardDefaults.cardElevation(2.dp)) {
+        Column(Modifier.padding(16.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(title, color = PosInk, fontWeight = FontWeight.Bold); IconButton(onClick = onExport, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.FileDownload, "Export", tint = PosInkSoft, modifier = Modifier.size(16.dp)) } }; Spacer(Modifier.height(10.dp)); content() }
+    }
+}
+
+private fun captureAnalyticsScreen(context: android.content.Context): String? {
+    val view = (context as? android.app.Activity)?.window?.decorView ?: return null
+    if (view.width <= 0 || view.height <= 0) return null
+    return try {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(AndroidCanvas(bitmap))
+        val name = "CafeOS_Analytics_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.png"
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CafeOS")
+        }
+        val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
+        context.contentResolver.openOutputStream(uri)?.use { output -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, output) }
+        bitmap.recycle()
+        "Saved $name"
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@Composable
+private fun BarChart(values: List<Double>, color: Color) {
+    var selectedIndex by remember(values) { mutableStateOf<Int?>(null) }
+    val max = values.maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
+    val progress by animateFloatAsState(1f, label = "chart")
+    Box(Modifier.fillMaxWidth().height(210.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(180.dp).pointerInput(values) {
+            detectTapGestures { position ->
+                if (values.isNotEmpty()) {
+                    selectedIndex = (position.x / (size.width / values.size)).toInt().coerceIn(0, values.lastIndex)
+                }
+            }
+        }) {
+            values.forEachIndexed { index, value ->
+                val width = size.width / values.size
+                val height = (value / max * size.height * .88f * progress).toFloat()
+                drawRoundRect(color, Offset(index * width + width * .18f, size.height - height), androidx.compose.ui.geometry.Size(width * .64f, height), androidx.compose.ui.geometry.CornerRadius(5f))
+            }
+            drawLine(PosBorder, Offset(0f, size.height), Offset(size.width, size.height), 2f)
+        }
+        selectedIndex?.let { index ->
+            Surface(color = PosCoffeeDeep, shape = RoundedCornerShape(8.dp), modifier = Modifier.align(Alignment.TopCenter)) {
+                Text("${formatHour(index)}  ${NumberFormat.getCurrencyInstance(Locale("en", "PH")).format(values[index])}", color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 184.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf(0, 6, 12, 18, 23).forEach { Text(formatHour(it), color = PosInkSoft, style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+}
+
+private fun formatHour(hour: Int): String {
+    val normalized = hour % 24
+    val displayHour = when {
+        normalized == 0 -> 12
+        normalized > 12 -> normalized - 12
+        else -> normalized
+    }
+    val period = if (normalized < 12) "AM" else "PM"
+    return "$displayHour $period"
+}
+
+@Composable
+private fun TrendChart(points: List<IngredientSpendTrendPoint>, color: Color) {
+    var selectedIndex by remember(points) { mutableStateOf<Int?>(null) }
+    val max = points.maxOfOrNull { it.amount }?.coerceAtLeast(1.0) ?: 1.0
+    Box(Modifier.fillMaxWidth().height(210.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(180.dp).pointerInput(points) {
+            detectTapGestures { position ->
+                if (points.isNotEmpty()) {
+                    val spacing = size.width / points.size.coerceAtLeast(1)
+                    selectedIndex = (position.x / spacing).toInt().coerceIn(0, points.lastIndex)
+                }
+            }
+        }) {
+        if (points.isEmpty()) return@Canvas
+        val width = if (points.size == 1) size.width else size.width / (points.size - 1)
+        val coordinates = points.mapIndexed { index, point ->
+            Offset(index * width, size.height - (point.amount / max * size.height * .88f).toFloat())
+        }
+        drawLine(PosBorder, Offset(0f, size.height), Offset(size.width, size.height), 2f)
+        coordinates.zipWithNext().forEach { (from, to) -> drawLine(color, from, to, 5f) }
+        coordinates.forEach { point -> drawCircle(color, 7f, point) }
+        }
+        selectedIndex?.let { index ->
+            val point = points[index]
+            Surface(color = PosCoffeeDeep, shape = RoundedCornerShape(8.dp), modifier = Modifier.align(Alignment.TopCenter)) {
+                Text("${SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(point.day))}  ${NumberFormat.getCurrencyInstance(Locale("en", "PH")).format(point.amount)}", color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+            }
+        }
+        if (points.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth().padding(top = 184.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf(points.first(), points[points.size / 2], points.last()).distinctBy { it.day }.forEach { point ->
+                    Text(SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(point.day)), color = PosInkSoft, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
     }
 }
+
+@Composable
+private fun LoadingPanel() {
+    ReportPanel("Loading analytics") {
+        Row(Modifier.fillMaxWidth().padding(vertical = 26.dp), horizontalArrangement = Arrangement.Center) {
+            CircularProgressIndicator(color = PosAccent, modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+        }
+    }
+}
+
+@Composable
+private fun EmptyAnalyticsPanel(range: String) {
+    ReportPanel("No sales in $range") {
+        Text("Try a wider date range to see performance trends.", color = PosInkSoft, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun HorizontalBarChart(data: List<Pair<String, Double>>, formatter: NumberFormat, color: Color) {
+    if (data.isEmpty()) {
+        Text("No data for this range.", color = PosInkSoft, style = MaterialTheme.typography.bodyMedium)
+        return
+    }
+    val max = data.maxOf { it.second }.coerceAtLeast(1.0)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        data.forEach { (label, value) ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(label, color = PosInk, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                    Text(formatter.format(value), color = color, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+                LinearProgressIndicator(progress = (value / max).toFloat().coerceIn(0f, 1f), modifier = Modifier.fillMaxWidth().height(7.dp), color = color, trackColor = PosMuted.copy(alpha = .3f))
+            }
+        }
+    }
+}
+
+fun exportReport(orders: List<Order>, formatter: NumberFormat, filePath: String) { try { File(filePath).bufferedWriter().use { writer -> writer.appendLine("Order Number,Customer,Date,Total Amount,Payment Method,Order Type,Status"); val dateFmt = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()); orders.forEach { writer.appendLine("${it.orderNumber},${it.customerName},${dateFmt.format(Date(it.createdAt))},${formatter.format(it.totalAmount).replace(",", "")},${it.paymentMethod},${it.orderType},${it.status}") } } } catch (_: Exception) { } }
