@@ -39,6 +39,7 @@ import com.cafeos.tablet.ui.components.PremiumHeader
 import com.cafeos.tablet.ui.components.PremiumScreen
 import com.cafeos.tablet.ui.theme.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -168,7 +169,9 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
     var showAdjustDialog by remember { mutableStateOf<Ingredient?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
     var showPurchaseDialog by remember { mutableStateOf(false) }
+    var historyIngredient by remember { mutableStateOf<Ingredient?>(null) }
     val scope = rememberCoroutineScope()
+    val supplierById = suppliers.associateBy { it.id }
     var importMessage by remember { mutableStateOf<String?>(null) }
     val templateLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         uri?.let { scope.launch { viewModel.writeIngredientsTemplate(it) } }
@@ -233,6 +236,33 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
                         if (isLow) {
                             Text("Low Stock", color = PosDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
+                        ingredient.lastSupplierId?.let { supplierId ->
+                            supplierById[supplierId]?.let { supplier ->
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Last from: ${supplier.name}",
+                                    color = PosAccent,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text(
+                                "History",
+                                color = PosInfo,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clickable { historyIngredient = ingredient }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -271,6 +301,15 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
                 viewModel.adjustStock(ingredient, delta, notes)
                 showAdjustDialog = null
             }
+        )
+    }
+
+    historyIngredient?.let { ingredient ->
+        IngredientHistoryDialog(
+            ingredient = ingredient,
+            suppliers = suppliers,
+            viewModel = viewModel,
+            onDismiss = { historyIngredient = null }
         )
     }
 
@@ -983,6 +1022,121 @@ fun PurchaseIngredientDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(20.dp)
+    )
+}
+
+/** Purchase history for one ingredient with supplier and price change vs previous (spec 014, US2). */
+@Composable
+fun IngredientHistoryDialog(
+    ingredient: Ingredient,
+    suppliers: List<Supplier>,
+    viewModel: CafeViewModel,
+    onDismiss: () -> Unit
+) {
+    var transactions by remember(ingredient.id) { mutableStateOf<List<IngredientTransaction>?>(null) }
+    val supplierById = suppliers.associateBy { it.id }
+    val formatter = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
+    val dateFormatter = SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault())
+
+    LaunchedEffect(ingredient.id) {
+        transactions = viewModel.getTransactionsForIngredient(ingredient.id).first()
+    }
+
+    // Purchase rows in ledger (id) order with the change vs the previous
+    // non-void purchase — row-id order, not timestamps, defines "previous".
+    val rows = remember(transactions) {
+        val purchases = transactions.orEmpty()
+            .filter { it.type == "PURCHASE" }
+            .sortedBy { it.id }
+        val seen = java.util.ArrayDeque<Double>() // previous unit costs, ledger order
+        purchases.map { txn ->
+            val previousCost = seen.peekLast()
+            if (txn.unitCost != null) seen.addLast(txn.unitCost!!)
+            Triple(txn, previousCost, PriceTrends.change(previousCost, txn.unitCost ?: 0.0))
+        }.asReversed()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${ingredient.name} — Purchase History", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.height(420.dp)) {
+                if (transactions == null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = PosAccent)
+                    }
+                } else if (rows.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No purchases recorded yet.", color = PosMuted)
+                    }
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(rows.size) { index ->
+                            val (txn, previousCost, change) = rows[index]
+                            val supplier = txn.referenceId?.let { supplierById[it] }
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = PosCoffeeLight)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            dateFormatter.format(Date(txn.createdAt)),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = PosMuted
+                                        )
+                                        if (supplier != null) {
+                                            Text(
+                                                supplier.name,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = PosAccent,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        } else {
+                                            Text("No supplier", style = MaterialTheme.typography.labelMedium, color = PosMuted)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                        Column {
+                                            val qtyDisplay = if (!txn.purchaseUnit.isNullOrBlank()) {
+                                                "${trimStock(txn.quantity)} ${ingredient.baseUnit} (${txn.purchaseUnit} bought)"
+                                            } else {
+                                                "${trimStock(txn.quantity)} ${ingredient.baseUnit}"
+                                            }
+                                            Text(qtyDisplay, style = MaterialTheme.typography.bodyMedium, color = PosPaper)
+                                            txn.unitCost?.let { unit ->
+                                                Text("Unit cost: ${formatter.format(unit)}", style = MaterialTheme.typography.bodyMedium, color = PosPaper)
+                                            }
+                                            txn.purchaseCost?.let { total ->
+                                                Text("Total: ${formatter.format(total)}", style = MaterialTheme.typography.bodySmall, color = PosMuted)
+                                            }
+                                            if (change != null) {
+                                                val up = change.delta >= 0
+                                                Text(
+                                                    text = if (previousCost == null) "" else "${if (up) "+" else ""}${formatter.format(change.delta)} (${if (up) "+" else ""}${"%.2f".format(change.percent)}%) vs previous",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = if (up) PosDanger else PosAccent,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            } else {
+                                                Text("First purchase — no previous price", style = MaterialTheme.typography.bodySmall, color = PosMuted)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp)

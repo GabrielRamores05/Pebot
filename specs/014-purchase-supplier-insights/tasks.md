@@ -73,8 +73,8 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 **Independent Test**: quickstart QS-2 â€” after two purchases of the same ingredient, detail shows the exact â‚± and % change.
 
-- [ ] T012 [US2] Tablet data: DAO queries for latest purchase per ingredient and previous purchase per ingredient (row-id ordering, ignoring VOID) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt` + ViewModel accessors in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`
-- [ ] T013 [US2] Tablet UI: ingredient card shows latest supplier name (from `lastSupplierId`) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt`; clicking a history row opens a detail dialog with supplier, entered/base quantities, total, unit cost, â‚± and % change vs previous
+- [X] T012 [US2] Tablet data: DAO queries for latest purchase per ingredient and previous purchase per ingredient (row-id ordering, ignoring VOID) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt` + ViewModel accessors in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`
+- [X] T013 [US2] Tablet UI: ingredient card shows latest supplier name (from `lastSupplierId`) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt`; clicking a history row opens a detail dialog with supplier, entered/base quantities, total, unit cost, â‚± and % change vs previous
 - [ ] T014 [US2] Web: trend queries in `my-app/modules/inventory/repository.ts` + service, UI for ingredient detail/history in `my-app/app/admin/inventory/page.tsx`
 - [ ] T015 [P] [US2] Trend-math unit tests (first purchase â†’ no comparison; equal price â†’ â‚±0.00/0%; increase and decrease cases) on both platforms
 
@@ -219,6 +219,7 @@ Task: "Web UI (T010) in app/admin/inventory/page.tsx"
 - Money and stock writes are append-only and single-transaction (constitution); VOID replaces edit/delete
 - Unit costs are always computed from stored quantity + total â€” never accepted from the client
 - Commit after each task or logical group; stop at checkpoints to validate the story independently
+
 
 
 
