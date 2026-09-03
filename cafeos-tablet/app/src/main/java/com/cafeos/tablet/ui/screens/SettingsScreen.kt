@@ -1,9 +1,11 @@
 package com.cafeos.tablet.ui.screens
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,7 +18,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -68,16 +72,17 @@ fun SettingsScreen(viewModel: CafeViewModel) {
         ScrollableTabRow(
             selectedTabIndex = selectedTab,
             edgePadding = 0.dp,
-            containerColor = PosMuted,
-            contentColor = PosInk
+            divider = {},
+            containerColor = PosCoffeeDeep,
+            contentColor = Color.White
         ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTab == index,
                     onClick = { selectedTab = index },
                     text = { Text(title) },
-                    selectedContentColor = PosAccent,
-                    unselectedContentColor = PosInkSoft
+                    selectedContentColor = Color.White,
+                    unselectedContentColor = PosCream.copy(alpha = 0.72f)
                 )
             }
         }
@@ -388,6 +393,7 @@ fun PaymentSettingsContent(businessSettings: BusinessSettings?, onSave: (Busines
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(if (gcashQrPath != null) "Change GCash QR" else "Upload GCash QR")
                 }
+                QrPreview(path = gcashQrPath, label = "GCash QR")
 
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
@@ -401,6 +407,7 @@ fun PaymentSettingsContent(businessSettings: BusinessSettings?, onSave: (Busines
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(if (paymayaQrPath != null) "Change PayMaya QR" else "Upload PayMaya QR")
                 }
+                QrPreview(path = paymayaQrPath, label = "PayMaya QR")
 
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
@@ -474,5 +481,31 @@ var footerText by remember { mutableStateOf(businessSettings?.footerMessage ?: "
                 }
             }
         }
+    }
+}
+
+/** Shows the uploaded e-wallet QR so staff can confirm it before saving. */
+@Composable
+fun QrPreview(path: String?, label: String) {
+    if (path == null) return
+    val bitmap = remember(path) {
+        runCatching { BitmapFactory.decodeFile(path) }.getOrNull()
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp),
+            contentScale = ContentScale.Fit
+        )
+    } else {
+        Text(
+            "QR file missing — please upload again.",
+            style = MaterialTheme.typography.bodySmall,
+            color = PosDanger
+        )
     }
 }

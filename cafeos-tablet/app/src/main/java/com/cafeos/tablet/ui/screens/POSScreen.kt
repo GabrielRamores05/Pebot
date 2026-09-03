@@ -462,7 +462,14 @@ fun ProductOptionsBottomSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 8.dp
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        // Scrollable so every group + the "Add to Order" button stay reachable
+        // on any screen height (clipped content hid the confirm button before).
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
+        ) {
             Text(product.name, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
             Spacer(modifier = Modifier.height(16.dp))
 

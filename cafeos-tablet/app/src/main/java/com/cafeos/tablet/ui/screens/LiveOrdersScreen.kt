@@ -2,7 +2,7 @@ package com.cafeos.tablet.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -188,10 +188,12 @@ fun KanbanOrderCard(
             .fillMaxWidth()
             .pointerInput(order.id) {
                 var dragX = 0f
-                detectDragGestures(
+                // Horizontal-only drag detection: vertical swipes stay with the
+                // column's LazyColumn so the kanban board can actually scroll.
+                detectHorizontalDragGestures(
                     onDragStart = { dragX = 0f },
-                    onDrag = { _, dragAmount ->
-                        dragX += dragAmount.x
+                    onHorizontalDrag = { _, dragAmount ->
+                        dragX += dragAmount
                     },
                     onDragEnd = {
                         val index = statusOrder.indexOf(order.status)

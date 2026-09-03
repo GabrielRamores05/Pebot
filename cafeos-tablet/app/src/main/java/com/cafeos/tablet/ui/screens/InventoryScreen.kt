@@ -9,8 +9,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -78,6 +82,29 @@ fun InventoryScreen(viewModel: CafeViewModel) {
 fun InventoryProductsTab(viewModel: CafeViewModel) {
     val products by viewModel.allProducts.collectAsState(initial = emptyList())
     val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
+    var producible by remember { mutableStateOf<Map<Int, Int?>>(emptyMap()) }
+
+    // A product's true availability = how many units the current ingredient
+    // supply can produce (limiting ingredient wins), matching the web café
+    // model where prepared items draw their stock from ingredients.
+    LaunchedEffect(products.map { it.id }, ingredients.map { it.id to it.currentStock }) {
+        val map = mutableMapOf<Int, Int?>()
+        for (product in products) {
+            val recipe = viewModel.getProductIngredients(product.id)
+            val units = if (recipe.isEmpty()) {
+                null
+            } else {
+                val perIngredient = recipe.mapNotNull { item ->
+                    if (item.quantity <= 0.0) return@mapNotNull null
+                    val ing = ingredients.find { it.id == item.ingredientId } ?: return@mapNotNull null
+                    (ing.currentStock / item.quantity).toInt()
+                }
+                perIngredient.minOrNull()
+            }
+            map[product.id] = units
+        }
+        producible = map
+    }
 
     // Product stock cards in a fixed 5-per-row grid.
     LazyVerticalGrid(
@@ -86,10 +113,7 @@ fun InventoryProductsTab(viewModel: CafeViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         gridItems(products) { product ->
-            val ingredient = ingredients.find { it.name == product.name }
-            val stock = ingredient?.currentStock ?: 0.0
-            val min = ingredient?.minStock ?: 0.0
-            val isLow = stock <= min && min > 0
+            val units = producible[product.id]
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -113,12 +137,20 @@ fun InventoryProductsTab(viewModel: CafeViewModel) {
                     Text("₱${product.price}", style = MaterialTheme.typography.bodySmall, color = PosMuted)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = if (ingredient != null) "${stock} ${ingredient.baseUnit}" else "No stock",
+                        text = when {
+                            units == null -> "No recipe"
+                            units > 0 -> "Can make $units"
+                            else -> "Out of stock"
+                        },
                         style = MaterialTheme.typography.titleLarge,
-                        color = if (isLow) PosDanger else PosGold,
+                        color = when {
+                            units == null -> PosMuted
+                            units > 0 -> PosAccent
+                            else -> PosDanger
+                        },
                         fontWeight = FontWeight.Bold
                     )
-                    if (isLow) {
+                    if (units == 0) {
                         Text("Low Stock", color = PosDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -728,49 +760,118 @@ fun PurchaseIngredientDialog(
     var ingredientExpanded by remember { mutableStateOf(false) }
     var supplierExpanded by remember { mutableStateOf(false) }
     var validationError by remember { mutableStateOf<String?>(null) }
+    val scrollState = rememberScrollState()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Record Purchase", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(scrollState)) {
                 Text("Ingredient", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(8.dp))
-                ExposedDropdownMenuBox(expanded = ingredientExpanded, onExpandedChange = { ingredientExpanded = it }) {
-                    OutlinedTextField(
-                        value = ingredients.find { it.id == selectedIngredientId }?.name ?: "Select ingredient",
-                        onValueChange = {},
-                        readOnly = true,
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { ingredientExpanded = !ingredientExpanded; supplierExpanded = false },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            ingredients.find { it.id == selectedIngredientId }?.name ?: "Select ingredient",
+                            color = if (selectedIngredientId != null) MaterialTheme.colorScheme.onSurface else PosMuted,
+                            fontWeight = if (selectedIngredientId != null) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                        Icon(
+                            if (ingredientExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = PosAccent
+                        )
+                    }
+                }
+                if (ingredientExpanded) {
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = ingredientExpanded) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
-                    )
-                    ExposedDropdownMenu(expanded = ingredientExpanded, onDismissRequest = { ingredientExpanded = false }) {
-                        ingredients.forEach { ing ->
-                            DropdownMenuItem(text = { Text(ing.name) }, onClick = { selectedIngredientId = ing.id; ingredientExpanded = false })
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            ingredients.forEach { ing ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedIngredientId = ing.id; ingredientExpanded = false }
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                                ) {
+                                    Text(ing.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text("${ing.currentStock} ${ing.baseUnit} in stock", color = PosMuted, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                Text("Supplier", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(8.dp))
-                ExposedDropdownMenuBox(expanded = supplierExpanded, onExpandedChange = { supplierExpanded = it }) {
-                    OutlinedTextField(
-                        value = suppliers.find { it.id == selectedSupplierId }?.name ?: "Select supplier (optional)",
-                        onValueChange = {},
-                        readOnly = true,
+                Text("Supplier (optional)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { supplierExpanded = !supplierExpanded; ingredientExpanded = false },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            suppliers.find { it.id == selectedSupplierId }?.name ?: "No supplier",
+                            color = if (selectedSupplierId != null) MaterialTheme.colorScheme.onSurface else PosMuted,
+                            fontWeight = if (selectedSupplierId != null) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                        Icon(
+                            if (supplierExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = PosAccent
+                        )
+                    }
+                }
+                if (supplierExpanded) {
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = supplierExpanded) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline)
-                    )
-                    ExposedDropdownMenu(expanded = supplierExpanded, onDismissRequest = { supplierExpanded = false }) {
-                        suppliers.forEach { sup ->
-                            DropdownMenuItem(text = { Text(sup.name) }, onClick = { selectedSupplierId = sup.id; supplierExpanded = false })
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedSupplierId = null; supplierExpanded = false }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                            ) {
+                                Text("No supplier", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                            }
+                            suppliers.forEach { sup ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedSupplierId = sup.id; supplierExpanded = false }
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                                ) {
+                                    Text(sup.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                }
+                            }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 OutlinedTextField(value = quantityText, onValueChange = { quantityText = it }, label = { Text("Quantity received (${ingredients.find { it.id == selectedIngredientId }?.baseUnit ?: "units"})") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PosAccent, unfocusedBorderColor = MaterialTheme.colorScheme.outline))
                 Spacer(modifier = Modifier.height(12.dp))

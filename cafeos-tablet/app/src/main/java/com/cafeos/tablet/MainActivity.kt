@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Group
@@ -109,7 +108,6 @@ fun MainScreen() {
         NavigationItem("Stations", Icons.Default.Build, "stations", group = "MANAGEMENT"),
         NavigationItem("Staff", Icons.Default.Group, "staff", group = "MANAGEMENT"),
         NavigationItem("Settings", Icons.Default.Settings, "settings", group = "MANAGEMENT"),
-        NavigationItem("Consultant", Icons.Default.Chat, "consultant", group = "MANAGEMENT"),
         NavigationItem("Audit Logs", Icons.Default.List, "audit_logs", group = "MANAGEMENT"),
         NavigationItem("Connection", Icons.Default.Wifi, "connection", group = "SYSTEM")
     ).filter { canAccess(it.route) }
@@ -299,7 +297,6 @@ fun MainScreen() {
                     composable("stations") { if (canAccess("stations")) StationsScreen(viewModel) else AccessDeniedScreen() }
                     composable("staff") { if (canAccess("staff")) StaffManagementScreen(viewModel) else AccessDeniedScreen() }
                     composable("settings") { if (canAccess("settings")) SettingsScreen(viewModel) else AccessDeniedScreen() }
-                    composable("consultant") { if (canAccess("consultant")) AIConsultantScreen(viewModel) else AccessDeniedScreen() }
                     composable("audit_logs") { if (canAccess("audit_logs")) AuditLogScreen(viewModel) else AccessDeniedScreen() }
                     composable("connection") { if (canAccess("connection")) ConnectionScreen(viewModel) else AccessDeniedScreen() }
                     }

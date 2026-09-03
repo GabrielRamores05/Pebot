@@ -14,7 +14,7 @@ import kotlinx.serialization.json.Json
  *    kitchen, loyalty, staff, settings.
  *  - ADMIN bypasses every permission check.
  *  - KITCHEN role is kitchen-only (spec 006).
- *  - Admin-only areas: Staff, Settings, Consultant, Audit Logs.
+ *  - Admin-only areas: Staff, Settings, Audit Logs.
  *
  * The tablet historically stored permissions as a comma-joined CSV of nav route
  * names (e.g. "pos,products") and treated a blank value as "full access". This
@@ -88,16 +88,15 @@ object AccessControl {
         "stock_history" -> "inventory"
         "reviews" -> "products"
         "audit_logs" -> "settings"
-        "consultant" -> "settings"
         "loyalty" -> "loyalty"
         "settings" -> "settings"
         "staff" -> "staff"
         else -> null
     }
 
-    /** Web admin-only areas (Staff management, AI Consultant, Audit Logs).
+    /** Web admin-only areas (Staff management, Audit Logs).
      *  Settings is permission-gated, not admin-only, on the web. */
-    private val adminOnlyRoutes = setOf("staff", "consultant", "audit_logs")
+    private val adminOnlyRoutes = setOf("staff", "audit_logs")
 
     /**
      * Web-equivalent access decision for a route.

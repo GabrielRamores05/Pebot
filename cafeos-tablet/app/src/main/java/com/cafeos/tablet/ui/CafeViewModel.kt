@@ -448,6 +448,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
     fun placeOrder() {
         if (_cartItems.isEmpty()) return
         viewModelScope.launch {
+            try {
             val total = _finalTotal.value
             val tendered = if (_paymentMethod.value == "CASH") _amountTendered.value.toDoubleOrNull() else total
             if (tendered == null || tendered < total) return@launch
@@ -567,6 +568,12 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             _discountRate.value = 0.0
             _selectedTableId.value = null
             _screenshotPath.value = null
+            } catch (e: Throwable) {
+                // An order write must never take the app down with it — log and
+                // close the checkout so the staff can retry.
+                android.util.Log.e("PlaceOrder", "Failed to place order", e)
+                _showCheckout.value = false
+            }
         }
     }
 

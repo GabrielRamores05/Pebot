@@ -240,9 +240,10 @@ fun ProductScreen(viewModel: CafeViewModel) {
                     val optionMap = remember { mutableStateMapOf<Int, List<Option>>() }
                     var showCreateDialog by remember { mutableStateOf(false) }
                     var editingGroup by remember { mutableStateOf<OptionGroup?>(null) }
+                    var refreshTick by remember { mutableStateOf(0) }
                     val scope = rememberCoroutineScope()
 
-                    LaunchedEffect(productOptionGroups) {
+                    LaunchedEffect(productOptionGroups, refreshTick) {
                         productOptionGroups.forEach { group ->
                             optionMap[group.id] = viewModel.getOptionsForGroup(group.id)
                         }
@@ -274,9 +275,17 @@ fun ProductScreen(viewModel: CafeViewModel) {
                                 viewModel = viewModel,
                                 group = group,
                                 options = optionMap[group.id].orEmpty(),
+                                ingredients = ingredients,
                                 onEdit = { editingGroup = group; showCreateDialog = true },
-                                onDelete = { scope.launch { viewModel.deleteOptionGroup(group) } },
-                                onDeleteOption = { option -> scope.launch { viewModel.deleteOption(option) } }
+                                onDelete = {
+                                    scope.launch { viewModel.deleteOptionGroup(group) }
+                                    refreshTick++
+                                },
+                                onDeleteOption = { option ->
+                                    scope.launch { viewModel.deleteOption(option) }
+                                    refreshTick++
+                                },
+                                onChanged = { refreshTick++ }
                             )
                         }
                     }

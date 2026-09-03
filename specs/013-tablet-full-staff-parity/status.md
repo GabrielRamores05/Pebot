@@ -5,6 +5,59 @@ lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/tsc
 clean/test:unit (422) green. Nine checkpoint commits: `3cea69c`, `dd3bb73`,
 `fce2a39`, `8a69d8a`, `ddc46cd`, `888ee8f`, `6249bf0`, `0d47d23`, `9dfa25c`.
 
+## Owner bug-fix / UI batch (2026-09-04, interactive session)
+
+Owner decisions this round: (1) customer orders may choose **Pay at counter**
+and send without a proof photo (GCash/Maya still require proof); (2) **AI
+Consultant removed from the tablet only** (Windows page untouched).
+
+Implemented on the tablet (`cafeos-tablet`), all gates green:
+
+- Option groups now edit a **per-option ingredient + amount** (e.g. Sizes:
+  Medium +25 g beans, Large +50 g). Options UI shows the linked ingredient
+  ("Uses 18 g of Coffee Beans"). Product > Options and the editor dialog use
+  inline selectors (popup menus inside AlertDialogs never opened on device).
+- Kanban (Live Orders) cards now detect **horizontal-only** drags so the
+  column list scrolls vertically (previously the card gesture swallowed it).
+- Inventory Products grid derives each product's real availability from the
+  ingredient supply ("Can make N"), no more blanket "No stock" from a
+  product-name↔ingredient-name match.
+- Record Purchase dialog: replaced the two popup dropdowns (which would not
+  open inside the dialog — the root cause of "not working") with expandable
+  inline ingredient/supplier lists; the dialog is now scrollable. Verified on
+  device: picker opens, ingredient pickable.
+- Settings tab strip (System/Business/Payments/Receipts/Voice) recolored to
+  match the side nav (`PosCoffeeDeep`) with white text; indicator default.
+- Settings > Payments now **previews the uploaded GCash/Maya QR**; upload
+  pickers open the gallery/file picker (no camera).
+- Receipts: `ReceiptPrinter` rewritten as a BIR-style A4 document — business
+  header + VAT-reg TIN, sequential receipt number, date/type/table/customer
+  block, itemized table with options and wrapped descriptions, VAT breakdown
+  from the settings rate, TOTAL DUE, amount in words, payment detail and
+  footer. Paginates across pages instead of a 216 pt strip on A4.
+- Customer QR menu (`LocalWebServer`, port 3000) rebuilt to mimic the Windows
+  café menu: sticky navbar (brand + cart + My Orders), category chips, photo
+  product cards (product photos now served via `/api/menu-image`), product
+  modal with single/multi option pills, slide-out cart with qty steppers,
+  **voucher code apply**, **Pay at counter / GCash / Maya** chips (proof upload
+  only for e-wallets and it opens the gallery — the old `capture="environment"`
+  camera trap removed), server-side totals/discounts, and a My Orders list.
+  Backend: `createOrder` accepts CASH + optional `voucherCode`, validates the
+  voucher and clamps the discount server-side, marks occupied tables, and never
+  trusts client pesos.
+- AI Consultant: rail item, route, screen file and AccessControl entries
+  removed (tests updated).
+- `placeOrder` wrapped so an order-write failure can never crash the app; POS
+  product-options bottom sheet made scrollable so "Add to Order" is always
+  reachable.
+
+Seeded dataset still on the device: 10 products with recipes + ingredient-linked
+options, 200 orders/301 items/200 payments ("Imported: 776. Skipped: 0").
+Not reproduced despite scripted attempts: the reported ordering crash (orders
+placed cleanly on the device; the POS sheet was scrollable-clipped before the
+fix). Stock/purchase amounts on device were last exercised at 99982 g Coffee
+Beans (test orders/usage).
+
 ## Where this leaves the owner
 
 Phases 0–6 foundations + roles/nav + the HR module + stations + tables quick

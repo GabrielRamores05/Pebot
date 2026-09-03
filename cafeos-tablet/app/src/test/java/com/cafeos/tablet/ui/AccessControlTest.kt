@@ -20,7 +20,7 @@ class AccessControlTest {
         assertTrue(AccessControl.canAccessRoute(admin, "kitchen"))
         assertTrue(AccessControl.canAccessRoute(admin, "staff"))
         assertTrue(AccessControl.canAccessRoute(admin, "settings"))
-        assertTrue(AccessControl.canAccessRoute(admin, "consultant"))
+        assertTrue(AccessControl.canAccessRoute(admin, "audit_logs"))
     }
 
     @Test
@@ -30,7 +30,6 @@ class AccessControlTest {
         assertTrue(AccessControl.canAccessRoute(s, "products"))
         // …but never admin-only areas
         assertFalse(AccessControl.canAccessRoute(s, "staff"))
-        assertFalse(AccessControl.canAccessRoute(s, "consultant"))
         assertFalse(AccessControl.canAccessRoute(s, "audit_logs"))
     }
 
@@ -63,7 +62,6 @@ class AccessControlTest {
         assertTrue(AccessControl.canAccessRoute(s, "settings"))
         assertFalse(AccessControl.canAccessRoute(s, "staff"))
         assertFalse(AccessControl.canAccessRoute(s, "audit_logs"))
-        assertFalse(AccessControl.canAccessRoute(s, "consultant"))
     }
 
     @Test
@@ -94,7 +92,7 @@ class AccessControlTest {
             "pos", "live_orders", "kitchen", "analytics", "order_history",
             "expenses", "vouchers", "products", "inventory", "tables",
             "stock_history", "reviews", "loyalty", "settings", "staff",
-            "consultant", "audit_logs"
+            "audit_logs"
         )
         for (route in routes) {
             assertTrue("route $route must map to a web key", AccessControl.permissionKeyForRoute(route) != null)
