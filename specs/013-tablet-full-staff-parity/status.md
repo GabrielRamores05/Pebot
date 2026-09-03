@@ -1,8 +1,17 @@
 # Spec 013 — Progress Status
 
-Last updated: 2026-09-04 (goal rounds 0–18). Gates last verified (round 18):
-Android lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/
-tsc clean/test:unit (422) green.
+Last updated: 2026-09-04 (goal rounds 0–45, session end). Final gates: Android
+lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/tsc
+clean/test:unit (422) green. Nine checkpoint commits: `3cea69c`, `dd3bb73`,
+`fce2a39`, `8a69d8a`, `ddc46cd`, `888ee8f`, `6249bf0`, `0d47d23`, `9dfa25c`.
+
+## Where this leaves the owner
+
+Phases 0–6 foundations + roles/nav + the HR module + stations + tables quick
+actions + kitchen parity + many cross-module bug fixes are implemented, gated
+green, and committed. What is NOT yet done (see below) is substantial UI and
+live-bridge work plus hardware acceptance; spec 013 should continue in a future
+session starting from this file.
 
 ## Latest increments (rounds 43–44)
 
