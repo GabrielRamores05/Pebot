@@ -97,4 +97,91 @@ class PcBridgePayloadTest {
         assertEquals(5, all.toSet().size)
         assertEquals("ORDER_PLACED", PcBridgeClient.Events.ORDER_PLACED)
     }
+
+    @Test
+    fun ingredientPayloadCarriesLastSupplierId() {
+        val withSupplier = Ingredient(id = 12, name = "Beans", baseUnit = "g", costPerUnit = 0.5, lastSupplierId = 3)
+        val payload = PcBridgeClient.ingredientPayload(withSupplier)
+
+        assertEquals(12, (payload["ingredientId"] as JsonPrimitive).content.toInt())
+        assertEquals("Beans", (payload["name"] as JsonPrimitive).content)
+        assertEquals("g", (payload["baseUnit"] as JsonPrimitive).content)
+        assertEquals(0.5, (payload["costPerUnit"] as JsonPrimitive).content.toDouble(), 0.001)
+        assertEquals(3, (payload["lastSupplierId"] as JsonPrimitive).content.toInt())
+
+        val neverPurchased = Ingredient(id = 13, name = "Milk", baseUnit = "ml", lastSupplierId = null)
+        val bare = PcBridgeClient.ingredientPayload(neverPurchased)
+        assertTrue(bare.keys.none { it == "lastSupplierId" })
+    }
+
+    @Test
+    fun transactionPayloadCarriesSupplierLinkageAndVoidType() {
+        val purchase = IngredientTransaction(
+            id = 7,
+            ingredientId = 12,
+            type = "PURCHASE",
+            quantity = 5000.0,
+            referenceType = "supplier",
+            referenceId = 3,
+            purchaseUnit = "kg",
+            purchaseCost = 2750.0,
+            unitCost = 0.55,
+            notes = "Arabica 5kg sack"
+        )
+        val p = PcBridgeClient.transactionPayload(purchase)
+        assertEquals(7, (p["transactionId"] as JsonPrimitive).content.toInt())
+        assertEquals(12, (p["ingredientId"] as JsonPrimitive).content.toInt())
+        assertEquals("PURCHASE", (p["type"] as JsonPrimitive).content)
+        assertEquals(5000.0, (p["quantity"] as JsonPrimitive).content.toDouble(), 0.001)
+        assertEquals("supplier", (p["referenceType"] as JsonPrimitive).content)
+        assertEquals(3, (p["referenceId"] as JsonPrimitive).content.toInt())
+        assertEquals(0.55, (p["unitCost"] as JsonPrimitive).content.toDouble(), 0.001)
+
+        // A VOID row flows through with its compensating type and void-of link.
+        val voidRow = IngredientTransaction(
+            id = 8,
+            ingredientId = 12,
+            type = "VOID_PURCHASE",
+            quantity = -5000.0,
+            referenceType = "void-of",
+            referenceId = 7,
+            createdAt = 8L
+        )
+        val v = PcBridgeClient.transactionPayload(voidRow)
+        assertEquals("VOID_PURCHASE", (v["type"] as JsonPrimitive).content)
+        assertEquals("void-of", (v["referenceType"] as JsonPrimitive).content)
+        assertEquals(7, (v["referenceId"] as JsonPrimitive).content.toInt())
+        assertEquals(-5000.0, (v["quantity"] as JsonPrimitive).content.toDouble(), 0.001)
+
+        // A supplierless purchase omits the reference keys entirely.
+        val supplierless = PcBridgeClient.transactionPayload(
+            IngredientTransaction(id = 9, ingredientId = 12, type = "PURCHASE", quantity = 100.0, createdAt = 9L)
+        )
+        assertTrue(supplierless.keys.none { it == "referenceType" || it == "referenceId" })
+    }
+
+    @Test
+    fun inventorySnapshotPayloadGroupsIngredientsBeforeTransactionsAndSerializes() {
+        val ingredients = listOf(
+            Ingredient(id = 12, name = "Beans", baseUnit = "g", lastSupplierId = 3)
+        )
+        val transactions = listOf(
+            IngredientTransaction(id = 7, ingredientId = 12, type = "PURCHASE", quantity = 5000.0, referenceType = "supplier", referenceId = 3, createdAt = 7L),
+            IngredientTransaction(id = 8, ingredientId = 12, type = "VOID_PURCHASE", quantity = -5000.0, referenceType = "void-of", referenceId = 7, createdAt = 8L)
+        )
+
+        val payload = PcBridgeClient.inventorySnapshotPayload(ingredients, transactions)
+        val ingredientsArr = payload["ingredients"] as JsonArray
+        val transactionsArr = payload["ingredientTransactions"] as JsonArray
+        assertEquals(1, ingredientsArr.size)
+        assertEquals(2, transactionsArr.size)
+        assertEquals(3, ((ingredientsArr[0] as JsonObject)["lastSupplierId"] as JsonPrimitive).content.toInt())
+        assertEquals("VOID_PURCHASE", ((transactionsArr[1] as JsonObject)["type"] as JsonPrimitive).content)
+
+        val serialized = PcBridgeClient.serialize(payload)
+        assertTrue(serialized.contains("\"ingredients\""))
+        assertTrue(serialized.contains("\"ingredientTransactions\""))
+        assertTrue(serialized.contains("\"VOID_PURCHASE\""))
+        assertTrue(serialized.contains("\"lastSupplierId\":3"))
+    }
 }

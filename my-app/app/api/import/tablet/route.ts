@@ -1,10 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { apiError, badRequest, forbidden, unauthorized, serverError } from '@/lib/api-response';
+import { badRequest, forbidden, unauthorized, serverError } from '@/lib/api-response';
+import {
+  clearUnknownSupplierLinks,
+  normalizeTransactionRow,
+  numberFromExport,
+  supplierIdFromExport,
+} from '@/modules/tablet/ingest';
 
 export const maxDuration = 60;
 
+/**
+ * POST /api/import/tablet — import a CaféOS tablet export into the PC ledger.
+ *
+ * Spec 014 T025 / contracts/bridge-schema.md:
+ * - parents (suppliers, ingredients) are inserted/updated before transactions;
+ * - ingredient rows carry the supplier link (`lastSupplierId` on the tablet →
+ *   the web `supplierId` column);
+ * - every ledger row (PURCHASE incl. supplier-linked `referenceType`/
+ *   `referenceId`, ADJUSTMENT, VOID_PURCHASE, …) is imported as-is and
+ *   append-only: rows already present are left untouched on re-import;
+ * - a purchase referencing an unknown supplier keeps its row but its supplier
+ *   link is cleared — never dropped as a record; legacy rows without reference
+ *   fields import unchanged.
+ * The whole import runs in one transaction so a failure never leaves a partial
+ * snapshot behind.
+ */
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUser(req);
@@ -34,9 +56,55 @@ export async function POST(req: NextRequest) {
       return badRequest('Invalid export format: missing orders array');
     }
 
-    const result = { orders: 0, orderItems: 0, payments: 0, products: 0, ingredients: 0, skipped: 0 };
+    const result = {
+      orders: 0,
+      orderItems: 0,
+      payments: 0,
+      products: 0,
+      ingredients: 0,
+      suppliers: 0,
+      ingredientTransactions: 0,
+      clearedSupplierLinks: 0,
+      skipped: 0,
+    };
 
     await prisma.$transaction(async (tx) => {
+      // Suppliers (parents) first, so ingredient + transaction links resolve.
+      const knownSupplierIds = new Set<number>();
+      if (data.suppliers && Array.isArray(data.suppliers)) {
+        for (const s of data.suppliers) {
+          if (!Number.isInteger(Number(s?.id)) || Number(s.id) <= 0) {
+            result.skipped++;
+            continue;
+          }
+          const supplierId = Number(s.id);
+          knownSupplierIds.add(supplierId);
+          await tx.supplier.upsert({
+            where: { id: supplierId },
+            update: {
+              name: typeof s.name === 'string' ? s.name : undefined,
+              contactPerson: s.contactPerson ?? null,
+              phone: s.phone ?? null,
+              email: s.email ?? null,
+              address: s.address ?? null,
+              notes: s.notes ?? null,
+              status: s.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
+            },
+            create: {
+              id: supplierId,
+              name: typeof s.name === 'string' ? s.name : `Supplier ${supplierId}`,
+              contactPerson: s.contactPerson ?? null,
+              phone: s.phone ?? null,
+              email: s.email ?? null,
+              address: s.address ?? null,
+              notes: s.notes ?? null,
+              status: s.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
+            },
+          });
+          result.suppliers++;
+        }
+      }
+
       // Products
       if (data.products && Array.isArray(data.products)) {
         for (const p of data.products) {
@@ -58,11 +126,83 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Ingredients
+      // Ingredients (after suppliers). Tablet rows use `lastSupplierId`; the web
+      // stores the same latest-supplier cache in `supplierId`.
       if (data.ingredients && Array.isArray(data.ingredients)) {
         for (const ing of data.ingredients) {
-          await tx.ingredient.upsert({ where: { id: ing.id }, update: { name: ing.name, currentStock: ing.currentStock, minStock: ing.minStock }, create: { name: ing.name, currentStock: ing.currentStock, minStock: ing.minStock, baseUnit: ing.baseUnit, costPerUnit: ing.costPerUnit } });
+          const supplierId = supplierIdFromExport(ing ?? {});
+          const upsertData: Record<string, unknown> = {
+            name: typeof ing.name === 'string' ? ing.name : `Ingredient ${ing.id}`,
+            currentStock: numberFromExport(ing.currentStock),
+            minStock: numberFromExport(ing.minStock),
+            costPerUnit: numberFromExport(ing.costPerUnit),
+            ...(supplierId !== undefined ? { supplierId } : {}),
+          };
+          const ingredientId = Number(ing.id);
+          if (!Number.isInteger(ingredientId) || ingredientId <= 0) {
+            result.skipped++;
+            continue;
+          }
+          await tx.ingredient.upsert({
+            where: { id: ingredientId },
+            update: upsertData,
+            create: {
+              id: ingredientId,
+              name: (upsertData.name as string) ?? `Ingredient ${ingredientId}`,
+              baseUnit: typeof ing.baseUnit === 'string' && ing.baseUnit ? ing.baseUnit : 'g',
+              ...upsertData,
+              purchaseUnit:
+                typeof ing.purchaseUnit === 'string' && ing.purchaseUnit
+                  ? ing.purchaseUnit
+                  : typeof ing.baseUnit === 'string' && ing.baseUnit
+                    ? ing.baseUnit
+                    : 'g',
+              category: typeof ing.category === 'string' ? ing.category : 'General',
+            } as any,
+          });
           result.ingredients++;
+        }
+      }
+
+      // Ingredient ledger (after parents). Append-only and idempotent.
+      if (data.ingredientTransactions && Array.isArray(data.ingredientTransactions)) {
+        const normalized = data.ingredientTransactions
+          .map((raw: any) => normalizeTransactionRow(raw ?? {}))
+          .filter((row: any) => row !== null);
+        const { rows, clearedSupplierLinks } = clearUnknownSupplierLinks(normalized, knownSupplierIds);
+        result.clearedSupplierLinks += clearedSupplierLinks;
+
+        for (const row of rows) {
+          // Never insert a transaction whose ingredient parent does not exist —
+          // an FK failure would roll back the whole import.
+          const parent = await tx.ingredient.findUnique({ where: { id: row.ingredientId }, select: { id: true } });
+          if (!parent) {
+            result.skipped++;
+            continue;
+          }
+          if (row.id != null) {
+            const existing = await tx.ingredientTransaction.findUnique({ where: { id: row.id }, select: { id: true } });
+            if (existing) {
+              result.skipped++;
+              continue;
+            }
+          }
+          await tx.ingredientTransaction.create({
+            data: {
+              ...(row.id != null ? { id: row.id } : {}),
+              ingredientId: row.ingredientId,
+              type: row.type || 'ADJUSTMENT',
+              quantity: row.quantity,
+              referenceId: row.referenceId,
+              referenceType: row.referenceType,
+              purchaseUnit: row.purchaseUnit,
+              purchaseCost: row.purchaseCost,
+              unitCost: row.unitCost,
+              notes: row.notes,
+              ...(row.createdAt ? { createdAt: row.createdAt } : {}),
+            } as any,
+          });
+          result.ingredientTransactions++;
         }
       }
 

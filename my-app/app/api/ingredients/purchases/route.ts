@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
-import { validatePurchase } from '@/lib/ingredient-utils';
 import { emitEvent } from '@/lib/socket';
-import { recomputeProducts } from '@/lib/availability';
-import { productsUsingIngredient } from '@/lib/availability';
+import { recomputeProducts, productsUsingIngredient } from '@/lib/availability';
 import { prisma } from '@/lib/prisma';
-import { recordIngredientPurchase } from '@/modules/inventory/repository';
-import { notFound, serverError, unauthorized } from '@/lib/api-response';
+import { recordPurchase } from '@/modules/inventory/service';
+import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
+import { ValidationError } from 'zod-validation-error';
 
 export async function POST(req: NextRequest) {
   const user = await requirePermission(req, 'inventory');
@@ -16,35 +15,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { ingredientId, quantity, purchaseUnit, purchaseCost, supplierId, notes } = body as {
-      ingredientId: number;
-      quantity: number;
-      purchaseUnit: string;
-      purchaseCost: number;
-      supplierId?: number | null;
-      notes?: string;
-    };
-
-    const error = validatePurchase(quantity, purchaseCost, purchaseUnit);
-    if (error) {
-      return NextResponse.json({ error }, { status: 400 });
-    }
 
     // All ledger writes (stock + cost + supplier-linked transaction) happen in
-    // one transaction inside the domain repository (spec 014 / constitution §IV).
-    const result = await recordIngredientPurchase(
-      {
-        ingredientId,
-        quantity,
-        purchaseUnit,
-        purchaseCost,
-        supplierId: supplierId ?? null,
-        notes: notes ?? null,
-        userId: user.userId,
-      },
-      1,
-    );
+    // one transaction inside the domain repository; the service validates with
+    // zod and writes the audit event (spec 014 / constitution §III/§IV).
+    const result = await recordPurchase(body, { userId: user.userId });
 
+    const ingredientId = result.ingredient.id;
     const affected = await productsUsingIngredient(prisma, ingredientId);
     await recomputeProducts(prisma, affected);
 
@@ -54,8 +31,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result, { status: 201 });
   } catch (error: any) {
     console.error('[INGREDIENT PURCHASE] Error:', error);
+    if (error instanceof ValidationError) {
+      return badRequest(error.message);
+    }
     if (error?.message === 'Ingredient not found') {
       return notFound('Ingredient not found');
+    }
+    if (
+      typeof error?.message === 'string' &&
+      (error.message.startsWith('Cannot record') ||
+        error.message.startsWith('Converted quantity') ||
+        error.message.startsWith('Quantity must') ||
+        error.message.startsWith('Purchase cost must'))
+    ) {
+      return badRequest(error.message);
     }
     return serverError(error, 'Failed to record purchase');
   }

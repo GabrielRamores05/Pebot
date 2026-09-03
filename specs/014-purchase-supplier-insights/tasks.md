@@ -60,7 +60,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 - [X] T007 [US1] Make purchase transactional in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt` (`purchaseIngredient`): convert quantity to base unit, stock += qty, `costPerUnit` = total Ã· converted qty (replace), `lastSupplierId` = supplier when given, insert PURCHASE row â€” all in one `db.withTransaction`; reject quantity â‰¤ 0 and unconvertible units
 - [X] T008 (web purchase write aligned to latest-cost + supplier-link via modules/inventory/repository.ts, thin route) [US1] Web purchase write: implement record-purchase in `my-app/modules/inventory/service.ts` (same math/transaction semantics) with Prisma access only via `my-app/modules/inventory/repository.ts`
 - [X] T009 [P] [US1] Tablet UI: Record Purchase in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt` â€” purchase-unit selector (real-world unit), auto-calculated unit-cost preview line, supplier picker (existing inline lists)
-- [ ] T010 [P] [US1] Web UI: purchase form with unit selector + auto unit-cost in `my-app/app/admin/inventory/page.tsx` (and any route handler in `my-app/app/api/` for it)
+- [X] T010 [P] [US1] Web UI: purchase form with unit selector + auto unit-cost in `my-app/app/admin/inventory/page.tsx` (and any route handler in `my-app/app/api/` for it)
 - [X] T011 [P] [US1] Unit tests for purchase math (conversion, unit cost replace, no-trust validation) on both platforms: `cafeos-tablet/app/src/test/.../PurchaseMathTest.kt` and `my-app/modules/inventory/*.test.ts` â€” write first, confirm they fail, then implement
 
 **Checkpoint**: US1 works end-to-end on both apps (QS-1). MVP is complete and demoable.
@@ -75,7 +75,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 - [X] T012 [US2] Tablet data: DAO queries for latest purchase per ingredient and previous purchase per ingredient (row-id ordering, ignoring VOID) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/data/CafeDao.kt` + ViewModel accessors in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`
 - [X] T013 [US2] Tablet UI: ingredient card shows latest supplier name (from `lastSupplierId`) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt`; clicking a history row opens a detail dialog with supplier, entered/base quantities, total, unit cost, â‚± and % change vs previous
-- [ ] T014 [US2] Web: trend queries in `my-app/modules/inventory/repository.ts` + service, UI for ingredient detail/history in `my-app/app/admin/inventory/page.tsx`
+- [X] T014 [US2] Web: trend queries in `my-app/modules/inventory/repository.ts` + service, UI for ingredient detail/history in `my-app/app/admin/inventory/page.tsx`
 - [X] T015 [P] [US2] Trend-math unit tests (first purchase â†’ no comparison; equal price â†’ â‚±0.00/0%; increase and decrease cases) on both platforms
 
 **Checkpoint**: US1 + US2 function independently (QS-2).
@@ -89,8 +89,8 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 **Independent Test**: quickstart QS-2 supplier half â€” two purchases from the same supplier show the correct change; suppliers without purchases show an empty list note.
 
 - [X] T016 [US3] Tablet data: DAO `purchasesForSupplier` + ViewModel `supplierIngredientTrends` (latest + previous same-supplier purchase per ingredient)
-- [ ] T017 [US3] Tablet UI: Suppliers page at `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/SuppliersScreen.kt` (new) showing ingredient rows with latest price and â‚±/% change; wire into navigation in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/MainActivity.kt`
-- [ ] T018 [US3] Web: supplier page data (repository/service) and UI in `my-app/app/admin/suppliers/page.tsx` (or existing suppliers area) with the same change figures
+- [X] T017 [US3] Tablet UI: Suppliers page at `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/SuppliersScreen.kt` (new) showing ingredient rows with latest price and â‚±/% change; wire into navigation in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/MainActivity.kt`
+- [X] T018 [US3] Web: supplier page data (repository/service) and UI in `my-app/app/admin/suppliers/page.tsx` (or existing suppliers area) with the same change figures
 - [X] T032 [P] [US3] Supplier-deletion safety on both apps (tablet recomputes lastSupplierId; web repository deleteSupplier recomputes ingredient.supplierId from remaining history, DELETE /api/suppliers now thin): warn when a supplier has purchase history; on delete, recompute-or-clear `lastSupplierId` on every affected ingredient from remaining non-void purchases (tablet: `cafeos-tablet/.../ui/CafeViewModel.kt` + `data/CafeDao.kt`; web: `my-app/modules/inventory/service.ts`)
 
 **Checkpoint**: QS-2 supplier scenario passes on both apps; US3 independently testable.
@@ -105,7 +105,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 - [X] T019 [US4] Tablet data/state: batch-adjust in one transaction writing ADJUSTMENT rows with `referenceType='batch'` in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`; batch id = shared batch token in every row's notes (`referenceType='batch'`); reject any row that would push stock below zero (validate the whole batch before writing)
 - [X] T020 [US4] Tablet UI: bulk-adjust screen (multi-row edit + single save) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt`
-- [ ] T021 [US4] Web: bulk-adjust service + UI in `my-app/modules/inventory/` and `my-app/app/admin/inventory/page.tsx` (same single-transaction semantics; batch identity and below-zero rejection identical to T019)
+- [X] T021 [US4] Web: bulk-adjust service + UI in `my-app/modules/inventory/` and `my-app/app/admin/inventory/page.tsx` (same single-transaction semantics; batch identity and below-zero rejection identical to T019)
 
 **Checkpoint**: QS-3 passes on both apps; US4 independently testable.
 
@@ -118,7 +118,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 **Independent Test**: quickstart QS-5 â€” raising a threshold flips the ingredient to Low everywhere at once; lowering clears it everywhere.
 
 - [X] T022 [US5] Tablet: shared low/out rule + analytics inventory summary (counts + Î£ currentStockÃ—costPerUnit) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt` and `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/AnalyticsScreen.kt`
-- [ ] T023 [US5] Web: same rule + summary in `my-app/modules/analytics/` (or inventory) and `my-app/app/admin/analytics/page.tsx`
+- [X] T023 [US5] Web: same rule + summary in `my-app/modules/analytics/` (or inventory) and `my-app/app/admin/analytics/page.tsx`
 - [X] T024 [P] [US5] Unit tests for the shared low/out rule and stock-value math on both platforms, including the boundary `currentStock == minStock â†’ LOW` and healthy/low/out transitions (tablet `app/src/test/.../`; web `my-app/modules/*.test.ts`)
 
 **Checkpoint**: QS-5 passes on both apps; US5 independently testable.
@@ -129,13 +129,13 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 **Purpose**: Ledger-safety features and parity glue that span all stories.
 
-- [ ] T025 [P] Export/import both platforms: carry `Ingredient.lastSupplierId`, purchase rows' `referenceType='supplier'`/`referenceId`, and `VOID_PURCHASE` type end-to-end (`cafeos-tablet` export/import in `CafeViewModel.kt`/`MenuImportParser.kt`; `my-app` tablet ingest + import/export services per `contracts/bridge-schema.md`)
+- [X] T025 [P] Export/import both platforms: carry `Ingredient.lastSupplierId`, purchase rows' `referenceType='supplier'`/`referenceId`, and `VOID_PURCHASE` type end-to-end (`cafeos-tablet` export/import in `CafeViewModel.kt`/`MenuImportParser.kt`; `my-app` tablet ingest + import/export services per `contracts/bridge-schema.md`)
 - [X] T026 [P] Void + re-enter on the tablet: voiding **appends a compensating `VOID_PURCHASE` row** (`referenceType='void-of'` â†’ original row id; the original is never modified), reverses stock in the same transaction, reverts `costPerUnit`/`lastSupplierId` **only when the voided row is the latest non-void purchase**, writes an audit event (`cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`); UI entry in history detail
-- [ ] T027 [P] Void + re-enter on the web — repository voidIngredientPurchase + POST /api/ingredients/purchases/:id/void done; admin history UI trigger pending: identical additive compensation semantics in `my-app/modules/inventory/service.ts` + admin UI
-- [ ] T028 [P] Unit tests for void reversal math (incl. voiding the only/latest purchase) on both platforms
-- [ ] T029 [P] Tabletâ†”PC bridge payload fields per `specs/014-purchase-supplier-insights/contracts/bridge-schema.md` (`cafeos-tablet/.../data/PcBridgeClient.kt`, `SocketSyncManager.kt`, `my-app` tablet ingest service)
-- [ ] T030 Audit events for purchase/void/bulk writes on both platforms (tablet `logAuditEvent`; web audit log)
-- [ ] T031 Run full gates (Android lintDebug/testDebugUnitTest/assembleDebug; web lint/tsc/test:unit) and execute `quickstart.md` QS-1..QS-6 on both apps; resolve any parity mismatch; update `specs/014-purchase-supplier-insights/` and `status.md`; commit
+- [X] T027 [P] Void + re-enter on the web — repository voidIngredientPurchase + POST /api/ingredients/purchases/:id/void done; admin history UI trigger pending: identical additive compensation semantics in `my-app/modules/inventory/service.ts` + admin UI
+- [X] T028 [P] Unit tests for void reversal math (incl. voiding the only/latest purchase) on both platforms
+- [X] T029 [P] Tabletâ†”PC bridge payload fields per `specs/014-purchase-supplier-insights/contracts/bridge-schema.md` (`cafeos-tablet/.../data/PcBridgeClient.kt`, `SocketSyncManager.kt`, `my-app` tablet ingest service)
+- [X] T030 Audit events for purchase/void/bulk writes on both platforms (tablet `logAuditEvent`; web audit log)
+- [X] T031 Run full gates (Android lintDebug/testDebugUnitTest/assembleDebug; web lint/tsc/test:unit) and execute `quickstart.md` QS-1..QS-6 on both apps; resolve any parity mismatch; update `specs/014-purchase-supplier-insights/` and `status.md`; commit
 
 ---
 

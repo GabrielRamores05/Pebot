@@ -59,9 +59,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    // currentStock or costPerUnit changed — recompute derived sellable quantities
-    // and the derived capital cost (costPerUnit drives product capital).
-    if (currentStock !== undefined || costPerUnit !== undefined) {
+    // stock/cost/threshold changed — recompute derived sellable quantities,
+    // the derived capital cost (costPerUnit drives product capital), and let
+    // every surface (ingredient page, alerts, analytics inventory summary)
+    // refresh: spec 014 US5 keeps low/high state consistent everywhere.
+    if (currentStock !== undefined || costPerUnit !== undefined || minStock !== undefined) {
       const affected = await productsUsingIngredient(prisma, parseInt(id));
       await recomputeProducts(prisma, affected);
       emitEvent('ingredients-update', []);

@@ -20,6 +20,7 @@ export async function findTabletSnapshotRows(): Promise<TabletRows> {
     productOptionGroups,
     ingredients,
     suppliers,
+    ingredientTransactions,
     restaurantTables,
     businessSettings,
     staffUsers,
@@ -36,6 +37,12 @@ export async function findTabletSnapshotRows(): Promise<TabletRows> {
     prisma.productOptionGroup.findMany(),
     prisma.ingredient.findMany(),
     prisma.supplier.findMany(),
+    // Spec 014 (contracts/bridge-schema.md): exported snapshots carry the full
+    // ingredient ledger — supplier-linked purchases (`referenceType='supplier'`
+    // + `referenceId`), batch adjustments and VOID_PURCHASE rows — so a tablet
+    // mirror shows the same history/trends as the PC. Ingredient rows already
+    // carry the web `supplierId` (latest-supplier cache).
+    prisma.ingredientTransaction.findMany({ orderBy: { id: 'asc' } }),
     prisma.restaurantTable.findMany(),
     prisma.businessSettings.findMany(),
     prisma.user.findMany(),
@@ -54,6 +61,7 @@ export async function findTabletSnapshotRows(): Promise<TabletRows> {
     productOptionGroups: productOptionGroups as any[],
     ingredients: ingredients as any[],
     suppliers: suppliers as any[],
+    ingredientTransactions: ingredientTransactions as any[],
     restaurantTables: restaurantTables as any[],
     businessSettings: businessSettings as any[],
     staffUsers: staffUsers as any[],

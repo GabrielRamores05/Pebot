@@ -22,6 +22,16 @@ interface AnalyticsData {
   salesByCategory: { name: string; sales: number }[];
 }
 
+// Spec 014 US5 — inventory health derived from the same low/out rule as the
+// ingredient page: healthy = stock > min; low = 0 < stock <= min; out = stock <= 0.
+interface InventorySummaryData {
+  totalIngredients: number;
+  healthy: number;
+  low: number;
+  out: number;
+  totalStockValue: number;
+}
+
 const COLORS = ['#d97706', '#b45309', '#92400e', '#78350f', '#f59e0b', '#fbbf24', '#fcd34d'];
 const STATUS_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#ef4444'];
 
@@ -55,6 +65,8 @@ export default function OverviewDashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [filter, setFilter] = useState('today');
   const [loading, setLoading] = useState(true);
+  const [inventory, setInventory] = useState<InventorySummaryData | null>(null);
+  const [inventoryLoaded, setInventoryLoaded] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -69,7 +81,32 @@ export default function OverviewDashboard() {
     }
   }, [filter]);
 
+  // Spec 014 US5 — inventory summary is separate from the sales numbers so a
+  // threshold change or purchase refreshes it without re-running the sales
+  // charts. Refetched on stock events so every surface flips at once.
+  const fetchInventorySummary = useCallback(async () => {
+    try {
+      const res = await fetch('/api/analytics/inventory');
+      if (res.ok) setInventory(await res.json());
+      else setInventory(null);
+    } catch (e) {
+      console.error('Failed to load inventory summary:', e);
+      setInventory(null);
+    } finally {
+      setInventoryLoaded(true);
+    }
+  }, []);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchInventorySummary(); }, [fetchInventorySummary]);
+
+  useSocket({
+    events: {
+      'ingredients-update': fetchInventorySummary,
+      'inventory-update': fetchInventorySummary,
+      'low-stock-alert': fetchInventorySummary,
+    },
+  });
 
   // Only refresh on filter change, not on socket events (to prevent excessive API calls)
   // useSocket({ events: { 'analytics-update': () => { fetchData(); } } });
@@ -140,6 +177,42 @@ export default function OverviewDashboard() {
                   <p className="text-gray-500 text-xs font-medium">{kpi.label}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Spec 014 US5 — Inventory health summary (threshold-driven) */}
+            <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900">Inventory Summary</h3>
+                <span className="text-gray-400 text-xs">
+                  {inventory != null ? `${inventory.totalIngredients} ingredients · thresholds` : '—'}
+                </span>
+              </div>
+              {inventory == null && !inventoryLoaded ? (
+                <p className="text-gray-400 text-sm py-2">Loading inventory health…</p>
+              ) : inventory == null ? (
+                <p className="text-gray-400 text-sm py-2">Inventory summary is unavailable right now.</p>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-green-50 rounded-2xl p-4">
+                    <p className="text-2xl font-bold text-green-600 tabular-nums">{inventory.healthy}</p>
+                    <p className="text-gray-500 text-xs font-medium mt-0.5">Healthy</p>
+                  </div>
+                  <div className="bg-orange-50 rounded-2xl p-4">
+                    <p className="text-2xl font-bold text-orange-500 tabular-nums">{inventory.low}</p>
+                    <p className="text-gray-500 text-xs font-medium mt-0.5">Low Stock</p>
+                  </div>
+                  <div className="bg-red-50 rounded-2xl p-4">
+                    <p className="text-2xl font-bold text-red-500 tabular-nums">{inventory.out}</p>
+                    <p className="text-gray-500 text-xs font-medium mt-0.5">Out of Stock</p>
+                  </div>
+                  <div className="bg-amber-50 rounded-2xl p-4">
+                    <p className="text-2xl font-bold text-gray-900 tabular-nums">
+                      ₱{inventory.totalStockValue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-gray-500 text-xs font-medium mt-0.5">Total Stock Value</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sales trend chart */}

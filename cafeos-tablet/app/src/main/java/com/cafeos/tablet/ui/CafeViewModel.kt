@@ -934,7 +934,8 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                     updatedAt = System.currentTimeMillis()
                 )
             )
-            dao.insertIngredientTransaction(
+            val supplierName = supplierId?.let { dao.getSupplier(it)?.name }
+            val txnId = dao.insertIngredientTransaction(
                 IngredientTransaction(
                     ingredientId = ingredientId,
                     type = "PURCHASE",
@@ -947,6 +948,15 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                     notes = (if (!purchaseName.isNullOrBlank()) "$purchaseName · " else "") + (notes ?: ""),
                     createdAt = System.currentTimeMillis()
                 )
+            )
+            // Spec 014 T030: every purchase write emits an audit event inside the
+            // same transaction (same pattern as the VOID_PURCHASE audit).
+            val supplierText = if (supplierName != null) " from $supplierName" else " (no supplier)"
+            logAuditEvent(
+                "PURCHASE_RECORD",
+                "ingredient_transaction",
+                txnId.toInt(),
+                details = "Purchased ${trimNumber(quantity)} $purchaseUnit of ${ingredient.name} for ₱${trimNumber(totalCost)}$supplierText (unit cost ₱${trimNumber(unitCost)}/${ingredient.baseUnit})"
             )
         }
     }
@@ -968,6 +978,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         if (ingredient.currentStock + delta < 0.0) return@withTransaction
                     }
                     val batchToken = "bulk-" + System.currentTimeMillis()
+                    var written = 0
                     for ((ingredientId, delta) in adjustments) {
                         if (delta == 0.0) continue
                         val ingredient = dao.getIngredientSync(ingredientId) ?: continue
@@ -986,6 +997,17 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                                 notes = if (notes.isBlank()) batchToken else "$notes · $batchToken",
                                 createdAt = System.currentTimeMillis()
                             )
+                        )
+                        written++
+                    }
+                    // Spec 014 T030: one audit event per batch write, inside the
+                    // same transaction (same pattern as the VOID_PURCHASE audit).
+                    if (written > 0) {
+                        logAuditEvent(
+                            "BULK_ADJUST",
+                            "ingredient",
+                            0,
+                            details = "Bulk adjusted $written ingredient(s) (batch $batchToken${if (notes.isNotBlank()) "; $notes" else ""})"
                         )
                     }
                 }
@@ -1126,7 +1148,9 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         val affected = dao.getAllIngredients().firstOrNull().orEmpty().filter { it.lastSupplierId == supplier.id }
         dao.deleteSupplier(supplier)
         for (ingredient in affected) {
-            val latest = dao.latestSupplierIdForIngredient(ingredient.id)
+            // Exclude the deleted supplier so an ingredient falls back to its
+            // prior supplier (or none) and never re-points at the removed id.
+            val latest = dao.latestSupplierIdForIngredientExcluding(ingredient.id, supplier.id)
             if (latest != ingredient.lastSupplierId) {
                 dao.updateIngredient(ingredient.copy(lastSupplierId = latest, updatedAt = System.currentTimeMillis()))
             }
@@ -1146,17 +1170,17 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 db.withTransaction {
                     val ingredient = dao.getIngredientSync(transaction.ingredientId) ?: return@withTransaction
-                    val latestRowId = dao.latestPurchaseRowId(transaction.ingredientId)
-                    val voidedIsLatest = latestRowId != null && latestRowId == transaction.id
+                    // Pure decision (T026/T028): latest/previous are the max-id
+                    // PURCHASE rows — VOID rows can never be latest or previous.
+                    val ledger = dao.getIngredientLedgerSync(transaction.ingredientId)
+                    val plan = VoidReversal.plan(ledger, transaction.id)
 
                     val stockReverted = ingredient.copy(
                         currentStock = (ingredient.currentStock - transaction.quantity).coerceAtLeast(0.0),
                         updatedAt = System.currentTimeMillis()
                     )
-                    val updated = if (voidedIsLatest) {
-                        val previousCost = dao.previousPurchaseUnitCost(transaction.ingredientId, transaction.id)
-                        val previousSupplier = dao.previousPurchaseSupplierId(transaction.ingredientId, transaction.id)
-                        stockReverted.copy(costPerUnit = previousCost ?: 0.0, lastSupplierId = previousSupplier)
+                    val updated = if (plan.voidedIsLatest) {
+                        stockReverted.copy(costPerUnit = plan.previousUnitCost ?: 0.0, lastSupplierId = plan.previousSupplierId)
                     } else {
                         stockReverted
                     }
@@ -1168,7 +1192,7 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                             quantity = -transaction.quantity,
                             referenceType = "void-of",
                             referenceId = transaction.id,
-                            notes = "Void of purchase #${transaction.id}" + if (voidedIsLatest) " (latest — cost/last supplier reverted)" else " (older purchase — stock only)",
+                            notes = "Void of purchase #${transaction.id}" + if (plan.voidedIsLatest) " (latest — cost/last supplier reverted)" else " (older purchase — stock only)",
                             createdAt = System.currentTimeMillis()
                         )
                     )
@@ -1804,8 +1828,20 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                             importedCount++
                         }
                     }
+                    // Spec 014 T025 (bridge-schema import rules): parents
+                    // (suppliers, then ingredients) are inserted before any
+                    // transaction rows reference them. A purchase referencing a
+                    // supplier that does not exist at the destination keeps its
+                    // row but its supplier link is cleared — never dropped. A
+                    // legacy row without reference fields imports unchanged.
+                    for (supplier in data.suppliers) {
+                        dao.insertSupplier(supplier)
+                        importedCount++
+                    }
+                    val supplierIds = (dao.getAllSuppliers().firstOrNull() ?: emptyList()).map { it.id }.toSet()
                     for (ingredient in data.ingredients) {
-                        dao.insertIngredient(ingredient)
+                        val resolved = SnapshotImportRules.resolveLatestSupplier(ingredient) { it in supplierIds }
+                        dao.insertIngredient(resolved)
                         importedCount++
                     }
                     for (recipe in data.productIngredients) {
@@ -1813,7 +1849,8 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                         importedCount++
                     }
                     for (txn in data.ingredientTransactions) {
-                        dao.insertIngredientTransaction(txn.copy(id = 0))
+                        val resolved = SnapshotImportRules.resolveSupplierLink(txn) { it in supplierIds }
+                        dao.insertIngredientTransaction(resolved.copy(id = 0))
                         importedCount++
                     }
                     for (payment in data.payments) {
@@ -1827,10 +1864,6 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     for (customer in data.customers) {
                         dao.insertCustomer(customer)
-                        importedCount++
-                    }
-                    for (supplier in data.suppliers) {
-                        dao.insertSupplier(supplier)
                         importedCount++
                     }
                     for (table in data.tables) {
@@ -2376,6 +2409,10 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
 
 private const val orderHistoryCsvHeader = "orderNumber,customerName,status,totalAmount,discountAmount,discountRate,discountReason,paymentMethod,orderType,tableId,createdAt"
 private const val ingredientCsvHeader = "name,category,baseUnit,currentStock,minStock,costPerUnit"
+
+/** Compact decimal rendering for audit-detail text (no locale grouping). */
+private fun trimNumber(value: Double): String =
+    if (value == value.toLong().toDouble()) value.toLong().toString() else "%.2f".format(value)
 
 @Serializable
 data class ExportData(

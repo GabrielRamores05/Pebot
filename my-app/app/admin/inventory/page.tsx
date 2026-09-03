@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useState, useEffect, useCallback, Fragment, useRef, useMemo } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
+import { formatPeso } from '@/lib/format';
+import { canConvertUnit, computePurchaseCostBreakdown, purchaseUnitOptions } from '@/lib/ingredient-utils';
 
 interface InventoryItem {
   id: number;
@@ -53,6 +55,54 @@ interface SupplierItem {
   }[];
 }
 
+// Spec 014 US2 — purchase history detail for one ingredient
+interface PurchaseHistoryRow {
+  id: number;
+  createdAt: string;
+  type: string;
+  quantity: number; // base unit
+  purchaseUnit: string | null;
+  enteredQuantity: number; // as entered
+  purchaseCost: number | null;
+  unitCost: number | null;
+  supplierId: number | null;
+  supplierName: string | null;
+  notes: string | null;
+  voided: boolean;
+  change: { delta: number; percent: number } | null;
+}
+
+interface PurchaseHistoryData {
+  ingredient: {
+    id: number;
+    name: string;
+    baseUnit: string;
+    currentStock: number;
+    minStock: number;
+    costPerUnit: number;
+    supplierId: number | null;
+  };
+  purchases: PurchaseHistoryRow[];
+}
+
+// Spec 014 US3 — per-supplier ingredient prices from purchase history
+interface SupplierIngredientPriceItem {
+  supplierId: number;
+  ingredientId: number;
+  ingredientName: string;
+  baseUnit: string;
+  purchaseCount: number;
+  latestUnitCost: number | null;
+  previousUnitCost: number | null;
+  change: { delta: number; percent: number } | null;
+}
+
+interface SupplierInsight {
+  supplierId: number;
+  supplierName: string;
+  items: SupplierIngredientPriceItem[];
+}
+
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +140,12 @@ export default function InventoryPage() {
   });
   const [purchaseSaving, setPurchaseSaving] = useState(false);
   const [purchaseResult, setPurchaseResult] = useState<any>(null);
+
+  // Spec 014 state: per-ingredient purchase history, supplier price insights,
+  // and the bulk-adjust modal (US2/US3/US4)
+  const [historyIngredient, setHistoryIngredient] = useState<IngredientItem | null>(null);
+  const [supplierInsights, setSupplierInsights] = useState<SupplierInsight[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   // Production Capacity state (derived, read-only view of sellable quantities)
   const [capacity, setCapacity] = useState<any[]>([]);
@@ -176,6 +232,17 @@ const [shopName, setShopName] = useState('CafeOS');
     }
   }, []);
 
+  // Spec 014 US3: per-supplier ingredient prices derived from purchase rows.
+  const fetchSupplierInsights = useCallback(async () => {
+    try {
+      const data = await fetchJson<SupplierInsight[]>('/api/suppliers/insights');
+      setSupplierInsights(Array.isArray(data) ? data : []);
+    } catch (e) {
+      // Additive view — the suppliers list still works if this read fails.
+      console.error('Failed to fetch supplier insights:', e);
+    }
+  }, []);
+
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
 
@@ -202,12 +269,13 @@ const [shopName, setShopName] = useState('CafeOS');
   useEffect(() => {
     fetchIngredients();
     fetchSuppliers();
+    fetchSupplierInsights();
     fetchCapacity();
     fetch('/api/settings/branding')
       .then((r) => r.json())
       .then((b) => { if (b?.shopName) setShopName(b.shopName); })
       .catch(() => {});
-  }, [fetchIngredients, fetchSuppliers, fetchCapacity]);
+  }, [fetchIngredients, fetchSuppliers, fetchSupplierInsights, fetchCapacity]);
 
   useSocket({
     events: {
@@ -624,12 +692,31 @@ const [shopName, setShopName] = useState('CafeOS');
   }
 
   async function savePurchase() {
+    const ingredient = ingredients.find((i) => i.id === Number(purchaseForm.ingredientId));
     const qty = parseFloat(purchaseForm.quantity);
     const cost = parseFloat(purchaseForm.purchaseCost);
-    if (isNaN(qty) || qty <= 0 || isNaN(cost) || cost < 0) return;
-    if (!purchaseForm.purchaseUnit) return;
-    if (!purchaseForm.ingredientId) {
+
+    // Spec 014 / QS error cases — reject before any write.
+    if (!ingredient) {
       alert('Please select an ingredient');
+      return;
+    }
+    if (isNaN(qty) || qty <= 0) {
+      alert('Quantity must be greater than 0');
+      return;
+    }
+    if (isNaN(cost) || cost < 0) {
+      alert('Purchase cost cannot be negative');
+      return;
+    }
+    if (!purchaseForm.purchaseUnit) {
+      alert('Unit is required');
+      return;
+    }
+    if (!canConvertUnit(ingredient.baseUnit, purchaseForm.purchaseUnit)) {
+      alert(
+        `Cannot record a ${purchaseForm.purchaseUnit} purchase for an ingredient stocked in ${ingredient.baseUnit}. Supported units: ${purchaseUnitOptions(ingredient.baseUnit).join(', ')}`
+      );
       return;
     }
 
@@ -640,7 +727,7 @@ const [shopName, setShopName] = useState('CafeOS');
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ingredientId: parseInt(String(purchaseForm.ingredientId)),
+          ingredientId: ingredient.id,
           quantity: qty,
           purchaseUnit: purchaseForm.purchaseUnit,
           purchaseCost: cost,
@@ -658,6 +745,7 @@ const [shopName, setShopName] = useState('CafeOS');
           supplierId: '', purchaseDate: '', notes: '',
         });
         fetchIngredients();
+        fetchSupplierInsights();
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to record purchase');
@@ -669,6 +757,13 @@ const [shopName, setShopName] = useState('CafeOS');
       setPurchaseSaving(false);
     }
   }
+
+  // Spec 014 US1: units offered in the purchase form depend on the selected
+  // ingredient's base unit so only convertible real-world units are offered.
+  const purchaseIngredient = ingredients.find((i) => i.id === Number(purchaseForm.ingredientId)) ?? null;
+  const purchaseUnitOptionsForIngredient = purchaseIngredient
+    ? purchaseUnitOptions(purchaseIngredient.baseUnit)
+    : [];
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 min-h-screen">
@@ -790,6 +885,12 @@ const [shopName, setShopName] = useState('CafeOS');
                   className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 >
                   + Add Purchase
+                </button>
+                <button
+                  onClick={() => setBulkOpen(true)}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                >
+                  ⚖ Bulk Adjust
                 </button>
                 <button
                   onClick={() => { setPlannerOpen(true); setCalcResult(null); setCalcProducts({}); }}
@@ -968,6 +1069,13 @@ const [shopName, setShopName] = useState('CafeOS');
                                     Details
                                   </button>
                                   <button
+                                    onClick={() => setHistoryIngredient(ing)}
+                                    title="Purchase history with price changes"
+                                    className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+                                  >
+                                    History
+                                  </button>
+                                  <button
                                     onClick={() => deleteIngredient(ing.id)}
                                     className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
                                   >
@@ -1010,7 +1118,14 @@ const [shopName, setShopName] = useState('CafeOS');
                       <label className="block text-xs font-medium text-gray-500 mb-1">Ingredient *</label>
                       <select
                         value={purchaseForm.ingredientId}
-                        onChange={(e) => setPurchaseForm((f) => ({ ...f, ingredientId: e.target.value }))}
+                        onChange={(e) => {
+                          const ingredientId = e.target.value;
+                          const ing = ingredients.find((i) => i.id === Number(ingredientId));
+                          const options = ing ? purchaseUnitOptions(ing.baseUnit) : [];
+                          const preferred = ing ? ing.purchaseUnit || ing.baseUnit || '' : '';
+                          const nextUnit = preferred && options.includes(preferred) ? preferred : (options[0] ?? '');
+                          setPurchaseForm((f) => ({ ...f, ingredientId, purchaseUnit: nextUnit }));
+                        }}
                         required
                         className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                       >
@@ -1048,10 +1163,13 @@ const [shopName, setShopName] = useState('CafeOS');
                           value={purchaseForm.purchaseUnit}
                           onChange={(e) => setPurchaseForm((f) => ({ ...f, purchaseUnit: e.target.value }))}
                           required
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                          disabled={!purchaseIngredient}
+                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black disabled:bg-gray-50 disabled:text-gray-400"
                         >
-                          <option value="">Select unit</option>
-                          {['kg', 'g', 'L', 'ml', 'pcs', 'bottle', 'pack', 'box', 'sachet'].map((u) => (
+                          <option value="">
+                            {purchaseIngredient ? 'Select unit' : 'Select an ingredient first'}
+                          </option>
+                          {purchaseUnitOptionsForIngredient.map((u) => (
                             <option key={u} value={u}>{u}</option>
                           ))}
                         </select>
@@ -1071,22 +1189,38 @@ const [shopName, setShopName] = useState('CafeOS');
                       />
                     </div>
 
-                    {/* Auto-calculated Price Per Unit display */}
-                    {purchaseForm.quantity && purchaseForm.purchaseCost && purchaseForm.purchaseUnit && (
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <span className="text-xs text-gray-500 font-medium">
-                          Price Per Unit:{' '}
-                          {(() => {
-                            const qty = parseFloat(purchaseForm.quantity);
-                            const cost = parseFloat(purchaseForm.purchaseCost);
-                            if (qty > 0) {
-                              return `₱${Math.round((cost / qty) * 100) / 100}/${purchaseForm.purchaseUnit}`;
-                            }
-                            return '—';
-                          })()}
-                        </span>
-                      </div>
-                    )}
+                    {/* Auto-calculated unit-cost preview (spec 014 US1): price
+                        per purchase unit AND per converted base unit, using the
+                        same math the server persists. */}
+                    {purchaseIngredient &&
+                      purchaseForm.quantity &&
+                      purchaseForm.purchaseCost &&
+                      purchaseForm.purchaseUnit &&
+                      (() => {
+                        const breakdown = computePurchaseCostBreakdown(
+                          purchaseIngredient.baseUnit,
+                          purchaseForm.purchaseUnit,
+                          parseFloat(purchaseForm.quantity),
+                          parseFloat(purchaseForm.purchaseCost),
+                        );
+                        if (!breakdown) return null;
+                        return (
+                          <div className="bg-gray-50 rounded-xl p-4 space-y-1">
+                            <p className="text-xs text-gray-500 font-medium">
+                              Price per {purchaseForm.purchaseUnit}:{' '}
+                              <span className="text-gray-900 font-semibold">
+                                {breakdown.pricePerUnit != null ? formatPeso(breakdown.pricePerUnit) : '—'}
+                              </span>
+                            </p>
+                            <p className="text-xs text-gray-500 font-medium">
+                              Unit cost: <span className="text-gray-900 font-semibold">
+                                {formatPeso(breakdown.unitCostBase)} / {purchaseIngredient.baseUnit}
+                              </span>
+                              <span className="text-gray-400"> · {breakdown.quantityInBase.toLocaleString()} {purchaseIngredient.baseUnit} in stock</span>
+                            </p>
+                          </div>
+                        );
+                      })()}
 
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Supplier</label>
@@ -1203,6 +1337,9 @@ const [shopName, setShopName] = useState('CafeOS');
                             )
                           )
                         );
+                        // Spec 014 US3: prices come from PURCHASE ledger rows, not
+                        // the (latest-supplier) cache — see data-model.md.
+                        const insightItems = supplierInsights.find((s) => s.supplierId === supplier.id)?.items ?? [];
                         return (
                           <Fragment key={supplier.id}>
                             <tr
@@ -1285,6 +1422,38 @@ const [shopName, setShopName] = useState('CafeOS');
                                         </div>
                                       )}
                                     </div>
+                                  </div>
+
+                                  {/* Spec 014 US3: ingredient prices from this supplier's purchases */}
+                                  <div className="mt-4">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                                      Ingredient prices (from purchase history)
+                                    </p>
+                                    {insightItems.length === 0 ? (
+                                      <p className="text-gray-400 text-sm">
+                                        No purchases from this supplier yet — after you record a purchase, its
+                                        ingredients and price history appear here.
+                                      </p>
+                                    ) : (
+                                      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+                                        {insightItems.map((item) => (
+                                          <div key={`${item.supplierId}-${item.ingredientId}`} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                                            <div className="min-w-0">
+                                              <p className="text-gray-900 font-medium text-sm truncate">{item.ingredientName}</p>
+                                              <p className="text-gray-400 text-xs">{item.purchaseCount} purchase{item.purchaseCount === 1 ? '' : 's'}</p>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                              <p className="text-gray-900 font-semibold text-sm">
+                                                {item.latestUnitCost != null
+                                                  ? `${formatPeso(item.latestUnitCost)} / ${item.baseUnit}`
+                                                  : '—'}
+                                              </p>
+                                              <TrendText change={item.change} baseUnit={item.baseUnit} />
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -2083,6 +2252,350 @@ const [shopName, setShopName] = useState('CafeOS');
           </div>
         </div>
       )}
+
+      {/* Spec 014 US2/FR-009: per-ingredient purchase history + void */}
+      {historyIngredient && (
+        <PurchaseHistoryModal
+          ingredient={historyIngredient}
+          onClose={() => setHistoryIngredient(null)}
+          onChanged={() => {
+            fetchIngredients();
+            fetchSupplierInsights();
+          }}
+        />
+      )}
+
+      {/* Spec 014 US4: bulk stock adjust */}
+      {bulkOpen && (
+        <BulkAdjustModal
+          ingredients={ingredients}
+          onClose={() => setBulkOpen(false)}
+          onApplied={() => {
+            setBulkOpen(false);
+            fetchIngredients();
+          }}
+        />
+      )}
      </div>
    );
+}
+
+// ---------------------------------------------------------------------------
+// Spec 014 US3: ₱/% change vs previous purchase text (increase red, decrease
+// green, equal neutral — equal price shows ₱0.00 (0%), never "no data").
+// ---------------------------------------------------------------------------
+function TrendText({ change, baseUnit }: { change: { delta: number; percent: number } | null; baseUnit?: string }) {
+  if (!change) {
+    return <span className="text-xs text-gray-400">First purchase</span>;
+  }
+  if (change.delta === 0) {
+    return <span className="text-xs font-medium text-gray-400">₱0.00 (0%)</span>;
+  }
+  const up = change.delta > 0;
+  const sign = up ? '+' : '-';
+  return (
+    <span className={`text-xs font-semibold ${up ? 'text-rose-600' : 'text-emerald-600'}`}>
+      {sign}₱{Math.abs(change.delta).toFixed(2)}{baseUnit ? ` / ${baseUnit}` : ''} ({sign}
+      {Math.abs(change.percent).toFixed(2)}%)
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Spec 014 US2 + FR-009: one ingredient's purchase history with supplier,
+// entered + base quantity, total, unit cost, ₱/% change vs the previous
+// purchase, and the admin Void action.
+// ---------------------------------------------------------------------------
+function PurchaseHistoryModal({
+  ingredient,
+  onClose,
+  onChanged,
+}: {
+  ingredient: { id: number; name: string; baseUnit: string };
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [history, setHistory] = useState<PurchaseHistoryData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [voidingId, setVoidingId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setHistory(await fetchJson<PurchaseHistoryData>(`/api/ingredients/${ingredient.id}/purchases`));
+    } catch (e) {
+      setLoadError(userMessage(e, 'Could not load purchase history.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [ingredient.id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function handleVoid(row: PurchaseHistoryRow) {
+    const confirmed = window.confirm(
+      `Void purchase #${row.id}? The original record is never changed — a compensating VOID entry is appended and stock rolls back. ` +
+        `If this was the latest purchase, unit cost and latest supplier also roll back to the previous purchase.`
+    );
+    if (!confirmed) return;
+    setVoidingId(row.id);
+    try {
+      const res = await fetch(`/api/ingredients/purchases/${row.id}/void`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Failed to void purchase');
+        return;
+      }
+      onChanged();
+      await load();
+    } catch (e) {
+      alert(userMessage(e, 'Failed to void purchase'));
+    } finally {
+      setVoidingId(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">{ingredient.name} — Purchase History</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {history?.ingredient
+                ? `Stock ${history.ingredient.currentStock.toLocaleString()} ${history.ingredient.baseUnit} · Latest cost ${formatPeso(history.ingredient.costPerUnit)} / ${history.ingredient.baseUnit}`
+                : `Stocked in ${ingredient.baseUnit}`}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 flex items-center justify-center transition-all"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3 overflow-y-auto flex-1 min-h-0">
+          {loadError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
+          )}
+          {loading ? (
+            <div className="py-12 text-center text-gray-400">Loading purchase history...</div>
+          ) : !history || history.purchases.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-gray-500 font-medium">No purchases recorded yet.</p>
+              <p className="text-gray-400 text-sm mt-1">Use “+ Add Purchase” to record the first delivery.</p>
+            </div>
+          ) : (
+            history.purchases.map((row) => (
+              <div key={row.id} className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-gray-400 text-xs font-medium">
+                        {new Date(row.createdAt).toLocaleString('en-PH', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                      {row.supplierName ? (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700">
+                          {row.supplierName}
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500">
+                          No supplier
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-900 font-medium text-sm mt-1.5">
+                      {row.enteredQuantity.toLocaleString()} {row.purchaseUnit || ingredient.baseUnit}
+                      <span className="text-gray-400 font-normal"> = {row.quantity.toLocaleString()} {ingredient.baseUnit}</span>
+                    </p>
+                    <div className="flex items-center gap-4 mt-1 flex-wrap">
+                      <span className="text-sm text-gray-700">
+                        Total: <span className="font-semibold">{formatPeso(row.purchaseCost)}</span>
+                      </span>
+                      {row.unitCost != null && (
+                        <span className="text-sm text-gray-700">
+                          Unit cost: <span className="font-semibold">{formatPeso(row.unitCost)} / {ingredient.baseUnit}</span>
+                        </span>
+                      )}
+                      <TrendText change={row.change} baseUnit={ingredient.baseUnit} />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleVoid(row)}
+                    disabled={voidingId != null || row.voided}
+                    className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-60 ${
+                      row.voided
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-red-50 hover:bg-red-100 text-red-600'
+                    }`}
+                    title={row.voided ? 'This purchase was already voided (compensating VOID entry exists)' : undefined}
+                  >
+                    {row.voided ? 'Voided' : voidingId === row.id ? 'Voiding...' : 'Void'}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 flex justify-end">
+          <button
+            onClick={onClose}
+            className="bg-black hover:bg-gray-800 text-white font-semibold py-2 px-5 rounded-xl transition"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Spec 014 US4: bulk stock corrections — one action saves the whole batch.
+// Mirrors the tablet dialog: enter +/− amounts, nothing below zero, stock only.
+// ---------------------------------------------------------------------------
+function BulkAdjustModal({
+  ingredients,
+  onClose,
+  onApplied,
+}: {
+  ingredients: IngredientItem[];
+  onClose: () => void;
+  onApplied: () => void;
+}) {
+  const [deltas, setDeltas] = useState<Record<number, string>>({});
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function apply() {
+    setError(null);
+    const rows: { ingredientId: number; adjustment: number }[] = [];
+    for (const ing of ingredients) {
+      const text = (deltas[ing.id] ?? '').trim();
+      if (!text) continue;
+      const delta = parseFloat(text);
+      if (!Number.isFinite(delta)) {
+        setError(`Enter a valid number for ${ing.name}.`);
+        return;
+      }
+      if (delta === 0) continue;
+      if (ing.currentStock + delta < 0) {
+        setError(`${ing.name} would drop below zero (only ${ing.currentStock} ${ing.baseUnit} left). Nothing was changed.`);
+        return;
+      }
+      rows.push({ ingredientId: ing.id, adjustment: delta });
+    }
+    if (rows.length === 0) {
+      setError('Enter at least one adjustment.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await fetchJson('/api/ingredients/bulk-adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows, notes }),
+      });
+      onApplied();
+    } catch (e) {
+      setError(userMessage(e, 'Failed to save bulk adjustment. Nothing was changed.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Bulk Adjust Stock</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Enter + to receive, − to correct down (stock can&apos;t go below zero). Stock only — never touches cost or supplier.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 flex items-center justify-center transition-all"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3 overflow-y-auto flex-1 min-h-0">
+          <input
+            type="text"
+            placeholder="Reason (optional, shared by the whole batch)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+          />
+          {ingredients.length === 0 ? (
+            <p className="py-10 text-center text-gray-400 text-sm">No ingredients to adjust.</p>
+          ) : (
+            ingredients.map((ing) => {
+              const isOut = ing.currentStock <= 0;
+              return (
+                <div key={ing.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-gray-900 font-medium text-sm truncate">{ing.name}</p>
+                    <p className={`text-xs ${isOut ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                      {ing.currentStock.toLocaleString()} {ing.baseUnit} in stock{isOut ? ' — out of stock' : ''}
+                    </p>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Δ"
+                    value={deltas[ing.id] ?? ''}
+                    onChange={(e) => setDeltas((prev) => ({ ...prev, [ing.id]: e.target.value }))}
+                    className="w-28 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-center text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+                  />
+                </div>
+              );
+            })
+          )}
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 flex gap-3 justify-end">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-white text-gray-700 font-semibold py-2.5 rounded-xl border border-gray-200 hover:bg-gray-100 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={apply}
+            disabled={saving || ingredients.length === 0}
+            className="flex-1 bg-black hover:bg-gray-800 text-white font-semibold py-2.5 rounded-xl transition disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Apply All'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

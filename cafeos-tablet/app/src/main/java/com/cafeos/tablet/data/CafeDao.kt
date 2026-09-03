@@ -173,7 +173,7 @@ interface CafeDao {
     suspend fun deleteIngredient(ingredient: Ingredient)
 
     @Insert
-    suspend fun insertIngredientTransaction(transaction: IngredientTransaction)
+    suspend fun insertIngredientTransaction(transaction: IngredientTransaction): Long
 
     @Insert
     suspend fun insertIngredientTransactions(transactions: List<IngredientTransaction>)
@@ -291,9 +291,22 @@ interface CafeDao {
     @Query("SELECT * FROM IngredientTransaction WHERE ingredientId = :ingredientId ORDER BY createdAt DESC")
     fun getTransactionsForIngredient(ingredientId: Int): Flow<List<IngredientTransaction>>
 
+    // Spec 014: full ledger of one ingredient in row-id (ledger) order for the
+    // pure void-reversal decision (T026/T028) — latest/previous are computed by
+    // VoidReversal over PURCHASE rows, never over VOID rows.
+    @Query("SELECT * FROM IngredientTransaction WHERE ingredientId = :ingredientId ORDER BY id ASC")
+    suspend fun getIngredientLedgerSync(ingredientId: Int): List<IngredientTransaction>
+
     // Spec 014: latest supplier (non-void purchase supplier link) for an ingredient.
     @Query("SELECT referenceId FROM IngredientTransaction WHERE ingredientId = :ingredientId AND type = 'PURCHASE' AND referenceType = 'supplier' AND referenceId IS NOT NULL ORDER BY id DESC LIMIT 1")
     suspend fun latestSupplierIdForIngredient(ingredientId: Int): Int?
+
+    // Spec 014 (supplier-delete safety, T032): latest supplier from the remaining
+    // non-void purchase history, EXCLUDING a specific (about-to-be-deleted)
+    // supplier — so an ingredient falls back to its prior supplier or none,
+    // never re-points at a removed id.
+    @Query("SELECT referenceId FROM IngredientTransaction WHERE ingredientId = :ingredientId AND type = 'PURCHASE' AND referenceType = 'supplier' AND referenceId IS NOT NULL AND referenceId != :excludeSupplierId ORDER BY id DESC LIMIT 1")
+    suspend fun latestSupplierIdForIngredientExcluding(ingredientId: Int, excludeSupplierId: Int): Int?
 
     // Spec 014: unit cost of the purchase immediately before :beforeId (row-id
     // order = ledger order) for trend math.

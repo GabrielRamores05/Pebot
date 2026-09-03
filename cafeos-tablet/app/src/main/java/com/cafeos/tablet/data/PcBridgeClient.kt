@@ -108,6 +108,47 @@ object PcBridgeClient {
         put("notes", notes)
     }
 
+    // ── Spec 014 T029 (contract: specs/014-purchase-supplier-insights/contracts/bridge-schema.md)
+    // Snapshot ingredient objects carry the cached latest supplier; ledger rows
+    // carry their supplier linkage; VOID_PURCHASE rows flow through with their
+    // type so the PC can apply the reverse exactly like a local void. Money
+    // values travel unrounded as decimal numbers.
+
+    /** Ingredient object for a tablet→PC snapshot (carries `lastSupplierId`). */
+    fun ingredientPayload(ingredient: Ingredient): JsonObject = buildJsonObject {
+        put("ingredientId", ingredient.id)
+        put("name", ingredient.name)
+        put("category", ingredient.category)
+        put("baseUnit", ingredient.baseUnit)
+        put("currentStock", ingredient.currentStock)
+        put("minStock", ingredient.minStock)
+        put("costPerUnit", ingredient.costPerUnit)
+        ingredient.lastSupplierId?.let { put("lastSupplierId", it) }
+    }
+
+    /** One ledger row for a tablet→PC snapshot (referenceType/referenceId as stored). */
+    fun transactionPayload(txn: IngredientTransaction): JsonObject = buildJsonObject {
+        put("transactionId", txn.id)
+        put("ingredientId", txn.ingredientId)
+        put("type", txn.type) // PURCHASE / ADJUSTMENT / USAGE / OPENING / VOID_PURCHASE
+        put("quantity", txn.quantity)
+        txn.referenceType?.let { put("referenceType", it) }
+        txn.referenceId?.let { put("referenceId", it) }
+        txn.purchaseUnit?.let { put("purchaseUnit", it) }
+        txn.purchaseCost?.let { put("purchaseCost", it) }
+        txn.unitCost?.let { put("unitCost", it) }
+        txn.notes?.let { put("notes", it) }
+    }
+
+    /** Full inventory snapshot payload (ingredients first, then their ledger). */
+    fun inventorySnapshotPayload(
+        ingredients: List<Ingredient>,
+        transactions: List<IngredientTransaction>
+    ): JsonObject = buildJsonObject {
+        put("ingredients", JsonArray(ingredients.map { ingredientPayload(it) }))
+        put("ingredientTransactions", JsonArray(transactions.map { transactionPayload(it) }))
+    }
+
     /** Serializes any [payload] so callers can store it in the OutboxQueue. */
     fun serialize(payload: JsonObject): String = json.encodeToString<JsonObject>(payload)
 
