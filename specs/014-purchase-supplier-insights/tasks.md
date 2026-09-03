@@ -103,8 +103,8 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 **Independent Test**: quickstart QS-3 â€” 3 ingredients adjusted in one batch; levels and ADJUSTMENT history rows update immediately; low flags refresh.
 
-- [ ] T019 [US4] Tablet data/state: batch-adjust in one transaction writing ADJUSTMENT rows with `referenceType='batch'` in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`; batch id = first ADJUSTMENT row id on every row; reject any row that would push stock below zero (validate the whole batch before writing)
-- [ ] T020 [US4] Tablet UI: bulk-adjust screen (multi-row edit + single save) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt`
+- [X] T019 [US4] Tablet data/state: batch-adjust in one transaction writing ADJUSTMENT rows with `referenceType='batch'` in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`; batch id = shared batch token in every row's notes (`referenceType='batch'`); reject any row that would push stock below zero (validate the whole batch before writing)
+- [X] T020 [US4] Tablet UI: bulk-adjust screen (multi-row edit + single save) in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/InventoryScreen.kt`
 - [ ] T021 [US4] Web: bulk-adjust service + UI in `my-app/modules/inventory/` and `my-app/app/admin/inventory/page.tsx` (same single-transaction semantics; batch identity and below-zero rejection identical to T019)
 
 **Checkpoint**: QS-3 passes on both apps; US4 independently testable.
@@ -219,6 +219,7 @@ Task: "Web UI (T010) in app/admin/inventory/page.tsx"
 - Money and stock writes are append-only and single-transaction (constitution); VOID replaces edit/delete
 - Unit costs are always computed from stored quantity + total â€” never accepted from the client
 - Commit after each task or logical group; stop at checkpoints to validate the story independently
+
 
 
 

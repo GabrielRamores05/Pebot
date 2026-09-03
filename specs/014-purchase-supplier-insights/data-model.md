@@ -1,6 +1,6 @@
-# Data Model — Inventory & Purchasing Intelligence (014)
+﻿# Data Model â€” Inventory & Purchasing Intelligence (014)
 
-Phase 1 output. Mirrors the existing CaféOS domain on both surfaces (Room schema
+Phase 1 output. Mirrors the existing CafÃ©OS domain on both surfaces (Room schema
 on the tablet, Prisma schema on the web/PC). Existing rows remain valid; all
 changes are additive except the semantics described below.
 
@@ -15,11 +15,11 @@ Represents one stocked item whose stock is tracked in a single **base unit**.
 | id | PK | |
 | name | string | |
 | category | string | e.g. General |
-| baseUnit | enum-ish string | `g` / `ml` / `pcs` — the unit every stock amount and trend is expressed in |
+| baseUnit | enum-ish string | `g` / `ml` / `pcs` â€” the unit every stock amount and trend is expressed in |
 | currentStock | double | mutable only through append-only transactions |
 | minStock | double | the adjustable **low-stock threshold** (single source of truth for all low flags) |
 | costPerUnit | double | **latest purchase unit cost** (replaced on each purchase; Q3 decision) |
-| **lastSupplierId** (NEW) | nullable FK → Supplier | latest supplier of this ingredient; set transactionally on purchase; null = never purchased |
+| **lastSupplierId** (NEW) | nullable FK â†’ Supplier | latest supplier of this ingredient; set transactionally on purchase; null = never purchased |
 | updatedAt | timestamp | |
 
 ### Supplier (existing, unchanged)
@@ -29,16 +29,16 @@ Represents one stocked item whose stock is tracked in a single **base unit**.
 | id, name, contact/phone/email/address, notes | unchanged |
 | status | ACTIVE / INACTIVE |
 
-### IngredientTransaction (existing — now the full purchase/adjustment ledger)
+### IngredientTransaction (existing â€” now the full purchase/adjustment ledger)
 
 Append-only; every stock movement is one row. `type` values used: `PURCHASE`,
 `ADJUSTMENT`, `USAGE`, `OPENING`, and `VOID_PURCHASE` (an appended compensating
-row that reverses a purchase — the original row is never modified).
+row that reverses a purchase â€” the original row is never modified).
 
 | Attribute | Type | Notes |
 |-----------|------|-------|
 | id | PK | auto-increment; **row-id order = ledger order** (used for "previous purchase") |
-| ingredientId | FK → Ingredient | |
+| ingredientId | FK â†’ Ingredient | |
 | type | string | PURCHASE / ADJUSTMENT / USAGE / OPENING / VOID_PURCHASE |
 | quantity | double | base-unit amount; positive for stock in, negative for stock out |
 | referenceId | nullable int | NEW meaning: when `referenceType='supplier'` this is the Supplier id; batch id for bulk adjustments |
@@ -50,7 +50,7 @@ row that reverses a purchase — the original row is never modified).
 latest-value queries ignore `VOID_PURCHASE` rows. A purchase row is never
 updated or deleted.
 
-### SupplierIngredientPrice (existing — price snapshot table)
+### SupplierIngredientPrice (existing â€” price snapshot table)
 
 Kept for any legacy/quick price display, but it is **not** the source of truth
 for purchase history or trends in this feature; those are derived from
@@ -70,20 +70,20 @@ Projection over Ingredient rows:
 - healthy: `currentStock > minStock`
 - low: `0 < currentStock <= minStock`
 - out: `currentStock <= 0`
-- stock value: `Σ (currentStock × costPerUnit)`
+- stock value: `Î£ (currentStock Ã— costPerUnit)`
 
 ## Relationship map
 
 ```text
-Supplier 1 ───< IngredientTransaction (PURCHASE via referenceType='supplier') >─── Ingredient 1
-Supplier 1 ───< SupplierIngredientPrice >─── Ingredient 1
-Ingredient.lastSupplierId ──────────────────→ Supplier (denormalized latest)
-Ingredient 1 ───< IngredientTransaction (all types) ─── order consumption, purchases, adjustments, voids
+Supplier 1 â”€â”€â”€< IngredientTransaction (PURCHASE via referenceType='supplier') >â”€â”€â”€ Ingredient 1
+Supplier 1 â”€â”€â”€< SupplierIngredientPrice >â”€â”€â”€ Ingredient 1
+Ingredient.lastSupplierId â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â†’ Supplier (denormalized latest)
+Ingredient 1 â”€â”€â”€< IngredientTransaction (all types) â”€â”€â”€ order consumption, purchases, adjustments, voids
 ```
 
 ## State transitions
 
-- Purchase: draft (form) → `PURCHASE` row written; ingredient `currentStock += qty`;
+- Purchase: draft (form) â†’ `PURCHASE` row written; ingredient `currentStock += qty`;
   `costPerUnit = total/qty(base)`; `lastSupplierId = supplier` (when given).
   All inside one transaction.
 - Void purchase: a **compensating row** is appended: `type = 'VOID_PURCHASE'`,
@@ -93,7 +93,7 @@ Ingredient 1 ───< IngredientTransaction (all types) ─── order consum
   ingredient, `costPerUnit` and `lastSupplierId` revert to the previous non-void
   purchase (or null when none); an audit event is written. Voiding a purchase
   that is NOT the latest only reverses stock.
-- Bulk adjustment: per row → new `ADJUSTMENT` row; stock changed; one transaction
+- Bulk adjustment: per row â†’ new `ADJUSTMENT` row; stock changed; one transaction
   for the whole batch. Batch identity = the first `ADJUSTMENT` row's id, written
   into every row's `referenceId` with `referenceType = 'batch'`. No batch row may
   push an ingredient's stock below zero (validated before the transaction).
@@ -111,6 +111,7 @@ Ingredient 1 ───< IngredientTransaction (all types) ─── order consum
   page, alerts, and analytics: healthy = `currentStock > minStock`, low =
   `0 < currentStock <= minStock` (stock equal to the threshold is low), out =
   `currentStock <= 0`.
-- Client-submitted unit costs are never accepted; unit cost = stored total ÷
+- Client-submitted unit costs are never accepted; unit cost = stored total Ã·
   stored converted quantity.
 - Manual stock corrections (bulk or single) never push stock below zero.
+

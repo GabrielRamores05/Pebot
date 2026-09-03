@@ -169,6 +169,7 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
     var showAdjustDialog by remember { mutableStateOf<Ingredient?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
     var showPurchaseDialog by remember { mutableStateOf(false) }
+    var showBulkDialog by remember { mutableStateOf(false) }
     var historyIngredient by remember { mutableStateOf<Ingredient?>(null) }
     val scope = rememberCoroutineScope()
     val supplierById = suppliers.associateBy { it.id }
@@ -291,6 +292,18 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
             Spacer(modifier = Modifier.width(8.dp))
             Text("Record Purchase", color = PosGold, fontWeight = FontWeight.SemiBold)
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { showBulkDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, PosInfo)
+        ) {
+            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp), tint = PosInfo)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Bulk Adjust Stock", color = PosInfo, fontWeight = FontWeight.SemiBold)
+        }
     }
 
     showAdjustDialog?.let { ingredient ->
@@ -333,6 +346,17 @@ fun InventoryIngredientsTab(viewModel: CafeViewModel) {
                     viewModel.purchaseIngredientWithUnits(ingredientId, purchaseUnit, quantity, totalCost, supplierId, notes)
                     showPurchaseDialog = false
                 }
+            }
+        )
+    }
+
+    if (showBulkDialog) {
+        BulkAdjustDialog(
+            ingredients = ingredients,
+            onDismiss = { showBulkDialog = false },
+            onApply = { lines ->
+                viewModel.bulkAdjustStock(lines)
+                showBulkDialog = false
             }
         )
     }

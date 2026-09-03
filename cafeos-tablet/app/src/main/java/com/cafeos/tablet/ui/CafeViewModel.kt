@@ -951,6 +951,50 @@ class CafeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Bulk stock corrections (spec 014, US4). One transaction for the whole
+     * batch; each line writes an ADJUSTMENT row sharing the batch token in its
+     * notes. No row may push stock below zero — the whole batch is validated
+     * first so a bad row saves nothing. Never touches cost or supplier.
+     */
+    fun bulkAdjustStock(adjustments: List<Pair<Int, Double>>, notes: String = "Bulk adjust") {
+        if (adjustments.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                db.withTransaction {
+                    // Validate the entire batch against current stock before writing.
+                    for ((ingredientId, delta) in adjustments) {
+                        val ingredient = dao.getIngredientSync(ingredientId) ?: return@withTransaction
+                        if (ingredient.currentStock + delta < 0.0) return@withTransaction
+                    }
+                    val batchToken = "bulk-" + System.currentTimeMillis()
+                    for ((ingredientId, delta) in adjustments) {
+                        if (delta == 0.0) continue
+                        val ingredient = dao.getIngredientSync(ingredientId) ?: continue
+                        dao.updateIngredient(
+                            ingredient.copy(
+                                currentStock = ingredient.currentStock + delta,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                        dao.insertIngredientTransaction(
+                            IngredientTransaction(
+                                ingredientId = ingredientId,
+                                type = "ADJUSTMENT",
+                                quantity = delta,
+                                referenceType = "batch",
+                                notes = if (notes.isBlank()) batchToken else "$notes · $batchToken",
+                                createdAt = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                }
+            } catch (e: Throwable) {
+                android.util.Log.e("BulkAdjust", "Bulk adjustment failed", e)
+            }
+        }
+    }
+
     suspend fun adjustStock(ingredientId: Int, newStock: Double, notes: String? = null) {
         val ingredient = dao.getIngredientSync(ingredientId) ?: return
         val delta = newStock - ingredient.currentStock
