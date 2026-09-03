@@ -4,6 +4,14 @@ Last updated: 2026-09-04 (goal rounds 0–18). Gates last verified (round 18):
 Android lintDebug/testDebugUnitTest/assembleDebug green; web lint (0 errors)/
 tsc clean/test:unit (422) green.
 
+## Latest increments (rounds 32–33)
+
+- Receipt printer honors the configured footer message; Settings ▸ Receipts can
+  edit it.
+- Tables card quick actions: guest −/+ (0…capacity) and one-tap status cycle
+  AVAILABLE → OCCUPIED → NEEDS_CLEANING → AVAILABLE (web behavior).
+- Full Android gates green at round 32; commit `fce2a39` (rounds 29–31).
+
 ## Latest increments (rounds 19–31)
 
 - HR module UI completed: Staff now has all eight tabs — Team, Time Clock,

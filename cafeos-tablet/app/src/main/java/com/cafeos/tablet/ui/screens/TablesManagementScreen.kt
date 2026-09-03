@@ -93,7 +93,18 @@ fun TablesManagementScreen(viewModel: CafeViewModel) {
                         table = table,
                         sections = sections,
                         onEdit = { editingTable = table; showTableForm = true },
-                        onDelete = { scope.launch { viewModel.deleteTable(table) } }
+                        onDelete = { scope.launch { viewModel.deleteTable(table) } },
+                        onSetOccupancy = { delta ->
+                            scope.launch {
+                                viewModel.saveTable(table.copy(currentOccupants = (table.currentOccupants + delta).coerceIn(0, table.capacity)))
+                            }
+                        },
+                        onCycleStatus = {
+                            scope.launch {
+                                val next = nextTableStatus(table.status)
+                                viewModel.saveTable(table.copy(status = next))
+                            }
+                        }
                     )
                 }
                 item {
@@ -134,8 +145,22 @@ fun TablesManagementScreen(viewModel: CafeViewModel) {
     }
 }
 
+private fun nextTableStatus(current: String): String = when (current) {
+    "AVAILABLE" -> "OCCUPIED"
+    "OCCUPIED" -> "NEEDS_CLEANING"
+    "RESERVED" -> "AVAILABLE"
+    else -> "AVAILABLE" // NEEDS_CLEANING or anything else → ready again
+}
+
 @Composable
-fun TableManagementCard(table: CafeTable, sections: List<TableSection>, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun TableManagementCard(
+    table: CafeTable,
+    sections: List<TableSection>,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onSetOccupancy: (Int) -> Unit,
+    onCycleStatus: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -166,6 +191,19 @@ fun TableManagementCard(table: CafeTable, sections: List<TableSection>, onEdit: 
                     else -> PosInkSoft
                 }
                 Text(table.status, style = MaterialTheme.typography.labelSmall, color = statusColor, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Guests: ${table.currentOccupants}/${table.capacity}", style = MaterialTheme.typography.bodySmall, color = PosInkSoft)
+                    TextButton(onClick = { onSetOccupancy(-1) }, contentPadding = PaddingValues(horizontal = 6.dp)) { Text("−", fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = { onSetOccupancy(1) }, contentPadding = PaddingValues(horizontal = 6.dp)) { Text("+", fontWeight = FontWeight.Bold) }
+                }
+                TextButton(onClick = onCycleStatus, contentPadding = PaddingValues(0.dp)) {
+                    Text(
+                        "Mark ${nextTableStatus(table.status)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = PosAccent,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             Row {
                 IconButton(onClick = onEdit) {
