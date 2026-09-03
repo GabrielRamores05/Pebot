@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
 import { badRequest, notFound, serverError, unauthorized } from '@/lib/api-response';
+import { deleteSupplier } from '@/modules/inventory/repository';
 
 // GET /api/suppliers - list all suppliers
 export async function GET(req: NextRequest) {
@@ -116,9 +117,9 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return badRequest('Supplier ID required');
 
-    await prisma.supplier.delete({
-      where: { id: Number(id) },
-    });
+    // Domain-side guard: recomputes affected ingredients' latest supplier
+    // from remaining purchase history (spec 014 T032).
+    await deleteSupplier(Number(id));
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

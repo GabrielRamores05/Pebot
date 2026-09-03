@@ -91,7 +91,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 - [X] T016 [US3] Tablet data: DAO `purchasesForSupplier` + ViewModel `supplierIngredientTrends` (latest + previous same-supplier purchase per ingredient)
 - [ ] T017 [US3] Tablet UI: Suppliers page at `cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/screens/SuppliersScreen.kt` (new) showing ingredient rows with latest price and â‚±/% change; wire into navigation in `cafeos-tablet/app/src/main/java/com/cafeos/tablet/MainActivity.kt`
 - [ ] T018 [US3] Web: supplier page data (repository/service) and UI in `my-app/app/admin/suppliers/page.tsx` (or existing suppliers area) with the same change figures
-- [ ] T032 [P] [US3] Supplier-deletion safety — tablet done (recompute lastSupplierId on delete); web half remains: warn when a supplier has purchase history; on delete, recompute-or-clear `lastSupplierId` on every affected ingredient from remaining non-void purchases (tablet: `cafeos-tablet/.../ui/CafeViewModel.kt` + `data/CafeDao.kt`; web: `my-app/modules/inventory/service.ts`)
+- [X] T032 [P] [US3] Supplier-deletion safety on both apps (tablet recomputes lastSupplierId; web repository deleteSupplier recomputes ingredient.supplierId from remaining history, DELETE /api/suppliers now thin): warn when a supplier has purchase history; on delete, recompute-or-clear `lastSupplierId` on every affected ingredient from remaining non-void purchases (tablet: `cafeos-tablet/.../ui/CafeViewModel.kt` + `data/CafeDao.kt`; web: `my-app/modules/inventory/service.ts`)
 
 **Checkpoint**: QS-2 supplier scenario passes on both apps; US3 independently testable.
 
@@ -131,7 +131,7 @@ description: "Task list for inventory & purchasing intelligence (spec 014)"
 
 - [ ] T025 [P] Export/import both platforms: carry `Ingredient.lastSupplierId`, purchase rows' `referenceType='supplier'`/`referenceId`, and `VOID_PURCHASE` type end-to-end (`cafeos-tablet` export/import in `CafeViewModel.kt`/`MenuImportParser.kt`; `my-app` tablet ingest + import/export services per `contracts/bridge-schema.md`)
 - [X] T026 [P] Void + re-enter on the tablet: voiding **appends a compensating `VOID_PURCHASE` row** (`referenceType='void-of'` â†’ original row id; the original is never modified), reverses stock in the same transaction, reverts `costPerUnit`/`lastSupplierId` **only when the voided row is the latest non-void purchase**, writes an audit event (`cafeos-tablet/app/src/main/java/com/cafeos/tablet/ui/CafeViewModel.kt`); UI entry in history detail
-- [ ] T027 [P] Void + re-enter on the web: identical additive compensation semantics in `my-app/modules/inventory/service.ts` + admin UI
+- [ ] T027 [P] Void + re-enter on the web — repository voidIngredientPurchase + POST /api/ingredients/purchases/:id/void done; admin history UI trigger pending: identical additive compensation semantics in `my-app/modules/inventory/service.ts` + admin UI
 - [ ] T028 [P] Unit tests for void reversal math (incl. voiding the only/latest purchase) on both platforms
 - [ ] T029 [P] Tabletâ†”PC bridge payload fields per `specs/014-purchase-supplier-insights/contracts/bridge-schema.md` (`cafeos-tablet/.../data/PcBridgeClient.kt`, `SocketSyncManager.kt`, `my-app` tablet ingest service)
 - [ ] T030 Audit events for purchase/void/bulk writes on both platforms (tablet `logAuditEvent`; web audit log)
@@ -219,6 +219,7 @@ Task: "Web UI (T010) in app/admin/inventory/page.tsx"
 - Money and stock writes are append-only and single-transaction (constitution); VOID replaces edit/delete
 - Unit costs are always computed from stored quantity + total â€” never accepted from the client
 - Commit after each task or logical group; stop at checkpoints to validate the story independently
+
 
 
 

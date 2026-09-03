@@ -279,7 +279,90 @@ export async function findSupplierById(id: number, locationId: number = 1) {
 }
 
 export async function deleteSupplier(id: number, _locationId: number = 1) {
-  return prisma.supplier.delete({ where: { id } });
+  // Spec 014 / no silent data loss: deleting a supplier must never leave an
+  // ingredient pointing at a missing vendor. Recompute each affected
+  // ingredient's latest supplier from remaining purchase history.
+  return prisma.$transaction(async (tx) => {
+    const affected = await tx.ingredient.findMany({ where: { supplierId: id }, select: { id: true } });
+    await tx.supplier.delete({ where: { id } });
+    for (const { id: ingredientId } of affected) {
+      const latest = await tx.ingredientTransaction.findFirst({
+        where: { ingredientId, type: 'PURCHASE', referenceType: 'supplier', referenceId: { not: null } },
+        orderBy: { id: 'desc' },
+        select: { referenceId: true },
+      });
+      await tx.ingredient.update({
+        where: { id: ingredientId },
+        data: { supplierId: latest?.referenceId ?? null },
+      });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Void purchase (spec 014 FR-009): additive compensation — the original
+// PURCHASE row is never modified; a VOID_PURCHASE row reverses stock, and only
+// when the voided row is the latest purchase does the cost/last supplier revert
+// to the previous non-void purchase.
+// ---------------------------------------------------------------------------
+
+export async function voidIngredientPurchase(transactionId: number, locationId: number = 1) {
+  return prisma.$transaction(async (tx) => {
+    const purchase = await tx.ingredientTransaction.findFirst({
+      where: { id: transactionId, type: 'PURCHASE', locationId },
+    });
+    if (!purchase) throw new Error('Purchase not found');
+
+    const ingredient = await tx.ingredient.findUnique({ where: { id: purchase.ingredientId } });
+    if (!ingredient) throw new Error('Ingredient not found');
+
+    const later = await tx.ingredientTransaction.findFirst({
+      where: { ingredientId: purchase.ingredientId, type: 'PURCHASE', id: { gt: purchase.id } },
+    });
+    const voidedIsLatest = later == null;
+
+    const previousCost = voidedIsLatest
+      ? await tx.ingredientTransaction.findFirst({
+          where: { ingredientId: purchase.ingredientId, type: 'PURCHASE', unitCost: { not: null }, id: { lt: purchase.id } },
+          orderBy: { id: 'desc' },
+          select: { unitCost: true },
+        })
+      : null;
+    const previousSupplier = voidedIsLatest
+      ? await tx.ingredientTransaction.findFirst({
+          where: { ingredientId: purchase.ingredientId, type: 'PURCHASE', referenceType: 'supplier', referenceId: { not: null }, id: { lt: purchase.id } },
+          orderBy: { id: 'desc' },
+          select: { referenceId: true },
+        })
+      : null;
+
+    const stockReverted = ingredient.currentStock - purchase.quantity;
+    const updateData: Record<string, unknown> = { currentStock: Math.max(0, stockReverted) };
+    if (voidedIsLatest) {
+      updateData.costPerUnit = previousCost?.unitCost ?? 0;
+      updateData.supplierId = previousSupplier?.referenceId ?? null;
+    }
+
+    const updated = await tx.ingredient.update({ where: { id: ingredient.id }, data: updateData });
+
+    const voidRow = await tx.ingredientTransaction.create({
+      data: {
+        ingredientId: ingredient.id,
+        type: 'VOID_PURCHASE',
+        quantity: -purchase.quantity,
+        purchaseCost: purchase.purchaseCost,
+        unitCost: purchase.unitCost,
+        purchaseUnit: purchase.purchaseUnit,
+        referenceId: purchase.id,
+        referenceType: 'void-of',
+        notes: `Void of purchase #${purchase.id}` + (voidedIsLatest ? ' (latest — cost/last supplier reverted)' : ' (older purchase — stock only)'),
+        userId: purchase.userId,
+        locationId,
+      },
+    });
+
+    return { ingredient: updated, voidRow, voidedIsLatest };
+  });
 }
 
 // ---------------------------------------------------------------------------
