@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listOrders, createOrder } from '@/modules/orders/service';
 import { badRequest, serverError } from '@/lib/api-response';
 import { guardStaff } from '@/lib/api-guards';
+import { getAuthUser } from '@/lib/auth';
+import { ValidationError } from 'zod-validation-error';
 
 // GET /api/orders – list orders (staff only; customers track a single order by number)
 export async function GET(req: NextRequest) {
@@ -28,7 +30,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const order = await createOrder(body);
+    // Customers order by QR without signing in; only staff may discount or confirm payment.
+    const user = await getAuthUser(req);
+    const order = await createOrder(body, { staff: Boolean(user) });
     return NextResponse.json(order, { status: 201 });
   } catch (e: any) {
     if (e instanceof Error && e.name === 'LoyaltyVoucherError') {
@@ -44,8 +48,11 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
-    if (e.status === 400) {
+    if (e.status === 400 || e instanceof ValidationError) {
       return badRequest(e.message);
+    }
+    if (e.status === 403) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
     }
     return serverError(e, 'Failed to create order');
   }

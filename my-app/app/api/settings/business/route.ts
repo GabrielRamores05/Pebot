@@ -4,11 +4,39 @@ import { logAction } from '@/lib/audit-log';
 import { badRequest, serverError } from '@/lib/api-response';
 import { guardFeature } from '@/lib/api-guards';
 import { createBusinessSettings, findBusinessSettings } from '@/modules/system/repository';
+import { checkFeatureAccess } from '@/lib/auth';
+
+const ORDER_TYPES = ['DINE_IN', 'TAKEOUT', 'DELIVERY'];
+
+/** Spec 017 settings: VAT registration and service charge. Returns an error message or the values. */
+function parseMoneySettings(body: Record<string, unknown>):
+  | { error: string }
+  | { vatRegistered?: boolean; serviceChargeRate?: number; serviceChargeOrderTypes?: string } {
+  const out: { vatRegistered?: boolean; serviceChargeRate?: number; serviceChargeOrderTypes?: string } = {};
+  if (body.vatRegistered !== undefined) {
+    if (typeof body.vatRegistered !== 'boolean') return { error: 'VAT-registered must be yes or no.' };
+    out.vatRegistered = body.vatRegistered;
+  }
+  if (body.serviceChargeRate !== undefined && body.serviceChargeRate !== null) {
+    const rate = Number(body.serviceChargeRate);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) return { error: 'Service charge must be between 0 and 100%.' };
+    out.serviceChargeRate = rate;
+  }
+  if (body.serviceChargeOrderTypes !== undefined && body.serviceChargeOrderTypes !== null) {
+    const types = String(body.serviceChargeOrderTypes)
+      .split(',')
+      .map((t) => t.trim().toUpperCase())
+      .filter(Boolean);
+    if (types.some((t) => !ORDER_TYPES.includes(t))) return { error: 'Unknown order type for service charge.' };
+    out.serviceChargeOrderTypes = [...new Set(types)].join(',');
+  }
+  return out;
+}
 
 // GET /api/settings/business - Get business settings.
 // Public: customers' cart/order pages load branding, payment-account and
 // receipt info without a session. Only PUT (updates) requires the settings role.
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     let settings = await findBusinessSettings();
 
@@ -29,6 +57,12 @@ export async function GET() {
       });
     }
 
+    // The AI service key is a secret: only people who can change settings see it.
+    const { hasAccess } = await checkFeatureAccess(req, 'settings');
+    if (!hasAccess) {
+      const { aiApiKey, ...publicSettings } = settings;
+      return NextResponse.json({ ...publicSettings, aiApiKeySet: Boolean(aiApiKey) });
+    }
     return NextResponse.json(settings);
   } catch (error) {
     return serverError(error, 'Failed to fetch business settings');
@@ -67,6 +101,9 @@ export async function PUT(req: NextRequest) {
       aiReadBirPricing,
     } = body;
 
+    const money = parseMoneySettings(body);
+    if ('error' in money) return badRequest(money.error);
+
     let settings = await prisma.businessSettings.findFirst();
 
     if (settings) {
@@ -91,6 +128,7 @@ export async function PUT(req: NextRequest) {
           aiSystemPrompt: aiSystemPrompt ?? settings.aiSystemPrompt,
           aiFolderAccess: aiFolderAccess ?? settings.aiFolderAccess,
           aiReadBirPricing: aiReadBirPricing ?? settings.aiReadBirPricing,
+          ...money,
         },
       });
     } else {
@@ -115,6 +153,7 @@ export async function PUT(req: NextRequest) {
           aiSystemPrompt: aiSystemPrompt ?? 'You are Pebot Assistant, a helpful AI consultant for restaurant management.',
           aiFolderAccess: aiFolderAccess ?? false,
           aiReadBirPricing: aiReadBirPricing ?? false,
+          ...money,
         },
       });
     }

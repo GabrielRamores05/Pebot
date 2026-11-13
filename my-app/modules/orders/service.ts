@@ -6,6 +6,8 @@ import {
   UpdateOrderInputSchema,
   OrderMessageInputSchema,
 } from '@/modules/orders/schema';
+import type { CreateOrderInput } from '@/modules/orders/schema';
+import { STATUTORY_DISCOUNT_RATE, serviceChargeRateFor, type CheckoutDiscount } from '@/lib/checkout';
 import * as repo from '@/modules/orders/repository';
 import { emitEvent } from '@/lib/socket';
 import { logAction } from '@/lib/audit-log';
@@ -142,16 +144,76 @@ export async function ingestTabletOrder(payload: Record<string, unknown>) {
     input.loyaltyVoucherCodes = [reason];
   }
 
-  const order = await createOrder(input as any);
+  const order = await createOrder(input as any, { staff: true, source: 'tablet' });
   return { ok: true, orderId: order.id, orderNumber: order.orderNumber, totalAmount: Number(order.totalAmount) };
+}
+
+// ---------------------------------------------------------------------------
+// Discount on the bill (spec 017)
+// ---------------------------------------------------------------------------
+
+interface DiscountPlan {
+  discount: CheckoutDiscount | null;
+  reason: string | null;
+  rate: number | null;
+  holders: string | null;
+}
+
+/** Senior/PWD, Student, or the older Student/PWD rate sent by the tablet import. */
+export function planDiscount(
+  data: Pick<CreateOrderInput, 'discount' | 'discountRate' | 'discountReason'>,
+  settings: { studentPwdDiscountRate?: number | null } | null,
+  hasLoyaltyReward: boolean,
+): DiscountPlan {
+  const d = data.discount;
+  if (d?.kind === 'STATUTORY') {
+    if (hasLoyaltyReward) {
+      throw setErrorStatus(
+        new Error('A Senior Citizen or PWD discount cannot be combined with a loyalty reward. Keep only one of them.'),
+        400,
+      );
+    }
+    if (d.holders.length > d.diners) {
+      throw setErrorStatus(new Error('There are more ID holders than diners.'), 400);
+    }
+    const types = new Set(d.holders.map((h) => h.type));
+    const reason = types.size > 1 ? 'SENIOR_PWD' : [...types][0];
+    return {
+      discount: { kind: reason === 'PWD' ? 'PWD' : 'SENIOR', holders: d.holders.length, diners: d.diners },
+      reason,
+      rate: STATUTORY_DISCOUNT_RATE,
+      holders: JSON.stringify(d.holders.map((h) => ({ type: h.type, name: h.name, idNumber: h.idNumber }))),
+    };
+  }
+  if (d?.kind === 'STUDENT') {
+    const rate = Number(settings?.studentPwdDiscountRate ?? 20);
+    return { discount: { kind: 'STUDENT', rate }, reason: 'STUDENT', rate, holders: null };
+  }
+  if (data.discountRate && data.discountRate > 0 && data.discountReason) {
+    return { discount: { kind: 'STUDENT', rate: data.discountRate }, reason: data.discountReason, rate: data.discountRate, holders: null };
+  }
+  return { discount: null, reason: null, rate: null, holders: null };
 }
 
 // ---------------------------------------------------------------------------
 // Create order
 // ---------------------------------------------------------------------------
 
-export async function createOrder(input: unknown) {
+export interface CreateOrderOptions {
+  /** A signed-in staff member placed the order. Customers ordering by QR are not staff. */
+  staff?: boolean;
+  /** Orders imported from the tablet product were paid there, not into this PC's drawer. */
+  source?: 'tablet';
+}
+
+/** Fields only staff may send: they change what is charged or skip checks. */
+const STAFF_ONLY_FIELDS = ['discount', 'discountRate', 'discountReason', 'paymentConfirmed', 'overrideStock'] as const;
+
+export async function createOrder(input: unknown, options: CreateOrderOptions = {}) {
   const data = parseInput(CreateOrderInputSchema, input);
+  if (!options.staff && STAFF_ONLY_FIELDS.some((k) => data[k] !== undefined)) {
+    throw setErrorStatus(new Error('Only signed-in staff can apply discounts, confirm payment or override stock.'), 403);
+  }
 
   const customerName = data.customerName;
   const loyaltyCustomerName = data.loyaltyCustomerName?.trim() ? data.loyaltyCustomerName.trim().toUpperCase() : null;
@@ -213,13 +275,28 @@ export async function createOrder(input: unknown) {
 
   const voucherCodes = [...new Set((data.loyaltyVoucherCodes ?? []).filter((c) => typeof c === 'string' && c.trim()))];
 
+  // The bill (spec 017): the repository finishes it once rewards are known.
+  const settings = await repo.findCheckoutSettings();
+  const discountPlan = planDiscount(data, settings, voucherCodes.length > 0);
+  const checkout = {
+    lines: orderItemsData.map((item) => ({
+      amount: item.subtotal,
+      vatExempt: Boolean((productMap.get(item.productId) as { vatExempt?: boolean } | undefined)?.vatExempt),
+    })),
+    discount: discountPlan.discount,
+    vatRegistered: settings?.vatRegistered ?? true,
+    vatRate: settings?.vatRate ?? 12,
+    serviceChargeRate: serviceChargeRateFor(settings, orderTypeValue),
+  };
+  const paymentMethod = data.paymentMethod ?? 'CASH';
+
   const order = await repo.createOrder({
     customerName,
     loyaltyCustomerName,
     tableId,
     sessionId,
     totalAmount: itemsSubtotal,
-    paymentMethod: data.paymentMethod ?? 'CASH',
+    paymentMethod,
     paymentScreenshot: data.paymentScreenshot ?? null,
     orderType: orderTypeValue,
     deliveryAddress: deliveryAddressValue,
@@ -227,9 +304,11 @@ export async function createOrder(input: unknown) {
     loyaltyVoucherCodes: voucherCodes,
     loyaltySelection: data.loyaltySelection,
     loyaltyAssignments: data.loyaltyAssignments ?? undefined,
-    discountAmount: 0,
-    discountRate: data.discountRate ?? 0,
-    discountReason: data.discountRate && data.discountRate > 0 && data.discountReason ? data.discountReason : null,
+    checkout,
+    discountRate: discountPlan.rate,
+    discountReason: discountPlan.reason,
+    discountHolders: discountPlan.holders,
+    countInDrawer: paymentMethod === 'CASH' && data.paymentConfirmed === true && options.source !== 'tablet',
     orderItemsData,
     discountLineItems,
     affectedProductIds: [...new Set(affectedProductIds)],

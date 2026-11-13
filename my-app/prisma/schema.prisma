@@ -281,6 +281,17 @@ model Order {
   barcodeValue         String              @unique
   notes                String?
   loyaltyPromo         Boolean             @default(false) // true if order used loyalty reward
+  // Bill breakdown (spec 017, lib/checkout.ts). Orders saved before spec 017 keep 0 here.
+  grossAmount          Float               @default(0) // items before any discount
+  loyaltyDiscount      Float               @default(0)
+  vatRemoved           Float               @default(0) // VAT taken off the Senior/PWD share
+  vatableSales         Float               @default(0)
+  vatAmount            Float               @default(0)
+  vatExemptSales       Float               @default(0) // or all sales when not VAT-registered
+  serviceCharge        Float               @default(0)
+  discountHolders      String? // JSON [{type: SENIOR|PWD, name, idNumber}]
+  cashSessionId        Int?
+  cashSession          CashSession?        @relation(fields: [cashSessionId], references: [id])
   paymentMethod        String              @default("CASH") // CASH | GCASH | PAYMAYA
    paymentScreenshot    String? // uploaded screenshot URL for GCash/PayMaya
   queueNumber          Int? // Kitchen queue position number for customer tracking
@@ -416,7 +427,10 @@ model BusinessSettings {
   lastReceiptNumber   Int      @default(0) // Last used receipt number
   footerMessage       String   @default("Thank you for your visit!")
   loyaltyEnabled      Boolean  @default(true) // Global loyalty program toggle
-  studentPwdDiscountRate Float  @default(20) // Student / PWD statutory discount rate (%)
+  studentPwdDiscountRate Float  @default(20) // Student discount rate (%); Senior/PWD is fixed at 20% by law
+  vatRegistered       Boolean  @default(true) // false: prices carry no VAT; Senior/PWD removes no VAT
+  serviceChargeRate   Float    @default(0) // %, 0 = off
+  serviceChargeOrderTypes String @default("DINE_IN") // comma-separated order types
   // Payment method settings
   gcashAccountName    String? // GCash account name
   gcashQrImage        String? // Base64 or file URL of uploaded GCash QR image
@@ -846,4 +860,37 @@ model StaffTraining {
   updatedAt     DateTime  @updatedAt
 
   @@unique([userId, trainingId])
+}
+
+// Cash drawer count for one shift (spec 017). One open session per location.
+model CashSession {
+  id           Int            @id @default(autoincrement())
+  locationId   Int            @default(1)
+  openedAt     DateTime       @default(now())
+  openedById   Int?
+  openedByName String
+  openingCash  Float
+  closedAt     DateTime?
+  closedById   Int?
+  closedByName String?
+  countedCash  Float?
+  expectedCash Float?         // frozen at close
+  note         String?
+  movements    CashMovement[]
+  orders       Order[]
+
+  @@index([locationId, closedAt])
+}
+
+// Cash put into or taken out of the drawer outside of sales (spec 017).
+model CashMovement {
+  id        Int         @id @default(autoincrement())
+  sessionId Int
+  session   CashSession @relation(fields: [sessionId], references: [id])
+  kind      String      // IN | OUT
+  amount    Float
+  reason    String
+  userId    Int?
+  userName  String
+  createdAt DateTime    @default(now())
 }

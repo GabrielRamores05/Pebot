@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   findOrders: vi.fn(),
   findProductsByIds: vi.fn(),
   createOrder: vi.fn(),
+  findCheckoutSettings: vi.fn(),
   findOrderByNumberOrId: vi.fn(),
   findOrderForMessage: vi.fn(),
   findOrderForFollowUp: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock('../../../modules/orders/repository', () => ({
   findOrders: mocks.findOrders,
   findProductsByIds: mocks.findProductsByIds,
   createOrder: mocks.createOrder,
+  findCheckoutSettings: mocks.findCheckoutSettings,
   findOrderByNumberOrId: mocks.findOrderByNumberOrId,
   findOrderForMessage: mocks.findOrderForMessage,
   findOrderForFollowUp: mocks.findOrderForFollowUp,
@@ -116,6 +118,9 @@ describe('orders service', () => {
     mocks.calculateOrderWaitTime.mockResolvedValue({ perStation: {}, maxWait: 5 });
     mocks.calculateStationWaitTime.mockResolvedValue(2);
     mocks.runRecoverableStep.mockResolvedValue(null);
+    mocks.findCheckoutSettings.mockResolvedValue({
+      vatRegistered: true, vatRate: 12, studentPwdDiscountRate: 20, serviceChargeRate: 0, serviceChargeOrderTypes: 'DINE_IN',
+    });
   });
 
   describe('listOrders', () => {
@@ -266,7 +271,7 @@ describe('orders service', () => {
         items: [{ productId: 1, quantity: 1 }],
         orderType: 'DINE_IN',
         paymentConfirmed: true,
-      });
+      }, { staff: true });
 
       expect(mocks.runRecoverableStep).toHaveBeenCalledWith(
         'LOYALTY_AWARD',
@@ -314,6 +319,108 @@ describe('orders service', () => {
         items: [{ productId: 1, quantity: 5 }],
         orderType: 'DINE_IN',
       })).rejects.toThrow('One or more items are out of stock');
+    });
+  });
+
+  describe('createOrder — discounts, service charge and cash drawer (spec 017)', () => {
+    const placed = { id: 1, orderNumber: 'TEST', totalAmount: 80, queueNumber: 1, createdAt: new Date(), customerName: 'Lola', loyaltyPromo: false, loyaltyCustomerName: null, items: [] };
+    const senior = { kind: 'STATUTORY' as const, diners: 1, holders: [{ type: 'SENIOR' as const, name: 'Lola Remedios', idNumber: 'OSCA-123' }] };
+
+    beforeEach(() => {
+      mocks.findProductsByIds.mockResolvedValue([{ id: 1, price: 112, categoryId: 1, vatExempt: false }]);
+      mocks.createOrder.mockResolvedValue(placed);
+      mocks.findLowStockItems.mockResolvedValue([]);
+    });
+
+    it.each([
+      ['discount', { discount: senior }],
+      ['discountRate', { discountRate: 100, discountReason: 'STUDENT_PWD' }],
+      ['paymentConfirmed', { paymentConfirmed: true }],
+      ['overrideStock', { overrideStock: true }],
+    ])('refuses %s from a customer who is not signed in', async (_field, extra) => {
+      await expect(
+        createOrder({ customerName: 'Guest', items: [{ productId: 1, quantity: 1 }], ...extra }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(mocks.createOrder).not.toHaveBeenCalled();
+    });
+
+    it('still accepts a plain QR order from a customer', async () => {
+      await createOrder({ customerName: 'Guest', items: [{ productId: 1, quantity: 1 }] });
+      expect(mocks.createOrder).toHaveBeenCalled();
+    });
+
+    it('passes a Senior Citizen discount with the holder recorded', async () => {
+      await createOrder(
+        { customerName: 'Lola', items: [{ productId: 1, quantity: 1 }], discount: senior, paymentMethod: 'CASH', paymentConfirmed: true },
+        { staff: true },
+      );
+      const params = mocks.createOrder.mock.calls[0][0];
+      expect(params.checkout).toEqual({
+        lines: [{ amount: 112, vatExempt: false }],
+        discount: { kind: 'SENIOR', holders: 1, diners: 1 },
+        vatRegistered: true,
+        vatRate: 12,
+        serviceChargeRate: 0,
+      });
+      expect(params.discountReason).toBe('SENIOR');
+      expect(params.discountRate).toBe(20);
+      expect(JSON.parse(params.discountHolders)).toEqual([{ type: 'SENIOR', name: 'Lola Remedios', idNumber: 'OSCA-123' }]);
+      expect(params.countInDrawer).toBe(true);
+    });
+
+    it('records a table with both a senior and a PWD as SENIOR_PWD', async () => {
+      const both = { kind: 'STATUTORY' as const, diners: 4, holders: [senior.holders[0], { type: 'PWD' as const, name: 'Ben', idNumber: 'PWD-9' }] };
+      await createOrder({ customerName: 'Table 3', items: [{ productId: 1, quantity: 1 }], discount: both }, { staff: true });
+      const params = mocks.createOrder.mock.calls[0][0];
+      expect(params.discountReason).toBe('SENIOR_PWD');
+      expect(params.checkout.discount).toEqual({ kind: 'SENIOR', holders: 2, diners: 4 });
+    });
+
+    it('refuses a Senior/PWD discount together with a loyalty reward', async () => {
+      await expect(
+        createOrder(
+          { customerName: 'Lola', items: [{ productId: 1, quantity: 1 }], discount: senior, loyaltyVoucherCodes: ['R1'] },
+          { staff: true },
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('refuses more ID holders than diners', async () => {
+      const crowd = { ...senior, diners: 1, holders: [senior.holders[0], senior.holders[0]] };
+      await expect(
+        createOrder({ customerName: 'Lola', items: [{ productId: 1, quantity: 1 }], discount: crowd }, { staff: true }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('uses the owner rate for a Student discount', async () => {
+      mocks.findCheckoutSettings.mockResolvedValue({ vatRegistered: true, vatRate: 12, studentPwdDiscountRate: 10, serviceChargeRate: 0, serviceChargeOrderTypes: 'DINE_IN' });
+      await createOrder({ customerName: 'Kim', items: [{ productId: 1, quantity: 1 }], discount: { kind: 'STUDENT' } }, { staff: true });
+      const params = mocks.createOrder.mock.calls[0][0];
+      expect(params.checkout.discount).toEqual({ kind: 'STUDENT', rate: 10 });
+      expect(params.discountReason).toBe('STUDENT');
+    });
+
+    it('applies the service charge only to the configured order types', async () => {
+      mocks.findCheckoutSettings.mockResolvedValue({ vatRegistered: true, vatRate: 12, studentPwdDiscountRate: 20, serviceChargeRate: 10, serviceChargeOrderTypes: 'DINE_IN' });
+      await createOrder({ customerName: 'A', items: [{ productId: 1, quantity: 1 }], orderType: 'DINE_IN' });
+      await createOrder({ customerName: 'B', items: [{ productId: 1, quantity: 1 }], orderType: 'TAKEOUT' });
+      expect(mocks.createOrder.mock.calls[0][0].checkout.serviceChargeRate).toBe(10);
+      expect(mocks.createOrder.mock.calls[1][0].checkout.serviceChargeRate).toBe(0);
+    });
+
+    it('does not count unpaid or non-cash orders in the drawer', async () => {
+      await createOrder({ customerName: 'Guest', items: [{ productId: 1, quantity: 1 }], paymentMethod: 'CASH' });
+      await createOrder({ customerName: 'G', items: [{ productId: 1, quantity: 1 }], paymentMethod: 'GCASH', paymentConfirmed: true }, { staff: true });
+      expect(mocks.createOrder.mock.calls[0][0].countInDrawer).toBe(false);
+      expect(mocks.createOrder.mock.calls[1][0].countInDrawer).toBe(false);
+    });
+
+    it('does not count tablet imports in this PC’s drawer', async () => {
+      await createOrder(
+        { customerName: 'T', items: [{ productId: 1, quantity: 1 }], paymentMethod: 'CASH', paymentConfirmed: true },
+        { staff: true, source: 'tablet' },
+      );
+      expect(mocks.createOrder.mock.calls[0][0].countInDrawer).toBe(false);
     });
   });
 

@@ -18,6 +18,26 @@ export const OrderItemInputSchema = z.object({
 
 export type OrderItemInput = z.infer<typeof OrderItemInputSchema>;
 
+export const DiscountHolderSchema = z.object({
+  type: z.enum(['SENIOR', 'PWD']),
+  name: z.string().trim().min(1, "Enter the ID holder's name."),
+  idNumber: z.string().trim().min(1, "Enter the ID holder's ID number."),
+});
+
+export type DiscountHolder = z.infer<typeof DiscountHolderSchema>;
+
+/** Discount chosen at the POS terminal (spec 017). Staff only. */
+export const OrderDiscountSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('STATUTORY'),
+    diners: z.number().int().positive(),
+    holders: z.array(DiscountHolderSchema).min(1, 'Add at least one Senior Citizen or PWD ID holder.'),
+  }),
+  z.object({ kind: z.literal('STUDENT') }),
+]);
+
+export type OrderDiscount = z.infer<typeof OrderDiscountSchema>;
+
 export const CreateOrderInputSchema = z.object({
   customerName: z.string().min(1, 'Customer name is required'),
   loyaltyCustomerName: z.string().nullable().optional(),
@@ -43,7 +63,9 @@ export const CreateOrderInputSchema = z.object({
       }),
     )
     .optional(),
-  discountRate: z.number().nonnegative().optional(),
+  discount: OrderDiscountSchema.optional(),
+  // Older clients (tablet import): a Student/PWD rate without VAT removal.
+  discountRate: z.number().nonnegative().max(100).optional(),
   discountReason: z.string().optional(),
 });
 

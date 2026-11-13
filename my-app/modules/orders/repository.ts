@@ -1,5 +1,7 @@
  
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@/lib/prisma-client';
+import { computeCheckout, type CheckoutInput } from '@/lib/checkout';
 
 // ---------------------------------------------------------------------------
 // Orders – location-scoped helpers
@@ -171,6 +173,9 @@ export async function createPaymentAndCompleteOrder(
       where: { id: orderId },
       data: { status: 'COMPLETED' },
     });
+    if (paymentData.method === 'CASH') {
+      await countInOpenDrawerTx(tx, orderId, locationId);
+    }
     return p;
   });
 }
@@ -357,15 +362,47 @@ export interface CreateOrderParams {
     loyaltyCardIds: number[];
     quantitiesPerCard: number[];
   }[];
-  discountAmount: number;
-  discountRate: number;
+  /** The bill without the loyalty reward, which is only known inside the transaction. */
+  checkout: Omit<CheckoutInput, 'loyaltyDiscount'>;
+  discountRate: number | null;
   discountReason: string | null;
+  discountHolders: string | null;
+  /** Paid in cash at this PC: count it in the open cash drawer, if any. */
+  countInDrawer: boolean;
   orderItemsData: CreateOrderTxItem[];
   discountLineItems: CreateOrderDiscountItem[];
   affectedProductIds: number[];
   resolvedByItem: any[];
   overrideStock: boolean;
   locationId: number;
+}
+
+type Tx = Prisma.TransactionClient;
+
+/** The cash drawer open at a location, if any (spec 017). */
+async function findOpenCashSessionTx(tx: Tx, locationId: number) {
+  return tx.cashSession.findFirst({ where: { locationId, closedAt: null }, select: { id: true } });
+}
+
+/** Count a cash order in the open drawer once it is paid, unless it already is. */
+async function countInOpenDrawerTx(tx: Tx, orderId: number, locationId: number) {
+  const order = await tx.order.findUnique({ where: { id: orderId }, select: { paymentMethod: true, cashSessionId: true } });
+  if (!order || order.paymentMethod !== 'CASH' || order.cashSessionId) return;
+  const drawer = await findOpenCashSessionTx(tx, locationId);
+  if (drawer) await tx.order.update({ where: { id: orderId }, data: { cashSessionId: drawer.id } });
+}
+
+/** Business settings the bill depends on (spec 017). */
+export async function findCheckoutSettings() {
+  return prisma.businessSettings.findFirst({
+    select: {
+      vatRegistered: true,
+      vatRate: true,
+      studentPwdDiscountRate: true,
+      serviceChargeRate: true,
+      serviceChargeOrderTypes: true,
+    },
+  });
 }
 
 export async function createOrder(params: CreateOrderParams): Promise<any> {
@@ -396,12 +433,9 @@ export async function createOrder(params: CreateOrderParams): Promise<any> {
     }
 
     const isLoyaltyOrder = loyaltyDiscount > 0;
-    let amountAfterLoyalty = Math.max(0, params.totalAmount - loyaltyDiscount);
-    let appliedDiscountAmount = 0;
-    if (params.discountRate > 0) {
-      appliedDiscountAmount = Math.round((amountAfterLoyalty * params.discountRate) / 100 * 100) / 100;
-      amountAfterLoyalty = Math.max(0, amountAfterLoyalty - appliedDiscountAmount);
-    }
+    const bill = computeCheckout({ ...params.checkout, loyaltyDiscount });
+    const hasDiscount = bill.discount > 0 || bill.vatRemoved > 0;
+    const drawer = params.countInDrawer ? await findOpenCashSessionTx(tx, params.locationId) : null;
 
     // Generate order number
     const { ticketDatePart, nextSequenceForDay, fullOrderNumber, sequenceValue } = await import('@/lib/ticket');
@@ -422,12 +456,21 @@ export async function createOrder(params: CreateOrderParams): Promise<any> {
         loyaltyCustomerName: params.loyaltyCustomerName,
         tableId: params.tableId,
         sessionId: params.sessionId,
-        totalAmount: amountAfterLoyalty,
+        totalAmount: bill.total,
         barcodeValue,
         notes: params.notes,
-        discountAmount: appliedDiscountAmount,
-        discountReason: params.discountReason,
-        discountRate: params.discountRate > 0 ? params.discountRate : null,
+        discountAmount: bill.discount,
+        discountReason: hasDiscount ? params.discountReason : null,
+        discountRate: hasDiscount ? params.discountRate : null,
+        discountHolders: hasDiscount ? params.discountHolders : null,
+        grossAmount: bill.gross,
+        loyaltyDiscount: bill.loyaltyDiscount,
+        vatRemoved: bill.vatRemoved,
+        vatableSales: bill.vatableSales,
+        vatAmount: bill.vatAmount,
+        vatExemptSales: bill.vatExemptSales,
+        serviceCharge: bill.serviceCharge,
+        cashSessionId: drawer?.id ?? null,
         loyaltyPromo: isLoyaltyOrder,
         paymentMethod: params.paymentMethod,
         paymentScreenshot: params.paymentScreenshot,
@@ -599,12 +642,26 @@ export async function updateOrderInTransaction(params: UpdateOrderParams): Promi
   return prisma.$transaction(async (tx) => {
     // Add items to existing order (within transaction to keep totals consistent)
     if (params.addItems && params.addItems.length > 0) {
+      // Added items carry no discount or service charge; keep the VAT breakdown in step.
+      const settings = await tx.businessSettings.findFirst();
+      const vatRegistered = settings?.vatRegistered ?? true;
+      const vatFactor = 1 + (settings?.vatRate ?? 12) / 100;
       let extraTotal = 0;
+      let extraVatable = 0;
+      let extraVat = 0;
+      let extraExempt = 0;
       for (const item of params.addItems) {
         const product = await tx.product.findUnique({ where: { id: item.productId } });
         if (!product) continue;
         const subtotal = Number(product.price) * item.quantity;
         extraTotal += subtotal;
+        if (vatRegistered && !product.vatExempt) {
+          const base = Math.round((subtotal / vatFactor) * 100) / 100;
+          extraVatable += base;
+          extraVat += Math.round((subtotal - base) * 100) / 100;
+        } else {
+          extraExempt += subtotal;
+        }
         await tx.orderItem.create({
           data: {
             orderId: params.orderId,
@@ -617,8 +674,18 @@ export async function updateOrderInTransaction(params: UpdateOrderParams): Promi
       }
       await tx.order.update({
         where: { id: params.orderId },
-        data: { totalAmount: { increment: extraTotal } },
+        data: {
+          totalAmount: { increment: extraTotal },
+          grossAmount: { increment: extraTotal },
+          vatableSales: { increment: extraVatable },
+          vatAmount: { increment: extraVat },
+          vatExemptSales: { increment: extraExempt },
+        },
       });
+    }
+
+    if (params.isPaymentConfirmation) {
+      await countInOpenDrawerTx(tx, params.orderId, params.locationId);
     }
 
     const updated = await tx.order.update({
