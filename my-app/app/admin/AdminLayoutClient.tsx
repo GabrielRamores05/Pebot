@@ -4,12 +4,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import {
-  IconMonitor, IconProducts,
-  IconAnalytics, IconInventory,
-  IconCoffee, IconSettings,
-   IconTerminal, IconHistory, IconConsultant, IconAudit, IconStar,
-  IconLogout,
-
+  IconMonitor, IconProducts, IconAnalytics, IconInventory, IconSettings,
+  IconTerminal, IconConsultant, IconAudit, IconStar, IconLogout,
+  IconClockBack, IconReceipt, IconWallet, IconUsers, IconGift, IconReport,
+  IconPlate, IconCash, IconBell, IconPanel,
 } from '@/lib/assets';
 import { useSocket } from '@/hooks/useSocket';
 import { playNewOrderSound } from '@/lib/sounds';
@@ -34,23 +32,31 @@ interface BrandingUpdatedDetail {
 const BRANDING_UPDATED_EVENT = 'branding:updated';
 
 
+type NavGroup = 'Service' | 'Business' | 'Team & setup';
+
 const navItems = [
-  { href: '/admin',            Icon: IconMonitor,   label: 'Live Orders', roles: ['ADMIN', 'STAFF'], permission: 'liveOrders' },
-  { href: '/admin/terminal',   Icon: IconTerminal,  label: 'New Order', roles: ['ADMIN', 'STAFF'], permission: 'terminal' },
-  { href: '/admin/analytics',  Icon: IconAnalytics, label: 'Analytics', roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
-  { href: '/admin/products',   Icon: IconProducts,  label: 'Products', roles: ['ADMIN', 'STAFF'], permission: 'products' },
-  { href: '/admin/inventory',  Icon: IconInventory, label: 'Inventory', roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
-  { href: '/admin/stock-history', Icon: IconHistory, label: 'Stock History', roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
-  { href: '/admin/expenses',   Icon: IconHistory,   label: 'Expenses', roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
-  { href: '/admin/loyalty',    Icon: IconCoffee,    label: 'Loyalty', roles: ['ADMIN', 'STAFF'], permission: 'loyalty' },
-  { href: '/admin/order-history', Icon: IconHistory, label: 'Order History', roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
-  { href: '/admin/end-of-day', Icon: IconAnalytics, label: 'End of Day', roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
-  { href: '/admin/reviews',       Icon: IconStar,   label: 'Reviews', roles: ['ADMIN', 'STAFF'], permission: 'products' },
-  { href: '/admin/staff',      Icon: IconMonitor,   label: 'Staff', roles: ['ADMIN'], permission: 'staff' },
-  { href: '/admin/settings',   Icon: IconSettings,  label: 'Settings', roles: ['ADMIN', 'STAFF'], permission: 'settings' },
-  { href: '/admin/consultant',  Icon: IconConsultant, label: 'Consultant', roles: ['ADMIN'], permission: 'settings' },
-  { href: '/admin/audit-logs',  Icon: IconAudit, label: 'Audit Logs', roles: ['ADMIN'], permission: 'settings' },
+  { href: '/admin',               Icon: IconMonitor,    label: 'Live Orders',   group: 'Service' as NavGroup,      roles: ['ADMIN', 'STAFF'], permission: 'liveOrders' },
+  { href: '/admin/terminal',      Icon: IconTerminal,   label: 'New Order',     group: 'Service' as NavGroup,      roles: ['ADMIN', 'STAFF'], permission: 'terminal' },
+  { href: '/admin/order-history', Icon: IconReceipt,    label: 'Order History', group: 'Service' as NavGroup,      roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
+  { href: '/admin/analytics',     Icon: IconAnalytics,  label: 'Analytics',     group: 'Business' as NavGroup,     roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
+  { href: '/admin/end-of-day',    Icon: IconReport,     label: 'End of Day',    group: 'Business' as NavGroup,     roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
+  { href: '/admin/products',      Icon: IconProducts,   label: 'Products',      group: 'Business' as NavGroup,     roles: ['ADMIN', 'STAFF'], permission: 'products' },
+  { href: '/admin/inventory',     Icon: IconInventory,  label: 'Inventory',     group: 'Business' as NavGroup,     roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
+  { href: '/admin/stock-history', Icon: IconClockBack,  label: 'Stock History', group: 'Business' as NavGroup,     roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
+  { href: '/admin/expenses',      Icon: IconWallet,     label: 'Expenses',      group: 'Business' as NavGroup,     roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
+  { href: '/admin/loyalty',       Icon: IconGift,       label: 'Loyalty',       group: 'Business' as NavGroup,     roles: ['ADMIN', 'STAFF'], permission: 'loyalty' },
+  { href: '/admin/reviews',       Icon: IconStar,       label: 'Reviews',       group: 'Business' as NavGroup,     roles: ['ADMIN', 'STAFF'], permission: 'products' },
+  { href: '/admin/staff',         Icon: IconUsers,      label: 'Staff',         group: 'Team & setup' as NavGroup, roles: ['ADMIN'],          permission: 'staff' },
+  { href: '/admin/settings',      Icon: IconSettings,   label: 'Settings',      group: 'Team & setup' as NavGroup, roles: ['ADMIN', 'STAFF'], permission: 'settings' },
+  { href: '/admin/consultant',    Icon: IconConsultant, label: 'Consultant',    group: 'Team & setup' as NavGroup, roles: ['ADMIN'],          permission: 'settings' },
+  { href: '/admin/audit-logs',    Icon: IconAudit,      label: 'Audit Logs',    group: 'Team & setup' as NavGroup, roles: ['ADMIN'],          permission: 'settings' },
 ];
+
+const NAV_GROUPS: NavGroup[] = ['Service', 'Business', 'Team & setup'];
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('') || '?';
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -61,6 +67,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [guestLeftNotif, setGuestLeftNotif] = useState<Array<{ guestNames: string; tableName: string; id: number }>>([]);
+  // Cash drawer status for the sidebar card (spec 017/018). Null = unknown or no access.
+  const [drawer, setDrawer] = useState<{ open: boolean; expected?: number; since?: string } | null>(null);
 
   const handleNewOrder = useCallback((data: any) => {
     playNewOrderSound();
@@ -158,6 +166,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return true;
   });
 
+  useEffect(() => {
+    if (!user) return;
+    const canSee = user.role === 'ADMIN' || user.permissions?.terminal === true;
+    if (!canSee) return;
+    let cancelled = false;
+    const load = () =>
+      fetch('/api/cash-drawer')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (cancelled || !d) return;
+          setDrawer(d.drawer ? { open: true, expected: d.drawer.totals.expectedCash, since: d.drawer.openedAt } : { open: false });
+        })
+        .catch(() => {});
+    load();
+    const t = window.setInterval(load, 60_000);
+    return () => { cancelled = true; window.clearInterval(t); };
+  }, [user, pathname]);
+
   // Enforce per-route permissions for non-admin staff. ADMIN has full access.
   useEffect(() => {
     if (!user || user.role === 'ADMIN') return;
@@ -175,140 +201,167 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [user, pathname, visibleNav, router]);
 
+  const peso = (n: number) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const collapsed = sidebarCollapsed;
+  const logOut = async () => {
+    await fetch('/api/auth/me', { method: 'DELETE' });
+    router.push('/login');
+  };
+
   return (
-    <div className="flex h-screen bg-page text-ink overflow-hidden">
-      {/* Mobile Header */}
-      <div className="fixed top-0 left-0 right-0 h-14 bg-page border-b border-hair flex items-center px-4 z-40 md:hidden">
+    <div className="flex h-screen overflow-hidden bg-page text-ink">
+      {/* Mobile header */}
+      <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-hair bg-page/95 px-4 backdrop-blur md:hidden">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-panel text-muted hover:bg-hair"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-hair bg-card text-muted"
+          aria-label="Open menu"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+          <IconPanel size={18} />
         </button>
-        <div className="ml-3 flex items-center gap-2">
-          {branding.logoUrl
-            ? <img src={branding.logoUrl} alt="Logo" className="w-7 h-7 rounded-lg object-cover" />
-            : <IconCoffee size={18} strokeWidth={1.75} className="text-accent-text" />}
-          <span className="text-ink font-bold text-sm truncate">{branding.shopName}</span>
-        </div>
+        <span className="truncate text-sm font-bold">{branding.shopName}</span>
       </div>
 
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
-      <nav className={`fixed md:relative z-50 md:z-auto inset-y-0 left-0 bg-page border-r border-hair flex flex-col flex-shrink-0 transition-all duration-300 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarCollapsed ? 'md:w-16' : 'md:w-52'}`}>
-        {/* Logo - hidden on mobile since it's in header */}
-        <div className="p-4 border-b border-hair hidden md:flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <nav
+        aria-label="Main"
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-shrink-0 flex-col bg-page transition-[width,transform] duration-300 md:relative md:z-auto md:translate-x-0 ${sidebarOpen ? 'translate-x-0 shadow-pop' : '-translate-x-full'} ${collapsed ? 'md:w-[76px]' : 'md:w-64'}`}
+      >
+        {/* Brand */}
+        <div className={`flex items-center gap-3 px-4 pb-2 pt-5 ${collapsed ? 'md:flex-col md:px-3' : ''}`}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-accent text-on-accent">
             {branding.logoUrl
-              ? <img src={branding.logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-cover shrink-0" />
-              : <IconCoffee size={22} strokeWidth={1.75} className="text-accent-text shrink-0" />}
-            <span className={`hidden md:block text-ink font-bold text-lg truncate transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>{branding.shopName}</span>
+              ? <img src={branding.logoUrl} alt="" className="h-full w-full object-cover" />
+              : <IconPlate size={20} strokeWidth={1.75} />}
+          </div>
+          <div className={`min-w-0 flex-1 ${collapsed ? 'md:hidden' : ''}`}>
+            <p className="truncate text-[17px] font-bold leading-tight tracking-[-0.02em]">{branding.shopName}</p>
+            <p className="truncate text-xs text-faint">Pebot POS</p>
           </div>
           <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg text-muted hover:bg-panel transition-transform"
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setSidebarCollapsed(!collapsed)}
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-hair bg-card text-muted transition-colors hover:text-ink md:flex"
+            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
           >
-            <svg className="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarCollapsed ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"} />
-            </svg>
+            <IconPanel size={16} />
           </button>
         </div>
 
-        {/* Nav Items */}
-        <div className="flex-1 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
-          {visibleNav.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+        {/* Groups */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3">
+          {NAV_GROUPS.map((group) => {
+            const items = visibleNav.filter((n) => n.group === group);
+            if (items.length === 0) return null;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-xl transition-colors ${isActive ? 'bg-accent-soft text-accent-text font-semibold' : 'text-muted hover:bg-panel hover:text-ink'}`}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                <item.Icon size={20} strokeWidth={1.75} className="shrink-0" />
-                <span className={`hidden md:block font-medium transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>{item.label}</span>
-              </Link>
+              <div key={group} className="mt-4">
+                <p className={`mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-faint ${collapsed ? 'md:sr-only' : ''}`}>{group}</p>
+                <div className="space-y-0.5">
+                  {items.map((item) => {
+                    const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setSidebarOpen(false)}
+                        aria-current={isActive ? 'page' : undefined}
+                        title={collapsed ? item.label : undefined}
+                        className={`flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] transition-colors ${collapsed ? 'md:justify-center md:px-0' : ''} ${
+                          isActive ? 'bg-accent-soft font-semibold text-accent-text' : 'text-muted hover:bg-panel hover:text-ink'
+                        }`}
+                      >
+                        <item.Icon size={18} strokeWidth={1.75} className="shrink-0" />
+                        <span className={`truncate ${collapsed ? 'md:hidden' : ''}`}>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </div>
 
-        {/* Logout — always visible, regardless of permissions */}
-        <div className="p-3 border-t border-hair">
-          <button
-            onClick={async () => {
-              await fetch('/api/auth/me', { method: 'DELETE' });
-              router.push('/login');
-            }}
-            className="flex items-center gap-3 w-full px-4 py-3 mx-2 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors"
-            title="Log out"
-          >
-            <IconLogout size={20} strokeWidth={1.75} className="shrink-0" />
-            <span className={`hidden md:block font-medium transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Log out</span>
-          </button>
+        {/* Status + user */}
+        <div className="space-y-2 px-3 pb-4">
+          {drawer && !collapsed && (
+            <Link
+              href="/admin/terminal"
+              className="flex items-center gap-3 rounded-2xl border border-hair bg-card px-3 py-2.5 transition-colors hover:border-hair-strong"
+            >
+              <span className={`h-2 w-2 shrink-0 rounded-full ${drawer.open ? 'bg-good' : 'bg-hair-strong'}`} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-semibold">{drawer.open ? 'Cash drawer open' : 'Cash drawer closed'}</span>
+                <span className="block truncate text-xs text-faint">
+                  {drawer.open && drawer.expected != null
+                    ? `Should hold ${peso(drawer.expected)}`
+                    : 'Open it from New Order'}
+                </span>
+              </span>
+              <IconCash size={16} className="shrink-0 text-faint" />
+            </Link>
+          )}
+          {user && (
+            <div className={`flex items-center gap-3 rounded-2xl px-2 py-1.5 ${collapsed ? 'md:flex-col' : ''}`}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-bold text-muted">
+                {initials(user.name)}
+              </span>
+              <span className={`min-w-0 flex-1 ${collapsed ? 'md:hidden' : ''}`}>
+                <span className="block truncate text-[13px] font-semibold">{user.name}</span>
+                <span className="block truncate text-xs capitalize text-faint">{user.role.toLowerCase()}</span>
+              </span>
+              <button
+                onClick={logOut}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-faint transition-colors hover:bg-danger-bg hover:text-danger"
+                title="Log out"
+                aria-label="Log out"
+              >
+                <IconLogout size={17} />
+              </button>
+            </div>
+          )}
         </div>
-
       </nav>
 
-      {/* New Order Notifications - adjust for mobile header */}
-      {notifQueue.length > 0 && (
-        <div className="fixed top-16 right-4 md:top-4 z-[60] flex flex-col gap-2 max-w-sm">
+      {/* Notifications */}
+      {(notifQueue.length > 0 || guestLeftNotif.length > 0) && (
+        <div className="fixed right-4 top-16 z-[60] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2 md:top-4" aria-live="polite">
           {notifQueue.map((n, i) => (
-            <div
-              key={`${n.orderNumber}-${i}`}
-              className="bg-green-600 text-white px-5 py-3 rounded-2xl shadow-2xl animate-bounce flex items-center gap-3"
-            >
-              <span className="text-2xl">🔔</span>
-              <div>
-                <p className="font-bold text-sm">New Order: {n.orderNumber}</p>
-                <p className="text-green-100 text-xs">{n.customerName}{n.tableName ? ` · ${n.tableName}` : ''}</p>
+            <div key={`${n.orderNumber}-${i}`} className="flex items-start gap-3 rounded-2xl border border-hair bg-card p-3 shadow-pop">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-good-bg text-good">
+                <IconBell size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">New order {n.orderNumber}</p>
+                <p className="truncate text-xs text-faint">{n.customerName}{n.tableName ? ` · ${n.tableName}` : ''}</p>
               </div>
-              <button
-                onClick={() => setNotifQueue(prev => prev.filter((_, idx) => idx !== i))}
-                className="ml-2 text-green-200 hover:text-white text-lg"
-              >✕</button>
+              <button onClick={() => setNotifQueue((prev) => prev.filter((_, idx) => idx !== i))} className="text-faint hover:text-ink" aria-label="Dismiss">
+                ×
+              </button>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Guest Left Notifications */}
-      {guestLeftNotif.length > 0 && (
-        <div className="fixed top-16 right-4 md:top-4 z-[60] flex flex-col gap-2 max-w-sm">
           {guestLeftNotif.map((n, i) => (
-            <div
-              key={`guest-left-${i}`}
-              className="bg-red-600 text-white px-5 py-3 rounded-2xl shadow-2xl animate-bounce flex items-center gap-3"
-            >
-              <span className="text-2xl">👋</span>
-              <div>
-                <p className="font-bold text-sm">Guest Left</p>
-                <p className="text-red-100 text-xs">{n.guestNames} left {n.tableName}</p>
+            <div key={`guest-left-${i}`} className="flex items-start gap-3 rounded-2xl border border-hair bg-card p-3 shadow-pop">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-warn-bg text-warn">
+                <IconUsers size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Guest left</p>
+                <p className="truncate text-xs text-faint">{n.guestNames} left {n.tableName}</p>
               </div>
-              <button
-                onClick={() => setGuestLeftNotif(prev => prev.filter((_, idx) => idx !== i))}
-                className="ml-2 text-red-200 hover:text-white text-lg"
-              >✕</button>
+              <button onClick={() => setGuestLeftNotif((prev) => prev.filter((_, idx) => idx !== i))} className="text-faint hover:text-ink" aria-label="Dismiss">
+                ×
+              </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-h-0 h-screen overflow-y-auto pt-14 md:pt-0">
+      {/* Main content: a raised sheet on the canvas */}
+      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-14 md:pt-0">
         {children}
       </main>
-
     </div>
   );
 }
-
