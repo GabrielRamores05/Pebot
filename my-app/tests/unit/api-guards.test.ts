@@ -10,8 +10,6 @@ vi.mock('@/lib/auth', () => ({
   getAuthUser: mocks.getAuthUser,
 }));
 
-vi.mock('@/lib/subscription', () => ({ getUserSubscription: vi.fn() }));
-
 import { NextRequest } from 'next/server';
 import { guardAdmin, guardFeature } from '../../lib/api-guards';
 import type { JWTPayload } from '../../lib/auth';
@@ -28,7 +26,7 @@ beforeEach(() => {
 });
 
 describe('guardFeature', () => {
-  test('passes the caller through when their tier includes the feature', async () => {
+  test('passes the caller through when they may use the feature', async () => {
     const staff = user('STAFF');
     mocks.checkFeatureAccess.mockResolvedValue({ user: staff, hasAccess: true });
 
@@ -49,14 +47,14 @@ describe('guardFeature', () => {
     await expect(result.error?.json()).resolves.toEqual({ error: 'Unauthorized' });
   });
 
-  test('answers 403 when the tier does not include the feature', async () => {
+  test('answers 403 when the caller may not use the feature', async () => {
     mocks.checkFeatureAccess.mockResolvedValue({ user: user('STAFF'), hasAccess: false });
 
     const result = await guardFeature(req, 'loyalty');
 
     expect(result.error?.status).toBe(403);
     await expect(result.error?.json()).resolves.toEqual({
-      error: 'Feature not available in your subscription tier',
+      error: "You don't have permission to use this. Ask the owner to turn it on in Staff.",
     });
   });
 });

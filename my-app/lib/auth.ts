@@ -2,7 +2,6 @@ import { SignJWT, jwtVerify } from 'jose';
 import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserSubscription, hasFeatureAccess } from '@/lib/subscription';
 
 const configuredSecret = process.env.JWT_SECRET?.trim() || null;
 const JWT_SECRET = configuredSecret ?? (
@@ -67,21 +66,8 @@ export function requireRole(user: JWTPayload | null, roles: string[]): boolean {
   return roles.includes(user.role);
 }
 
-// Subscription middleware
-export async function withSubscriptionCheck(
-  req: NextRequest,
-  feature: keyof NonNullable<Awaited<ReturnType<typeof getUserSubscription>>>['features']
-): Promise<{ user: JWTPayload | null; subscription: NonNullable<Awaited<ReturnType<typeof getUserSubscription>>> | null; hasAccess: boolean }> {
-  const user = await getAuthUser(req);
-  if (!user) {
-    return { user: null, subscription: null, hasAccess: false };
-  }
-
-  const subscription = await getUserSubscription(user.userId);
-  const hasAccess = user.role === 'ADMIN' || hasFeatureAccess(subscription, feature);
-
-  return { user, subscription, hasAccess };
-}
+/** Features the owner switches on per staff member in Staff Management. */
+export type FeatureKey = 'analytics' | 'inventory' | 'staff' | 'settings' | 'kitchen' | 'loyalty';
 
 // Require a feature permission for the signed-in user.
 // - ADMIN always passes.
@@ -100,11 +86,14 @@ export async function requirePermission(
   return null;
 }
 
-// Helper function for API routes
+// Feature access for API routes (spec 015, FR-019). Pebot is sold as one license with
+// every feature, so access is no longer a pricing tier. It is who may use what:
+// ADMIN always, everyone else only with the Staff Management flag for that feature.
 export async function checkFeatureAccess(
   req: NextRequest,
-  feature: keyof NonNullable<Awaited<ReturnType<typeof getUserSubscription>>>['features']
+  feature: FeatureKey
 ): Promise<{ user: JWTPayload | null; hasAccess: boolean }> {
-  const { user, hasAccess } = await withSubscriptionCheck(req, feature);
-  return { user, hasAccess };
+  const user = await getAuthUser(req);
+  if (!user) return { user: null, hasAccess: false };
+  return { user, hasAccess: user.role === 'ADMIN' || (user.permissions ?? {})[feature] === true };
 }

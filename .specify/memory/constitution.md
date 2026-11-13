@@ -1,9 +1,11 @@
 # Pebot / CaféOS Constitution
 
-CaféOS is a local-first, single-tenant POS and ordering system for independent
-cafés in the Philippines. One Windows PC per location runs the whole stack; staff
-terminals, the kitchen display, and customer QR ordering are browsers on that
-café's LAN. There is no cloud backend and no cross-location server.
+Pebot (formerly CaféOS) is a local-first, single-tenant POS and ordering system
+sold to independent restaurants and food businesses in the Philippines:
+carinderias, cafés, fast food, casual dining, bakeries. One Windows PC per
+location runs the whole stack. Staff terminals, the kitchen display, and customer
+QR ordering are browsers on that location's LAN. There is no cloud backend and
+no cross-location server.
 
 This document supersedes any agent's defaults. If a request conflicts with a
 principle below, follow the principle and say so — do not quietly pick one.
@@ -102,6 +104,23 @@ happened and what to do next; the log gets the stack and enough context to find
 it, with no personal data or tokens; the owner gets told in plain language. A
 caught-and-ignored error is a bug that has been hidden rather than fixed.
 
+### VIII. Commercial licensing fails closed, offline
+
+Pebot is sold per location, at a one-time price for lifetime use. A location's
+main PC runs business features only while it holds a license that the seller's
+private key signed and that is bound to that PC's Machine Code.
+
+- **No free access paths.** There is no trial, grace period, expiry or dev
+  bypass, and licensing never depends on the date. A bug must not be able to
+  grant free use.
+- **Enforcement is central.** It lives in the local server that every HTTP
+  request and socket passes through (Principles II and V), never only in
+  Electron.
+- **The app verifies but never mints keys.** The private key and the seller's
+  keygen tool are never committed or shipped.
+- **Licensing never touches restaurant data.** Activation, deactivation and
+  revocation leave the database as it was.
+
 ## Locked Technical Decisions
 
 Settled. Do not reopen these, and do not ask the owner about them.
@@ -190,4 +209,7 @@ control and the written rule is documentation of it.
 Its ancestor document is `docs/archive/PEBOT_MASTER_PROMPT.md`, kept for
 provenance only; this file is the live version.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-27 | **Last Amended**: 2026-08-27
+**Version**: 1.1.0 | **Ratified**: 2026-08-27 | **Last Amended**: 2026-11-14
+
+1.1.0 (2026-11-14): The owner widened the scope from cafés to restaurants and food
+businesses, and Principle VIII (commercial licensing) was added for spec 015.

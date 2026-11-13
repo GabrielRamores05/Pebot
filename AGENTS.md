@@ -10,8 +10,10 @@ Then read the spec you are working on, in `specs/NNN-slug/`.
 
 ## What this is
 
-CaféOS is a local-first café POS: one Windows PC per location runs a Next.js app
-plus Socket.IO over the café LAN, with SQLite as that location's source of truth.
+Pebot (formerly CaféOS) is a local-first restaurant POS. It is sold per location
+and unlocked with an offline license key (constitution Principle VIII). One
+Windows PC per location runs a Next.js app plus Socket.IO over the restaurant
+LAN, with SQLite as that location's source of truth.
 No cloud backend. Customer phones order via table QR; staff, admin, and kitchen
 are browsers on the same LAN at different trust levels. The app lives in
 `my-app/`.

@@ -62,3 +62,6 @@ prisma/*.db-wal
 # Turbopack and other build artifacts
 .turbopack*
 .swc
+
+# Pebot license activation record (spec 015)
+prisma/pebot-license.json

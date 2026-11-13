@@ -40,6 +40,7 @@
       ".next/**/*",
       "public/**/*",
       "lib/**/*",
+      "legal/**/*",
       "node_modules/.prisma/**/*",
       "node_modules/**/*",
       "prisma/schema.prisma",
@@ -105,7 +106,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "CaféOS POS"
+      "shortcutName": "CaféOS POS",
+      "license": "legal/pebot-license-agreement.txt"
     },
     "compression": "store"
   },

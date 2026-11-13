@@ -12,7 +12,7 @@ export const unauthorized = (message = 'Unauthorized') => apiError(message, 401)
 export const forbidden = (message = 'Forbidden') => apiError(message, 403);
 
 export const featureUnavailable = () =>
-  apiError('Feature not available in your subscription tier', 403);
+  apiError("You don't have permission to use this. Ask the owner to turn it on in Staff.", 403);
 
 export const notFound = (message = 'Not found') => apiError(message, 404);
 

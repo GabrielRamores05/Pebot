@@ -176,13 +176,6 @@ export async function deleteAdminUser(id: number) {
   return prisma.user.delete({ where: { id } });
 }
 
-export async function findUserWithSubscription(userId: number) {
-  return prisma.user.findUnique({
-    where: { id: userId },
-    include: { subscription: true },
-  });
-}
-
 // ----- Restore – Prisma lifecycle passthrough -----
 
 export async function disconnectPrisma() {

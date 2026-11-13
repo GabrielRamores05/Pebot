@@ -15,6 +15,14 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  // License core is CommonJS on purpose: server.js and tools/pebot-keygen run
+  // under plain Node and must share this exact code with the app (spec 015).
+  {
+    files: ['lib/license/**/*.js'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
