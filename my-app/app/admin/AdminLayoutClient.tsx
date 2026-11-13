@@ -44,6 +44,7 @@ const navItems = [
   { href: '/admin/expenses',   Icon: IconHistory,   label: 'Expenses', roles: ['ADMIN', 'STAFF'], permission: 'inventory' },
   { href: '/admin/loyalty',    Icon: IconCoffee,    label: 'Loyalty', roles: ['ADMIN', 'STAFF'], permission: 'loyalty' },
   { href: '/admin/order-history', Icon: IconHistory, label: 'Order History', roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
+  { href: '/admin/end-of-day', Icon: IconAnalytics, label: 'End of Day', roles: ['ADMIN', 'STAFF'], permission: 'analytics' },
   { href: '/admin/reviews',       Icon: IconStar,   label: 'Reviews', roles: ['ADMIN', 'STAFF'], permission: 'products' },
   { href: '/admin/staff',      Icon: IconMonitor,   label: 'Staff', roles: ['ADMIN'], permission: 'staff' },
   { href: '/admin/settings',   Icon: IconSettings,  label: 'Settings', roles: ['ADMIN', 'STAFF'], permission: 'settings' },

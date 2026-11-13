@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import { formatPeso } from '@/lib/format';
 import { calculateLoyaltyDiscountForItems } from '@/lib/pos-utils';
+import { CheckoutError, computeCheckout, serviceChargeRateFor, type CheckoutTotals } from '@/lib/checkout';
+import DiscountPicker, { discountProblem, toCheckoutDiscount, toOrderDiscount, type TerminalDiscount } from './DiscountPicker';
+import CashDrawerPanel from './CashDrawerPanel';
 
 interface InventoryData { quantity: number; lowStockThreshold: number; }
 interface Product { id: number; name: string; description?: string; price: number; imageUrl?: string; available: boolean; inventory?: InventoryData; vatExempt?: boolean; marginType?: string; marginValue?: number; capitalCost?: number; }
@@ -44,12 +47,37 @@ interface OrderReceipt {
   // Cash payment details
   cashReceived?: number;
   change?: number;
-  // Discount (e.g., Student / PWD)
+  // Discount (spec 017): Senior Citizen / PWD / Student
   discountAmount?: number;
   discountReason?: string;
   discountRate?: number;
   loyaltyDiscount?: number;
+  vatRemoved?: number;
+  serviceCharge?: number;
 }
+
+const DISCOUNT_LABELS: Record<string, string> = {
+  SENIOR: 'Senior Citizen discount',
+  PWD: 'PWD discount',
+  SENIOR_PWD: 'Senior/PWD discount',
+  STUDENT: 'Student discount',
+  STUDENT_PWD: 'Student/PWD discount',
+};
+
+/** Lines between the item list and the total, in bill order (spec 017). */
+function receiptAdjustments(r: OrderReceipt): { label: string; amount: number }[] {
+  const lines: { label: string; amount: number }[] = [];
+  if ((r.loyaltyDiscount ?? 0) > 0) lines.push({ label: 'Loyalty reward', amount: -(r.loyaltyDiscount ?? 0) });
+  if ((r.vatRemoved ?? 0) > 0) lines.push({ label: 'Less VAT (Senior/PWD)', amount: -(r.vatRemoved ?? 0) });
+  if ((r.discountAmount ?? 0) > 0) {
+    const label = DISCOUNT_LABELS[r.discountReason ?? ''] ?? 'Discount';
+    lines.push({ label: r.discountRate ? `${label} (${r.discountRate}%)` : label, amount: -(r.discountAmount ?? 0) });
+  }
+  if ((r.serviceCharge ?? 0) > 0) lines.push({ label: 'Service charge', amount: r.serviceCharge ?? 0 });
+  return lines;
+}
+
+const signedPeso = (n: number) => `${n < 0 ? '−' : ''}₱${Math.abs(n).toFixed(2)}`;
 
 interface BusinessSettings {
   businessName: string;
@@ -61,11 +89,10 @@ interface BusinessSettings {
   serialNo?: string;
   loyaltyEnabled?: boolean;
   studentPwdDiscountRate?: number;
+  vatRegistered?: boolean;
+  serviceChargeRate?: number;
+  serviceChargeOrderTypes?: string;
 }
-
-// VAT Configuration - Adjustable for future rate changes
-const VAT_RATE = 0.12; // 12% VAT rate
-const VAT_INCLUSIVE_DIVISOR = 112; // Used to extract VAT from VAT-inclusive prices (price * 12/112)
 
 function escapeHtml(str: string): string {
   return str.replace(/[&<>"']/g, (c) => ({
@@ -253,8 +280,8 @@ export default function PosTerminalPage() {
   const [cashInput, setCashInput] = useState('');
   const [orderFeedback, setOrderFeedback] = useState<'idle' | 'success'>('idle');
   const [cashReceived, setCashReceived] = useState<number>(0);
-  // Student / PWD discount rate (%) applied at the calculator; 0 = no discount
-  const [discountRate, setDiscountRate] = useState<number>(0);
+  // Senior Citizen / PWD / Student discount for the current bill (spec 017)
+  const [discount, setDiscount] = useState<TerminalDiscount>({ kind: 'NONE' });
   const [isDownloading, setIsDownloading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -370,7 +397,6 @@ export default function PosTerminalPage() {
   };
 
   const cartSubtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const discountAmount = discountRate > 0 ? Math.round(cartSubtotal * discountRate / 100 * 100) / 100 : 0;
   const loyaltyDiscount = cart.length > 0 && loyaltyVouchers.length > 0
     ? calculateLoyaltyDiscountForItems(
         cart.map(i => ({ productId: i.productId, price: i.price, quantity: i.quantity, categoryId: i.categoryId })),
@@ -383,7 +409,24 @@ export default function PosTerminalPage() {
         {}
       )
     : 0;
-  const total = Math.max(0, cartSubtotal - discountAmount - loyaltyDiscount);
+  // The bill, calculated exactly as the server will (lib/checkout.ts, spec 017).
+  const studentRate = businessSettings?.studentPwdDiscountRate ?? 20;
+  const billInput = {
+    lines: cart.map((i) => ({ amount: i.price * i.quantity, vatExempt: Boolean(i.vatExempt) })),
+    loyaltyDiscount,
+    vatRegistered: businessSettings?.vatRegistered ?? true,
+    vatRate: businessSettings?.vatRate ?? 12,
+    serviceChargeRate: serviceChargeRateFor(businessSettings, orderType),
+  };
+  let billError: string | null = null;
+  let bill: CheckoutTotals;
+  try {
+    bill = computeCheckout({ ...billInput, discount: toCheckoutDiscount(discount, studentRate) });
+  } catch (e) {
+    billError = e instanceof CheckoutError ? e.message : 'This discount cannot be applied.';
+    bill = computeCheckout(billInput);
+  }
+  const total = bill.total;
   const cashValue = cashReceived > 0 ? cashReceived : Number.parseFloat(cashInput || '0') || 0;
   const changeValue = cashValue > 0 ? cashValue - total : 0;
   const hasCashInput = cashInput.trim() !== '' || cashReceived > 0;
@@ -707,6 +750,8 @@ export default function PosTerminalPage() {
     // Calculate totals for validation - product prices already include VAT (from BIR pricing).
     // `total` is the discounted (VAT-inclusive) total shown in the calculator.
     const totalAmount = total;
+    const problem = billError ?? discountProblem(discount);
+    if (problem) { setError(problem); return; }
 
     // Validate cash payment
     if (paymentMethod === 'CASH') {
@@ -744,8 +789,7 @@ export default function PosTerminalPage() {
            deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress.trim() : undefined,
            paymentConfirmed: true,
            overrideStock,
-           discountRate: discountRate > 0 ? discountRate : undefined,
-           discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
+           discount: toOrderDiscount(discount),
            // The peso amount is not sent: /api/orders derives it from these
            // codes and redeems them with the order.
            ...(loyaltyVoucherCodes.length > 0 && { loyaltyVoucherCodes }),
@@ -768,46 +812,37 @@ export default function PosTerminalPage() {
          setWarnings(data.warnings);
        }
       
-      // Calculate tax breakdown from BIR pricing for RECEIPT DISPLAY ONLY
-      // Product price = basePrice + VAT, so VAT = price * VAT_RATE/VAT_INCLUSIVE_DIVISOR
-      // Note: This is just for display on the receipt, not for payment calculation
-      let vatTaxableTotal = 0;
-      let vatExemptTotal = 0;
-      cart.forEach(item => {
-        const itemTotal = item.price * item.quantity;
-        if (item.vatExempt) {
-          vatExemptTotal += itemTotal;
-        } else {
-          // VAT included in price = price × (rate / (100 + rate))
-          // For 12%: VAT = price × 0.12 / 112 = price × (1 - 1/1.12)
-          const vatPortion = itemTotal * (1 - 1 / 1.12);
-          vatTaxableTotal += (itemTotal - vatPortion); // Base price before VAT
-        }
-      });
-      const subtotal = vatTaxableTotal + vatExemptTotal;
-      const vatAmount = vatTaxableTotal * VAT_RATE; // VAT_RATE of base price
+      // Receipt figures: the saved order's own breakdown (same calculation as the bill shown).
+      const saved = data as Partial<Record<string, unknown>>;
+      const num = (k: string, fallback: number) => (typeof saved[k] === 'number' ? (saved[k] as number) : fallback);
+      const reasonByKind: Record<string, string | undefined> = {
+        STUDENT: 'STUDENT',
+        STATUTORY: typeof saved.discountReason === 'string' ? saved.discountReason : 'SENIOR',
+      };
       
       setReceipt({
         orderNumber: data.orderNumber,
         receiptSerial: data.receiptSerial || `INV-${Date.now()}`,
         customerName: customerName.trim() || 'Guest',
-        totalAmount: total, // Discounted (VAT-inclusive) amount paid
+        totalAmount: num('totalAmount', total),
         items: cart.map(i => ({ name: i.name, quantity: i.quantity, price: i.price, vatExempt: i.vatExempt })),
         tableName: table?.name,
         deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress.trim() : undefined,
         createdAt: new Date().toISOString(),
         paymentMethod,
         orderType,
-        subtotal,
-        vatTaxableTotal,
-        vatExemptTotal,
-        vatAmount,
-         discountAmount: discountRate > 0 ? discountAmount : 0,
-         discountReason: discountRate > 0 ? 'STUDENT_PWD' : undefined,
-         discountRate: discountRate > 0 ? discountRate : undefined,
-         loyaltyDiscount: loyaltyDiscount > 0 ? loyaltyDiscount : undefined,
+        subtotal: num('grossAmount', bill.gross),
+        vatTaxableTotal: num('vatableSales', bill.vatableSales),
+        vatExemptTotal: num('vatExemptSales', bill.vatExemptSales),
+        vatAmount: num('vatAmount', bill.vatAmount),
+        discountAmount: num('discountAmount', bill.discount),
+        discountReason: reasonByKind[discount.kind],
+        discountRate: discount.kind === 'STUDENT' ? studentRate : discount.kind === 'STATUTORY' ? 20 : undefined,
+        loyaltyDiscount: num('loyaltyDiscount', bill.loyaltyDiscount) || undefined,
+        vatRemoved: num('vatRemoved', bill.vatRemoved) || undefined,
+        serviceCharge: num('serviceCharge', bill.serviceCharge) || undefined,
         cashReceived: paymentMethod === 'CASH' ? cashReceived : undefined,
-        change: paymentMethod === 'CASH' ? cashReceived - total : undefined,
+        change: paymentMethod === 'CASH' ? cashReceived - num('totalAmount', total) : undefined,
       });
       clearCart();
       setCustomerName('Walk-In');
@@ -816,6 +851,7 @@ export default function PosTerminalPage() {
       setLoyaltyVouchers([]);
       setLoyaltyVoucherCodes([]);
       setPaymentMethod('CASH');
+      setDiscount({ kind: 'NONE' });
       setOrderType('DINE_IN');
       setDeliveryAddress('');
       resetCalculator();
@@ -883,10 +919,22 @@ export default function PosTerminalPage() {
               <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Total</span>
               <span className="text-sm font-semibold tracking-[-0.04em] text-white" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{formatPeso(total)}</span>
             </div>
-            {discountRate > 0 && (
+            {bill.vatRemoved > 0 && (
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Discount ({discountRate}%)</span>
-                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatPeso(discountAmount)}</span>
+                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Less VAT</span>
+                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatPeso(bill.vatRemoved)}</span>
+              </div>
+            )}
+            {bill.discount > 0 && (
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Discount</span>
+                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatPeso(bill.discount)}</span>
+              </div>
+            )}
+            {bill.serviceCharge > 0 && (
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Service charge</span>
+                <span className="text-sm font-semibold tracking-[-0.04em] text-white" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{formatPeso(bill.serviceCharge)}</span>
               </div>
             )}
             <div className="flex justify-between items-center mb-1">
@@ -909,21 +957,9 @@ export default function PosTerminalPage() {
             )}
           </div>
 
-          {typeof businessSettings?.studentPwdDiscountRate === 'number' && (
-            <button
-              onClick={() => setDiscountRate(discountRate > 0 ? 0 : (businessSettings?.studentPwdDiscountRate ?? 20))}
-              className={`mb-1.5 w-full rounded-[var(--radius-md)] py-1.5 text-[10px] font-semibold tracking-[0.04em] transition ${
-                discountRate > 0
-                  ? 'bg-[var(--pos-accent)] text-white'
-                  : 'border border-[var(--pos-border)] bg-[var(--pos-surface)] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]'
-              }`}
-              style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
-            >
-              {discountRate > 0
-                ? `Student/PWD −${discountRate}%  (−${formatPeso(discountAmount)})`
-                : `Apply Student / PWD −${businessSettings?.studentPwdDiscountRate ?? 20}%`}
-            </button>
-          )}
+          <CashDrawerPanel businessName={businessSettings?.businessName || 'My Restaurant'} />
+          <DiscountPicker value={discount} onChange={setDiscount} studentRate={studentRate} />
+          {billError && <p className="mb-1.5 text-[10px] text-[#b42318]" role="alert">{billError}</p>}
 
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Enter cash tendered</div>
           <div className="grid grid-cols-4 gap-1 mb-1.5">{[100,200,500,1000].map(a=>(<button key={a} onClick={()=>setCashInput(String(a))} className="rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] py-1.5 text-[10px] font-semibold tracking-[-0.04em] text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>₱{a}</button>))}</div>
@@ -1489,24 +1525,12 @@ export default function PosTerminalPage() {
                   <span className="text-gray-500">Subtotal:</span>
                   <span className="text-gray-800">₱{receipt.subtotal.toFixed(2)}</span>
                 </div>
-                {receipt.vatAmount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">VAT (12%):</span>
-                    <span className="text-gray-800">₱{receipt.vatAmount.toFixed(2)}</span>
+                {receiptAdjustments(receipt).map((line) => (
+                  <div key={line.label} className="flex justify-between">
+                    <span className="text-gray-500">{line.label}:</span>
+                    <span className="text-gray-800">{signedPeso(line.amount)}</span>
                   </div>
-                )}
-                {(receipt.discountAmount ?? 0) > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">{receipt.discountReason || 'Discount'}{receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span>
-                    <span className="text-gray-800">−₱{(receipt.discountAmount ?? 0).toFixed(2)}</span>
-                  </div>
-                )}
-                {(receipt.loyaltyDiscount ?? 0) > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Loyalty Reward:</span>
-                    <span className="text-gray-800">−₱{(receipt.loyaltyDiscount ?? 0).toFixed(2)}</span>
-                  </div>
-                )}
+                ))}
               </div>
 
               {/* Grand Total */}
@@ -1538,7 +1562,7 @@ export default function PosTerminalPage() {
                 {receipt.vatTaxableTotal > 0 && (
                   <>
                     <p>VATable Sales: ₱{receipt.vatTaxableTotal.toFixed(2)}</p>
-                    <p>VAT Amount (12%): ₱{receipt.vatAmount.toFixed(2)}</p>
+                    <p>VAT Amount ({businessSettings?.vatRate ?? 12}%): ₱{receipt.vatAmount.toFixed(2)}</p>
                   </>
                 )}
                 {receipt.vatExemptTotal > 0 && (
@@ -1583,7 +1607,6 @@ export default function PosTerminalPage() {
                   onClick={() => {
                     const printWindow = window.open('', '_blank', 'width=350,height=600');
                     if (printWindow) {
-                      const vatRate = businessSettings?.vatRate || 12;
                       const vatAmount = receipt.vatAmount;
                       printWindow.document.write(`
                         <!DOCTYPE html>
@@ -1647,9 +1670,7 @@ export default function PosTerminalPage() {
                           </div>
                           <div class="totals">
                             <div class="row"><span>Subtotal:</span><span>₱${receipt.subtotal.toFixed(2)}</span></div>
-                             <div class="row"><span>VAT (${vatRate}%):</span><span>₱${receipt.vatAmount.toFixed(2)}</span></div>
-                              ${(receipt.discountAmount ?? 0) > 0 ? `<div class="row"><span>${escapeHtml(receipt.discountReason || 'Discount')}${receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span><span>−₱${(receipt.discountAmount ?? 0).toFixed(2)}</span></div>` : ''}
-                              ${(receipt.loyaltyDiscount ?? 0) > 0 ? `<div class="row"><span>Loyalty Reward:</span><span>−₱${(receipt.loyaltyDiscount ?? 0).toFixed(2)}</span></div>` : ''}
+                              ${receiptAdjustments(receipt).map((line) => `<div class="row"><span>${escapeHtml(line.label)}:</span><span>${signedPeso(line.amount)}</span></div>`).join('')}
                               <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
                             ${receipt.paymentMethod === 'CASH' && receipt.cashReceived !== undefined ? `
                               <div class="row"><span>Cash:</span><span>₱${receipt.cashReceived.toFixed(2)}</span></div>
@@ -1684,7 +1705,6 @@ export default function PosTerminalPage() {
                     // Open thermal print for auto-print
                     const printWindow = window.open('', '_blank', 'width=350,height=600');
                     if (printWindow) {
-                      const vatRate = businessSettings?.vatRate || 12;
                       printWindow.document.write(`
                         <!DOCTYPE html>
                         <html>
@@ -1729,9 +1749,7 @@ export default function PosTerminalPage() {
                           </div>
                           <div class="totals">
                             <div class="row"><span>Subtotal:</span><span>₱${receipt.subtotal.toFixed(2)}</span></div>
-                             <div class="row"><span>VAT (${vatRate}%):</span><span>₱${receipt.vatAmount.toFixed(2)}</span></div>
-                              ${(receipt.discountAmount ?? 0) > 0 ? `<div class="row"><span>${escapeHtml(receipt.discountReason || 'Discount')}${receipt.discountRate ? ` (${receipt.discountRate}%)` : ''}:</span><span>−₱${(receipt.discountAmount ?? 0).toFixed(2)}</span></div>` : ''}
-                              ${(receipt.loyaltyDiscount ?? 0) > 0 ? `<div class="row"><span>Loyalty Reward:</span><span>−₱${(receipt.loyaltyDiscount ?? 0).toFixed(2)}</span></div>` : ''}
+                              ${receiptAdjustments(receipt).map((line) => `<div class="row"><span>${escapeHtml(line.label)}:</span><span>${signedPeso(line.amount)}</span></div>`).join('')}
                               <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
                             ${receipt.paymentMethod === 'CASH' && receipt.cashReceived !== undefined ? `
                               <div class="row"><span>Cash:</span><span>₱${receipt.cashReceived.toFixed(2)}</span></div>
