@@ -309,6 +309,7 @@ export async function createOrder(input: unknown, options: CreateOrderOptions = 
     discountReason: discountPlan.reason,
     discountHolders: discountPlan.holders,
     countInDrawer: paymentMethod === 'CASH' && data.paymentConfirmed === true && options.source !== 'tablet',
+    paid: data.paymentConfirmed === true,
     orderItemsData,
     discountLineItems,
     affectedProductIds: [...new Set(affectedProductIds)],

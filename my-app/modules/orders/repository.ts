@@ -173,6 +173,7 @@ export async function createPaymentAndCompleteOrder(
       where: { id: orderId },
       data: { status: 'COMPLETED' },
     });
+    await tx.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paidAt: new Date() } });
     if (paymentData.method === 'CASH') {
       await countInOpenDrawerTx(tx, orderId, locationId);
     }
@@ -369,6 +370,8 @@ export interface CreateOrderParams {
   discountHolders: string | null;
   /** Paid in cash at this PC: count it in the open cash drawer, if any. */
   countInDrawer: boolean;
+  /** Payment was confirmed when the order was placed. */
+  paid?: boolean;
   orderItemsData: CreateOrderTxItem[];
   discountLineItems: CreateOrderDiscountItem[];
   affectedProductIds: number[];
@@ -471,6 +474,7 @@ export async function createOrder(params: CreateOrderParams): Promise<any> {
         vatExemptSales: bill.vatExemptSales,
         serviceCharge: bill.serviceCharge,
         cashSessionId: drawer?.id ?? null,
+        paidAt: params.paid ? new Date() : null,
         loyaltyPromo: isLoyaltyOrder,
         paymentMethod: params.paymentMethod,
         paymentScreenshot: params.paymentScreenshot,
@@ -685,6 +689,7 @@ export async function updateOrderInTransaction(params: UpdateOrderParams): Promi
     }
 
     if (params.isPaymentConfirmation) {
+      await tx.order.updateMany({ where: { id: params.orderId, paidAt: null }, data: { paidAt: new Date() } });
       await countInOpenDrawerTx(tx, params.orderId, params.locationId);
     }
 

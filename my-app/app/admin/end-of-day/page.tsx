@@ -23,6 +23,7 @@ interface Report {
   summary: {
     orderCount: number;
     cancelled: { count: number; amount: number };
+    unpaid: { count: number; amount: number };
     gross: number;
     loyaltyDiscount: number;
     discounts: { senior: number; pwd: number; seniorAndPwd: number; student: number; legacyStudentPwd: number; other: number };
@@ -153,6 +154,11 @@ export default function EndOfDayPage() {
               {discountRows.map(([label, v]) => <Row key={label} label={label} value={v} minus />)}
               {s.serviceCharge > 0 && <Row label="Service charge" value={s.serviceCharge} />}
               <Row label="Net sales" value={s.net} strong />
+              {s.unpaid.count > 0 && (
+                <p className="mt-2 text-xs text-gray-500">
+                  {s.unpaid.count} order{s.unpaid.count === 1 ? '' : 's'} not yet paid ({formatPeso(s.unpaid.amount)}) not counted.
+                </p>
+              )}
               {s.cancelled.count > 0 && (
                 <p className="mt-2 text-xs text-gray-500">
                   {s.cancelled.count} cancelled order{s.cancelled.count === 1 ? '' : 's'} ({formatPeso(s.cancelled.amount)}) not counted.

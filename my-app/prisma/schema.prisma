@@ -290,6 +290,7 @@ model Order {
   vatExemptSales       Float               @default(0) // or all sales when not VAT-registered
   serviceCharge        Float               @default(0)
   discountHolders      String? // JSON [{type: SENIOR|PWD, name, idNumber}]
+  paidAt               DateTime? // when payment was confirmed (spec 017); null = not paid yet
   cashSessionId        Int?
   cashSession          CashSession?        @relation(fields: [cashSessionId], references: [id])
   paymentMethod        String              @default("CASH") // CASH | GCASH | PAYMAYA

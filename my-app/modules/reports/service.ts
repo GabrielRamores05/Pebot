@@ -30,6 +30,14 @@ export function dayRange(date: string): { from: Date; to: Date } {
   return { from, to: new Date(y, mo, d + 1) };
 }
 
+/**
+ * Paid when payment was confirmed. Orders from before spec 017 have no paidAt;
+ * for those, an order the kitchen has started or finished counts as paid.
+ */
+export function isPaid(status: string, paidAt: Date | null): boolean {
+  return paidAt != null || ['PREPARING', 'READY', 'COMPLETED'].includes(status);
+}
+
 export async function endOfDay(date: string): Promise<EndOfDayReport> {
   const { from, to } = dayRange(date);
   const [orders, business, drawers] = await Promise.all([
@@ -45,7 +53,7 @@ export async function endOfDay(date: string): Promise<EndOfDayReport> {
       tin: business?.tin ?? '',
       vatRegistered: business?.vatRegistered ?? true,
     },
-    summary: summarizeDay(orders),
+    summary: summarizeDay(orders.map(({ paidAt, ...o }) => ({ ...o, paid: isPaid(o.status, paidAt) }))),
     drawers,
     generatedAt: new Date().toISOString(),
   };

@@ -366,6 +366,7 @@ describe('orders service', () => {
       expect(params.discountRate).toBe(20);
       expect(JSON.parse(params.discountHolders)).toEqual([{ type: 'SENIOR', name: 'Lola Remedios', idNumber: 'OSCA-123' }]);
       expect(params.countInDrawer).toBe(true);
+      expect(params.paid).toBe(true);
     });
 
     it('records a table with both a senior and a PWD as SENIOR_PWD', async () => {
