@@ -200,7 +200,7 @@ export default function AdminReviewsPage() {
                       <div className="space-y-1">
                         {review.comment && <p>{review.comment}</p>}
                         {review.tasteSuggestion && (
-                          <p className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded">
+                          <p className="text-xs text-accent-text bg-amber-50 px-2 py-1 rounded">
                             💡 {review.tasteSuggestion}
                           </p>
                         )}

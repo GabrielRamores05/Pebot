@@ -55,7 +55,7 @@ export default function AnalyticsMaster() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-4 font-medium text-sm border-b-2 transition-all whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'border-amber-500 text-amber-600'
+                  ? 'border-amber-500 text-accent-text'
                   : 'border-transparent text-gray-500 hover:text-gray-900'
               }`}
             >

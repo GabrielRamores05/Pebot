@@ -23,7 +23,7 @@ interface VoucherStats {
 
 const statusColor = (status: string) => {
   if (status === 'REDEEMED') return 'bg-emerald-100 text-emerald-700 border border-emerald-200';
-  if (status === 'ACTIVE') return 'bg-amber-100 text-amber-700 border border-amber-200';
+  if (status === 'ACTIVE') return 'bg-amber-100 text-accent-text border border-amber-200';
   return 'bg-slate-100 text-slate-600';
 };
 
@@ -137,7 +137,7 @@ export default function VoucherRedemptionHistory() {
 
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
               <div className="text-slate-500 text-sm font-medium">Pending</div>
-              <div className="text-3xl font-bold mt-2 text-amber-600">{stats.pendingVouchers}</div>
+              <div className="text-3xl font-bold mt-2 text-accent-text">{stats.pendingVouchers}</div>
               <div className="text-xs text-slate-400 mt-2">not yet redeemed</div>
             </div>
           </div>
@@ -211,7 +211,7 @@ export default function VoucherRedemptionHistory() {
                 <tbody>
                   {sortedVouchers.map((voucher) => (
                     <tr key={voucher.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-amber-600 font-semibold">{voucher.code}</td>
+                      <td className="px-4 py-3 font-mono text-accent-text font-semibold">{voucher.code}</td>
                       <td className="px-4 py-3 text-slate-900">{voucher.customerName}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-lg text-xs font-medium ${statusColor(voucher.status)}`}>

@@ -252,8 +252,11 @@ async function main() {
   });
   console.log('  Recipes assigned');
 
-  // Derived capital cost = Σ (ingredient.costPerUnit × quantity) over the recipe.
-  // Recomputed here so a fresh seed has correct costs without manual entry.
+  // Derived capital cost and sellable cache, recomputed from the recipe here so a
+  // fresh seed is immediately usable without manual entry.
+  //  - capitalCost = Σ (ingredient.costPerUnit × quantity)
+  //  - Inventory.quantity = floor(min over required ingredients of currentStock/quantity),
+  //    the same derived "sellable" cache the menu/terminal read to decide "Sold out".
   for (const p of [americano, latte]) {
     const recipe = await prisma.productIngredient.findMany({
       where: { productId: p.id },
@@ -264,6 +267,19 @@ async function main() {
       0,
     );
     await prisma.product.update({ where: { id: p.id }, data: { capitalCost: capital } });
+
+    const required = recipe.filter((pi) => (pi.required ?? true) && pi.quantity > 0);
+    if (required.length > 0) {
+      const sellable = Math.min(
+        ...required.map((pi) => Math.floor((pi.ingredient.currentStock ?? 0) / pi.quantity)),
+      );
+      const quantity = Math.max(0, sellable);
+      await prisma.inventory.upsert({
+        where: { productId: p.id },
+        update: { quantity },
+        create: { productId: p.id, quantity, lowStockThreshold: 10, unit: 'pcs' },
+      });
+    }
   }
 
   // ── Per-product option groups & options ─────────────────────────────────────

@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { getUserSubscription, SubscriptionTier } from '@/lib/subscription';
+import type { SubscriptionTier } from '@/lib/subscription';
 
 interface SubscriptionState {
   subscription: SubscriptionTier | null;
   loading: boolean;
   error: string | null;
-  fetchSubscription: (userId: number) => Promise<void>;
+  fetchSubscription: (userId?: number) => Promise<void>;
   hasFeature: (feature: keyof SubscriptionTier['features']) => boolean;
-  refreshSubscription: (userId: number) => Promise<void>;
+  refreshSubscription: (userId?: number) => Promise<void>;
 }
 
 export const useSubscriptionStore = create<SubscriptionState>()(
@@ -19,10 +19,12 @@ export const useSubscriptionStore = create<SubscriptionState>()(
         loading: false,
         error: null,
         
-        fetchSubscription: async (userId: number) => {
+        fetchSubscription: async () => {
           set({ loading: true, error: null });
           try {
-            const subscription = await getUserSubscription(userId);
+            const res = await fetch('/api/subscription', { cache: 'no-store' });
+            if (!res.ok) throw new Error(`Failed to load subscription (${res.status})`);
+            const subscription = (await res.json()) as SubscriptionTier | null;
             set({ subscription, loading: false });
           } catch (error) {
             console.error('Failed to fetch subscription:', error);
@@ -39,7 +41,7 @@ export const useSubscriptionStore = create<SubscriptionState>()(
           return subscription.features[feature] ?? false;
         },
         
-        refreshSubscription: async (userId: number) => {
+        refreshSubscription: async (userId?: number) => {
           await get().fetchSubscription(userId);
         },
       }),

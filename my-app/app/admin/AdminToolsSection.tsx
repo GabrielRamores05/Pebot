@@ -234,7 +234,7 @@ export default function AdminToolsSection({ shopName = 'CaféOS', logoUrl }: { s
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={() => setShowQR(true)}
-            className="flex items-center gap-3 text-amber-600 hover:bg-amber-50 transition-colors w-full bg-white border border-amber-200 p-3 rounded-xl"
+            className="flex items-center gap-3 text-accent-text hover:bg-amber-50 transition-colors w-full bg-white border border-amber-200 p-3 rounded-xl"
           >
             <IconQR size={20} strokeWidth={1.75} className="shrink-0" />
             <span className="font-medium text-sm">Customer QR</span>

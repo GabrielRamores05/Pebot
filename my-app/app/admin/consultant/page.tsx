@@ -117,7 +117,7 @@ export default function ConsultantPage() {
               className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-accent-text">
                   <span className="text-sm">🤖</span>
                 </div>
               )}
@@ -139,7 +139,7 @@ export default function ConsultantPage() {
           ))}
           {loading && (
             <div className="flex gap-3 justify-start">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-accent-text">
                 <span className="text-sm">🤖</span>
               </div>
               <div className="bg-white shadow border border-gray-200 rounded-2xl px-4 py-3">

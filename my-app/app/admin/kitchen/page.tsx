@@ -61,7 +61,7 @@ export default function AdminKitchenPage() {
 
     // Status colors
     const statusConfig: Record<string, { bg: string; border: string; text: string; badge: string; label: string }> = {
-      PENDING: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-500', label: 'PENDING' },
+      PENDING: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-accent-text', badge: 'bg-amber-500', label: 'PENDING' },
       PREPARING: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-500', label: 'PREPARING' },
       COMPLETED: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', badge: 'bg-green-500', label: 'READY' },
       CANCELLED: { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', badge: 'bg-gray-500', label: 'CANCELLED' },
@@ -116,7 +116,7 @@ export default function AdminKitchenPage() {
             onClick={() => setThreadOrder(order)}
             className={`mb-3 w-full text-left rounded-xl px-3 py-2 border transition ${hasUnanswered ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
           >
-            <span className={`text-[11px] font-bold uppercase tracking-wide ${hasUnanswered ? 'text-amber-600' : 'text-gray-400'}`}>
+            <span className={`text-[11px] font-bold uppercase tracking-wide ${hasUnanswered ? 'text-accent-text' : 'text-gray-400'}`}>
               💬 {msgs.length} message{msgs.length > 1 ? 's' : ''}{hasUnanswered ? ' · waiting' : ''}
             </span>
             <p className={`text-sm truncate mt-0.5 ${lastMsg.sender === order.customerName ? 'text-gray-700' : 'text-gray-500'}`}>
@@ -133,7 +133,7 @@ export default function AdminKitchenPage() {
                 <span className="text-base font-bold text-gray-900 min-w-[24px]">{item.quantity}×</span>
                 <span className="text-base text-gray-700 font-medium">
                   {item.product.name}
-                  {item.selections && <span className="text-sm text-amber-700 font-semibold">{selectionsLabelFromJson(item.selections)}</span>}
+                  {item.selections && <span className="text-sm text-accent-text font-semibold">{selectionsLabelFromJson(item.selections)}</span>}
                 </span>
               </div>
             </div>
@@ -177,8 +177,8 @@ export default function AdminKitchenPage() {
           {/* Stats in Sidebar */}
           <div className="grid grid-cols-3 gap-2 mb-6">
             <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-200">
-              <p className="text-2xl font-bold text-amber-600">{activeOrders.filter((o) => o.status === 'PENDING').length}</p>
-              <p className="text-xs text-amber-700 font-medium">Pending</p>
+              <p className="text-2xl font-bold text-accent-text">{activeOrders.filter((o) => o.status === 'PENDING').length}</p>
+              <p className="text-xs text-accent-text font-medium">Pending</p>
             </div>
             <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
               <p className="text-2xl font-bold text-blue-600">{activeOrders.filter((o) => o.status === 'PREPARING').length}</p>

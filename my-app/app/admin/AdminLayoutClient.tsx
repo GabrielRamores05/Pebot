@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   IconMonitor, IconProducts,
   IconAnalytics, IconInventory,
@@ -97,21 +97,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Fetch user and handle redirect on mount
   useEffect(() => {
+    let cancelled = false;
+
+    const redirectToLogin = () => {
+      const next = encodeURIComponent(window.location.pathname + window.location.search);
+      router.replace(`/login?next=${next}`);
+    };
 
     fetch('/api/auth/me')
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { 
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
         if (data?.user) {
           setUser(data.user);
+        } else {
+          redirectToLogin();
         }
       })
-      .catch(console.error);
+      .catch(() => {
+        if (!cancelled) redirectToLogin();
+      });
 
     fetch('/api/settings/branding')
       .then((r) => r.json())
       .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
       .catch(() => {});
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   useEffect(() => {
     function handleBrandingUpdated(event: Event) {
@@ -142,68 +157,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return true;
   });
 
-  // Redirect to first allowed page if user changes (only run once on initial load, not on refresh)
-  const hasRedirected = useRef(false);
-  
+  // Enforce per-route permissions for non-admin staff. ADMIN has full access.
   useEffect(() => {
-    
-    // Prevent running on subsequent renders
-    if (hasRedirected.current) {
-      return;
+    if (!user || user.role === 'ADMIN') return;
+
+    const currentNav = navItems.find(
+      (n) => pathname === n.href || (n.href !== '/admin' && pathname.startsWith(n.href)),
+    );
+    const allowed =
+      !currentNav ||
+      (currentNav.roles.includes(user.role) &&
+        (!currentNav.permission || user.permissions?.[currentNav.permission] === true));
+
+    if (!allowed) {
+      router.replace(visibleNav.length > 0 ? visibleNav[0].href : '/unauthorized');
     }
-    
-    // Wait until user is loaded
-    if (!user) {
-      return;
-    }
-    
-    // Add a small delay to ensure client-side navigation is complete
-    const timer = setTimeout(() => {
-      // Mark as redirected only when redirect logic is about to run
-      hasRedirected.current = true;
-      
-      // Admin has full access
-      if (user.role === 'ADMIN') {
-        return;
-      }
-      
-      // Check if user has analytics permission - redirect to analytics if so
-      if (user.permissions?.analytics) {
-        router.push('/admin/analytics');
-        return;
-      }
-      
-      // Check if user has any other permissions
-      const hasAnyPermission = user.permissions && Object.values(user.permissions).some(v => v === true);
-      
-      // If no permissions, send to unauthorized
-      if (!hasAnyPermission) {
-        router.push('/unauthorized');
-        return;
-      }
-      
-      // Check if user has access to current page
-      const currentNav = navItems.find(n => n.href === pathname);
-      const hasAccess = currentNav 
-        ? (currentNav.permission && user.permissions ? user.permissions[currentNav.permission] === true : true)
-        : true;
-      
-      if (!hasAccess && visibleNav.length > 0) {
-        // Redirect to first available page
-        router.push(visibleNav[0].href);
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
   }, [user, pathname, visibleNav, router]);
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden">
+    <div className="flex h-screen bg-page text-ink overflow-hidden">
       {/* Mobile Header */}
-      <div className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 flex items-center px-4 z-40 md:hidden">
+      <div className="fixed top-0 left-0 right-0 h-14 bg-page border-b border-hair flex items-center px-4 z-40 md:hidden">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200"
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-panel text-muted hover:bg-hair"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -212,8 +189,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="ml-3 flex items-center gap-2">
           {branding.logoUrl
             ? <img src={branding.logoUrl} alt="Logo" className="w-7 h-7 rounded-lg object-cover" />
-            : <IconCoffee size={18} strokeWidth={1.75} className="text-amber-400" />}
-          <span className="text-slate-800 font-bold text-sm truncate">{branding.shopName}</span>
+            : <IconCoffee size={18} strokeWidth={1.75} className="text-accent-text" />}
+          <span className="text-ink font-bold text-sm truncate">{branding.shopName}</span>
         </div>
       </div>
 
@@ -226,18 +203,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Sidebar */}
-      <nav className={`fixed md:relative z-50 md:z-auto inset-y-0 left-0 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 transition-all duration-300 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarCollapsed ? 'md:w-16' : 'md:w-52'}`}>
+      <nav className={`fixed md:relative z-50 md:z-auto inset-y-0 left-0 bg-page border-r border-hair flex flex-col flex-shrink-0 transition-all duration-300 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarCollapsed ? 'md:w-16' : 'md:w-52'}`}>
         {/* Logo - hidden on mobile since it's in header */}
-        <div className="p-4 border-b border-slate-200 hidden md:flex items-center justify-between">
+        <div className="p-4 border-b border-hair hidden md:flex items-center justify-between">
           <div className="flex items-center gap-3">
             {branding.logoUrl
               ? <img src={branding.logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-cover shrink-0" />
-              : <IconCoffee size={22} strokeWidth={1.75} className="text-amber-400 shrink-0" />}
-            <span className={`hidden md:block text-slate-800 font-bold text-lg truncate transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>{branding.shopName}</span>
+              : <IconCoffee size={22} strokeWidth={1.75} className="text-accent-text shrink-0" />}
+            <span className={`hidden md:block text-ink font-bold text-lg truncate transition-opacity ${sidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>{branding.shopName}</span>
           </div>
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 transition-transform"
+            className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg text-muted hover:bg-panel transition-transform"
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <svg className="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,7 +231,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-xl transition-colors ${isActive ? 'bg-amber-700 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'}`}
+                className={`flex items-center gap-3 px-4 py-3 mx-2 rounded-xl transition-colors ${isActive ? 'bg-accent-soft text-accent-text font-semibold' : 'text-muted hover:bg-panel hover:text-ink'}`}
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 <item.Icon size={20} strokeWidth={1.75} className="shrink-0" />
@@ -265,7 +242,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Logout — always visible, regardless of permissions */}
-        <div className="p-3 border-t border-slate-200">
+        <div className="p-3 border-t border-hair">
           <button
             onClick={async () => {
               await fetch('/api/auth/me', { method: 'DELETE' });

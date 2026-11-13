@@ -176,8 +176,11 @@ export default function PosTerminalPage() {
   const [colW, setColW] = useState<{ calc: number; summary: number }>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = JSON.parse(localStorage.getItem('terminal-col-widths') || '');
-        if (saved?.calc && saved?.summary) return saved;
+        const raw = localStorage.getItem('terminal-col-widths');
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved?.calc && saved?.summary) return saved;
+        }
       } catch (e) {
         console.error('Could not read the saved column widths, using defaults:', e);
       }
@@ -1401,7 +1404,7 @@ export default function PosTerminalPage() {
           <div ref={receiptRef} className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-300" style={{ fontSize: '11px' }}>
             {/* Receipt Header */}
             <div className="px-4 py-4 text-center border-b-2 border-dashed border-gray-300 bg-gray-50 rounded-t-2xl">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Official Receipt</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent-text">Official Receipt</p>
               <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'CaféOS Coffee Shop'}</h2>
               {businessSettings?.businessAddress && (
                 <p className="text-[10px] text-gray-500 mt-1">{businessSettings.businessAddress}</p>
@@ -1670,7 +1673,7 @@ export default function PosTerminalPage() {
                       setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
                     }
                   }}
-                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-2xl transition-all duration-200 hover:shadow-lg flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-accent hover:bg-amber-500 text-white font-semibold rounded-2xl transition-all duration-200 hover:shadow-lg flex items-center justify-center gap-2"
                 >
                   🖨️ Thermal
                 </button>

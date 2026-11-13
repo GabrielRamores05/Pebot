@@ -117,7 +117,7 @@ export default function OrderFulfillmentMetrics() {
 
           <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
             <div className="text-gray-500 text-sm font-medium">Avg Prep Time</div>
-            <div className="text-3xl font-bold mt-2 text-amber-600">{stats.averagePrepTimeMinutes.toFixed(1)}m</div>
+            <div className="text-3xl font-bold mt-2 text-accent-text">{stats.averagePrepTimeMinutes.toFixed(1)}m</div>
             <div className="text-xs text-gray-400 mt-2">target: &lt; 15 min</div>
           </div>
 
@@ -274,7 +274,7 @@ export default function OrderFulfillmentMetrics() {
                 <tbody>
                   {filteredOrders.slice(0, 20).map((order) => (
                     <tr key={order.orderNumber} className="border-b border-gray-100 hover:bg-amber-50/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-amber-600 font-semibold">{order.orderNumber}</td>
+                      <td className="px-4 py-3 font-mono text-accent-text font-semibold">{order.orderNumber}</td>
                       <td className="px-4 py-3">{order.customerName}</td>
                       <td className="px-4 py-3">
                         <span
@@ -292,7 +292,7 @@ export default function OrderFulfillmentMetrics() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">{order.itemCount}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-amber-600">
+                      <td className="px-4 py-3 text-right font-semibold text-accent-text">
                         {order.prepTimeMinutes > 0 ? `${order.prepTimeMinutes}m` : '—'}
                       </td>
                       <td className="px-4 py-3 text-center">

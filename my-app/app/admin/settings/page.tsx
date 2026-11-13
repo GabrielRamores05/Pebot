@@ -19,7 +19,7 @@ interface AppUser {
 const ROLES: AppUser['role'][] = ['ADMIN', 'STAFF', 'KITCHEN'];
 
 const ROLE_COLORS: Record<AppUser['role'], string> = {
-  ADMIN: 'bg-amber-50 text-amber-600 border-amber-200',
+  ADMIN: 'bg-amber-50 text-accent-text border-amber-200',
   STAFF: 'bg-blue-50 text-blue-600 border-blue-200',
   KITCHEN: 'bg-green-50 text-green-600 border-green-200',
 };
@@ -431,7 +431,7 @@ export default function SettingsPage() {
               <button
                 onClick={saveBranding}
                 disabled={brandingSaving}
-                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
+                className="px-5 py-2.5 bg-accent hover:bg-amber-500 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
               >
                 {brandingSaving ? 'Saving...' : 'Save Changes'}
               </button>
@@ -562,7 +562,7 @@ export default function SettingsPage() {
               <button
                 onClick={saveBusinessSettings}
                 disabled={businessSaving}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                className="bg-accent hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
                 {businessSaving ? 'Saving...' : '💾 Save Business Settings'}
               </button>
@@ -588,7 +588,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={() => setLoyaltyEnabled(!loyaltyEnabled)}
-                className={`relative h-7 w-12 rounded-full transition-colors ${loyaltyEnabled ? 'bg-amber-600' : 'bg-gray-300'}`}
+                className={`relative h-7 w-12 rounded-full transition-colors ${loyaltyEnabled ? 'bg-accent' : 'bg-gray-300'}`}
               >
                 <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform ${loyaltyEnabled ? 'translate-x-6' : 'left-1'}`} />
               </button>
@@ -598,7 +598,7 @@ export default function SettingsPage() {
               <button
                 onClick={saveBusinessSettings}
                 disabled={businessSaving}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                className="bg-accent hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
                 {businessSaving ? 'Saving...' : '💾 Save Loyalty Settings'}
               </button>
@@ -715,7 +715,7 @@ export default function SettingsPage() {
               <button
                 onClick={saveBusinessSettings}
                 disabled={businessSaving}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                className="bg-accent hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
                 {businessSaving ? 'Saving...' : '💾 Save Payment Settings'}
               </button>
@@ -743,7 +743,7 @@ export default function SettingsPage() {
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500 font-mono text-sm"
                 placeholder="sk-or-v1-..."
               />
-              <p className="text-xs text-gray-500 mt-1">Get your API key from <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:text-amber-700">openrouter.ai</a></p>
+              <p className="text-xs text-gray-500 mt-1">Get your API key from <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:text-accent-text">openrouter.ai</a></p>
               <p className="text-xs text-gray-500 mt-1">The key is stored securely in your local database and never sent to the client.</p>
             </div>
 
@@ -836,7 +836,7 @@ export default function SettingsPage() {
               <button
                 onClick={saveBusinessSettings}
                 disabled={businessSaving}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                className="bg-accent hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
                 {businessSaving ? 'Saving...' : '💾 Save AI Settings'}
               </button>
@@ -951,7 +951,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleCreate}
                 disabled={formSaving}
-                className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-amber-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {formSaving ? 'Creating...' : 'Create User'}
               </button>
@@ -1003,7 +1003,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleChangePassword}
                 disabled={pwSaving}
-                className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-amber-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {pwSaving ? 'Saving...' : 'Update Password'}
               </button>

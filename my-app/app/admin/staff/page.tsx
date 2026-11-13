@@ -81,11 +81,12 @@ export default function StaffPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-slate-800">Staff &amp; HR</h1>
-        <p className="text-sm text-slate-500 mt-1">Your team, their schedule, attendance, leave and pay — in one place.</p>
-      </div>
-      {overviewError && <div className="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{overviewError}</div>}
+      <header className="mb-5">
+        <p className="c-eyebrow">People</p>
+        <h1 className="c-title mt-1">Staff &amp; HR</h1>
+        <p className="text-sm text-muted mt-1">Your team, their schedule, attendance, leave and pay — in one place.</p>
+      </header>
+      {overviewError && <div className="mb-4 rounded-field bg-danger-bg border border-danger/30 text-danger text-sm p-3">{overviewError}</div>}
 
       {/* Overview strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -96,20 +97,22 @@ export default function StaffPage() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex flex-wrap gap-1 mb-1 border-b border-slate-200">
+      <div className="flex flex-wrap gap-1 mb-1 border-b border-hair">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              activeTab === t.key ? 'bg-amber-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+            className={`px-3 py-2 text-sm rounded-t-lg transition-colors ${
+              activeTab === t.key
+                ? 'bg-accent-soft text-accent-text font-semibold'
+                : 'text-muted hover:bg-panel hover:text-ink'
             }`}
           >
             {t.label}
           </button>
         ))}
       </div>
-      <p className="text-xs text-slate-400 mb-5">{TABS.find(t => t.key === activeTab)?.hint}</p>
+      <p className="text-xs text-faint mb-5">{TABS.find(t => t.key === activeTab)?.hint}</p>
 
       {activeTab === 'Team' && <TeamTab onChanged={loadOverview} />}
       {activeTab === 'Schedule' && <ScheduleTab />}
@@ -125,10 +128,10 @@ export default function StaffPage() {
 
 function OverviewCard({ label, value, icon, accent, small }: { label: string; value: string | number; icon: string; accent?: boolean; small?: boolean }) {
   return (
-    <div className={`rounded-2xl border p-4 bg-white shadow-sm ${accent ? 'border-amber-300' : 'border-slate-200'}`}>
+    <div className={`c-card p-4 ${accent ? 'ring-1 ring-danger/30' : ''}`}>
       <div className="text-2xl">{icon}</div>
-      <p className={`mt-1 font-bold text-slate-800 ${small ? 'text-lg' : 'text-2xl'}`}>{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className={`mt-1 font-bold text-ink tabular-nums ${small ? 'text-lg' : 'text-2xl'}`}>{value}</p>
+      <p className="text-xs text-faint">{label}</p>
     </div>
   );
 }
@@ -236,11 +239,11 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Team ({filtered.length})</h2>
-          {!showForm && <p className="text-xs text-slate-400 mt-1">{active} active · {full} full access</p>}
+          <h2 className="text-lg font-semibold text-ink">Team ({filtered.length})</h2>
+          {!showForm && <p className="text-xs text-faint mt-1">{active} active · {full} full access</p>}
         </div>
         {!showForm && (
-          <button onClick={openCreate} className="rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 text-sm font-semibold">
+          <button onClick={openCreate} className="rounded-xl bg-accent hover:bg-accent-soft0 text-white px-4 py-2 text-sm font-semibold">
             + Add staff
           </button>
         )}
@@ -250,15 +253,15 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
       {success && <div className="rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm p-3">{success}</div>}
 
       {showForm && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
-          <h3 className="font-semibold text-slate-800">{editingId ? 'Edit staff member' : 'Add staff member'}</h3>
+        <div className="rounded-2xl border border-hair bg-card p-5 shadow-sm space-y-5">
+          <h3 className="font-semibold text-ink">{editingId ? 'Edit staff member' : 'Add staff member'}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Full name" value={form.name} onChange={v => setForm({ ...form, name: v })} />
             <Field label="Email" value={form.email} onChange={v => setForm({ ...form, email: v })} />
             <Field label="Password (leave blank to keep)" type="password" value={form.password} onChange={v => setForm({ ...form, password: v })} />
             <div>
-              <label className="text-xs font-medium text-slate-600">Role</label>
-              <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <label className="text-xs font-medium text-muted">Role</label>
+              <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value as any })} className="mt-1 w-full rounded-lg border border-hair px-3 py-2 text-sm">
                 <option value="STAFF">Staff</option>
                 <option value="KITCHEN">Kitchen</option>
                 <option value="ADMIN">Admin</option>
@@ -269,15 +272,15 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
             <Field label="Date of birth" type="date" value={form.dateOfBirth} onChange={v => setForm({ ...form, dateOfBirth: v })} />
             <Field label="Hire date" type="date" value={form.hireDate} onChange={v => setForm({ ...form, hireDate: v })} />
             <div>
-              <label className="text-xs font-medium text-slate-600">Position</label>
-              <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <label className="text-xs font-medium text-muted">Position</label>
+              <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} className="mt-1 w-full rounded-lg border border-hair px-3 py-2 text-sm">
                 <option value="">—</option>
                 {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600">Department</label>
-              <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <label className="text-xs font-medium text-muted">Department</label>
+              <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className="mt-1 w-full rounded-lg border border-hair px-3 py-2 text-sm">
                 <option value="">—</option>
                 {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
@@ -288,8 +291,8 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
             <div>
-              <label className="text-xs font-medium text-slate-600">How they are paid</label>
-              <select value={form.paymentType} onChange={e => setForm({ ...form, paymentType: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <label className="text-xs font-medium text-muted">How they are paid</label>
+              <select value={form.paymentType} onChange={e => setForm({ ...form, paymentType: e.target.value })} className="mt-1 w-full rounded-lg border border-hair px-3 py-2 text-sm">
                 <option value="">—</option>
                 <option value="HOURLY">Hourly wage</option>
                 <option value="SALARIED">Monthly salary</option>
@@ -301,25 +304,25 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
 
           <div className="border-t border-slate-100 pt-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-semibold text-slate-700">What they can open</p>
+              <p className="text-sm font-semibold text-ink">What they can open</p>
               <div className="flex gap-2">
-                <button onClick={() => setPermDraft(blankPerms(true))} className="text-xs text-amber-600 hover:underline">Select all</button>
-                <button onClick={() => setPermDraft(blankPerms())} className="text-xs text-slate-500 hover:underline">Deselect all</button>
+                <button onClick={() => setPermDraft(blankPerms(true))} className="text-xs text-accent-text hover:underline">Select all</button>
+                <button onClick={() => setPermDraft(blankPerms())} className="text-xs text-faint hover:underline">Deselect all</button>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {PERMS.map(p => (
-                <label key={p.key} className="flex items-start gap-2 p-2 rounded-lg border border-slate-100 hover:bg-slate-50">
+                <label key={p.key} className="flex items-start gap-2 p-2 rounded-lg border border-slate-100 hover:bg-page">
                   <input type="checkbox" checked={permDraft[p.key]} onChange={e => setPermDraft({ ...permDraft, [p.key]: e.target.checked })} className="mt-0.5" />
-                  <span className="text-xs"><span className="font-medium text-slate-700">{p.label}</span><br /><span className="text-slate-400">{p.desc}</span></span>
+                  <span className="text-xs"><span className="font-medium text-ink">{p.label}</span><br /><span className="text-faint">{p.desc}</span></span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 text-sm">Cancel</button>
-            <button onClick={submit} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold">Save</button>
+            <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg text-muted hover:bg-panel text-sm">Cancel</button>
+            <button onClick={submit} className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-soft0 text-white text-sm font-semibold">Save</button>
           </div>
         </div>
       )}
@@ -329,7 +332,7 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search by name or email..."
-          className="w-full md:w-80 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          className="w-full md:w-80 rounded-xl border border-hair px-3 py-2 text-sm"
         />
       )}
 
@@ -338,14 +341,14 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(s => (
-            <div key={s.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={s.id} className="rounded-2xl border border-hair bg-card p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white font-bold">
                   {s.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-800 truncate">{s.name}</p>
-                  <p className="text-xs text-slate-500 truncate">{s.email}</p>
+                  <p className="font-semibold text-ink truncate">{s.name}</p>
+                  <p className="text-xs text-faint truncate">{s.email}</p>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-1 text-[11px]">
@@ -449,21 +452,21 @@ function ScheduleTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-hair bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <p className="text-sm font-semibold text-slate-700">Shift templates</p>
-            <p className="text-xs text-slate-400">Create your own shifts (e.g. Opening, Closing). Times are shown as 12-hour.</p>
+            <p className="text-sm font-semibold text-ink">Shift templates</p>
+            <p className="text-xs text-faint">Create your own shifts (e.g. Opening, Closing). Times are shown as 12-hour.</p>
           </div>
-          <button onClick={openNewShift} className="text-sm rounded-lg bg-amber-600 text-white px-3 py-1.5">+ New shift</button>
+          <button onClick={openNewShift} className="text-sm rounded-lg bg-accent text-white px-3 py-1.5">+ New shift</button>
         </div>
         {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
         <div className="flex flex-wrap gap-2">
-          {shifts.length === 0 && <span className="text-xs text-slate-400">None yet.</span>}
+          {shifts.length === 0 && <span className="text-xs text-faint">None yet.</span>}
           {shifts.map(s => (
-            <div key={s.id} className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1 text-xs">
-              <span className="font-medium text-slate-700">{s.name}</span>
-              <span className="text-slate-400">{fmtTime(s.startTime)}–{fmtTime(s.endTime)}</span>
+            <div key={s.id} className="inline-flex items-center gap-2 bg-page border border-hair rounded-full px-3 py-1 text-xs">
+              <span className="font-medium text-ink">{s.name}</span>
+              <span className="text-faint">{fmtTime(s.startTime)}–{fmtTime(s.endTime)}</span>
               <button onClick={() => openEditShift(s)} className="text-blue-600 hover:underline">edit</button>
               <button onClick={() => deleteShift(s.id)} className="text-red-500 hover:text-red-700">×</button>
             </div>
@@ -476,44 +479,44 @@ function ScheduleTab() {
             <Field label="Start" type="time" value={shiftForm.startTime} onChange={v => setShiftForm({ ...shiftForm, startTime: v })} />
             <Field label="End" type="time" value={shiftForm.endTime} onChange={v => setShiftForm({ ...shiftForm, endTime: v })} />
             <Field label="Break (min)" value={String(shiftForm.breakMinutes)} onChange={v => setShiftForm({ ...shiftForm, breakMinutes: Number(v) || 0 })} />
-            <button onClick={saveShift} className="rounded-lg bg-amber-600 text-white px-3 py-2 text-sm font-semibold">{editingShift ? 'Update' : 'Add'}</button>
+            <button onClick={saveShift} className="rounded-lg bg-accent text-white px-3 py-2 text-sm font-semibold">{editingShift ? 'Update' : 'Add'}</button>
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-semibold text-slate-800">Weekly schedule</h2>
+        <h2 className="text-lg font-semibold text-ink">Weekly schedule</h2>
         <div className="flex items-center gap-2">
-          <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="px-3 py-1.5 rounded-lg bg-slate-100 text-sm">‹ Prev</button>
-          <span className="text-sm text-slate-600">{iso(weekStart)} — {iso(addDays(weekStart, 6))}</span>
-          <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="px-3 py-1.5 rounded-lg bg-slate-100 text-sm">Next ›</button>
+          <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="px-3 py-1.5 rounded-lg bg-panel text-sm">‹ Prev</button>
+          <span className="text-sm text-muted">{iso(weekStart)} — {iso(addDays(weekStart, 6))}</span>
+          <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="px-3 py-1.5 rounded-lg bg-panel text-sm">Next ›</button>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-hair bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100">
               <th className="text-left p-3">Staff</th>
-              {weekDays.map(d => <th key={d.toISOString()} className="text-center p-3 font-medium text-slate-600">{dayName(d)}<br /><span className="text-xs text-slate-400">{d.getMonth()+1}/{d.getDate()}</span></th>)}
+              {weekDays.map(d => <th key={d.toISOString()} className="text-center p-3 font-medium text-muted">{dayName(d)}<br /><span className="text-xs text-faint">{d.getMonth()+1}/{d.getDate()}</span></th>)}
             </tr>
           </thead>
           <tbody>
             {staff.map(s => (
               <tr key={s.id} className="border-b border-slate-50">
-                <td className="p-3 font-medium text-slate-700">{s.name}{s.position ? <span className="text-xs text-slate-400 block">{s.position}</span> : null}</td>
+                <td className="p-3 font-medium text-ink">{s.name}{s.position ? <span className="text-xs text-faint block">{s.position}</span> : null}</td>
                 {weekDays.map(d => {
                   const ds = daySchedules(d, s.id);
                   return (
                     <td key={d.toISOString()} className="p-2 text-center">
                       <div className="space-y-1">
                         {ds.map(sc => (
-                          <div key={sc.id} className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 rounded px-1.5 py-0.5 text-[11px]">
+                          <div key={sc.id} className="inline-flex items-center gap-1 bg-accent-soft text-amber-800 rounded px-1.5 py-0.5 text-[11px]">
                             {sc.shift.name}
-                            <button onClick={() => unassign(sc)} className="text-amber-600 hover:text-red-600">×</button>
+                            <button onClick={() => unassign(sc)} className="text-accent-text hover:text-red-600">×</button>
                           </div>
                         ))}
-                        <select onChange={e => { if (e.target.value) { assign(s.id, Number(e.target.value), d); e.target.value = ''; } }} className="block w-full text-[11px] rounded border border-slate-200 px-1 py-0.5">
+                        <select onChange={e => { if (e.target.value) { assign(s.id, Number(e.target.value), d); e.target.value = ''; } }} className="block w-full text-[11px] rounded border border-hair px-1 py-0.5">
                           <option value="">+ shift</option>
                           {shifts.map(sh => <option key={sh.id} value={sh.id}>{sh.name}</option>)}
                         </select>
@@ -662,17 +665,17 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+      <div className="rounded-2xl border border-amber-200 bg-accent-soft p-3 text-sm text-amber-800">
         Tip: staff are clocked in automatically when they log in, and clocked out when they log out. Use the buttons below only to fix mistakes.
       </div>
-      <h2 className="text-lg font-semibold text-slate-800">Time clock</h2>
+      <h2 className="text-lg font-semibold text-ink">Time clock</h2>
       <div className="flex gap-2 items-end flex-wrap">
-        <div><label className="text-xs text-slate-600">From</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="block rounded-lg border border-slate-200 px-2 py-1 text-sm" /></div>
-        <div><label className="text-xs text-slate-600">To</label><input type="date" value={to} onChange={e => setTo(e.target.value)} className="block rounded-lg border border-slate-200 px-2 py-1 text-sm" /></div>
-        <button onClick={loadRecords} className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm">Filter</button>
+        <div><label className="text-xs text-muted">From</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="block rounded-lg border border-hair px-2 py-1 text-sm" /></div>
+        <div><label className="text-xs text-muted">To</label><input type="date" value={to} onChange={e => setTo(e.target.value)} className="block rounded-lg border border-hair px-2 py-1 text-sm" /></div>
+        <button onClick={loadRecords} className="px-3 py-1.5 rounded-lg bg-accent text-white text-sm">Filter</button>
         <button onClick={clockInScheduledNow} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm">Clock in everyone scheduled now</button>
         <button onClick={clockOutEnded} className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-sm">Clock out ended shifts</button>
-        {msg && <span className="text-sm text-slate-600">{msg}</span>}
+        {msg && <span className="text-sm text-muted">{msg}</span>}
       </div>
       {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
 
@@ -680,10 +683,10 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
         {staff.map(s => {
           const active = activeByUser.get(s.id);
           return (
-            <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-3 flex items-center justify-between">
+            <div key={s.id} className="rounded-xl border border-hair bg-card p-3 flex items-center justify-between">
               <div>
-                <p className="font-medium text-slate-700">{s.name}</p>
-                <p className="text-xs text-slate-400">{active ? 'In since ' + new Date(active.clockIn).toLocaleTimeString() : 'Not clocked in'}</p>
+                <p className="font-medium text-ink">{s.name}</p>
+                <p className="text-xs text-faint">{active ? 'In since ' + new Date(active.clockIn).toLocaleTimeString() : 'Not clocked in'}</p>
               </div>
               {active
                 ? <button onClick={() => clockOut(active.id)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-sm">Clock out</button>
@@ -693,19 +696,19 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
         })}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-hair bg-card shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-slate-100 text-slate-600"><th className="text-left p-3">Staff</th><th className="text-left p-3">In</th><th className="text-left p-3">Out</th><th className="text-left p-3">Hours</th></tr></thead>
+          <thead><tr className="border-b border-slate-100 text-muted"><th className="text-left p-3">Staff</th><th className="text-left p-3">In</th><th className="text-left p-3">Out</th><th className="text-left p-3">Hours</th></tr></thead>
           <tbody>
             {records.map(r => (
               <tr key={r.id} className="border-b border-slate-50">
                 <td className="p-3">{r.user?.name}</td>
                 <td className="p-3">{new Date(r.clockIn).toLocaleString()}</td>
-                <td className="p-3">{r.clockOut ? new Date(r.clockOut).toLocaleString() : <span className="text-amber-600">Active</span>}</td>
+                <td className="p-3">{r.clockOut ? new Date(r.clockOut).toLocaleString() : <span className="text-accent-text">Active</span>}</td>
                 <td className="p-3">{r.totalHours ?? '—'}</td>
               </tr>
             ))}
-            {records.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-slate-400">No records in range</td></tr>}
+            {records.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-faint">No records in range</td></tr>}
           </tbody>
         </table>
       </div>
@@ -757,23 +760,23 @@ function TimeOffTab({ onChanged }: { onChanged: () => void }) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-slate-800">Time off</h2>
+      <h2 className="text-lg font-semibold text-ink">Time off</h2>
       {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-        <p className="text-sm font-semibold text-slate-700">Request leave</p>
+      <div className="rounded-2xl border border-hair bg-card p-4 shadow-sm space-y-3">
+        <p className="text-sm font-semibold text-ink">Request leave</p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-          <select value={form.leaveTypeId} onChange={e => setForm({ ...form, leaveTypeId: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Type</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-          <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-          <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-          <input placeholder="Reason" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <select value={form.leaveTypeId} onChange={e => setForm({ ...form, leaveTypeId: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm"><option value="">Type</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+          <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+          <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+          <input placeholder="Reason" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
         </div>
-        <button onClick={submit} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Submit request</button>
+        <button onClick={submit} className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold">Submit request</button>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-hair bg-card shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-slate-100 text-slate-600"><th className="text-left p-3">Staff</th><th className="text-left p-3">Type</th><th className="text-left p-3">Dates</th><th className="text-left p-3">Status</th><th className="text-left p-3">Actions</th></tr></thead>
+          <thead><tr className="border-b border-slate-100 text-muted"><th className="text-left p-3">Staff</th><th className="text-left p-3">Type</th><th className="text-left p-3">Dates</th><th className="text-left p-3">Status</th><th className="text-left p-3">Actions</th></tr></thead>
           <tbody>
             {requests.map(r => (
               <tr key={r.id} className="border-b border-slate-50">
@@ -789,7 +792,7 @@ function TimeOffTab({ onChanged }: { onChanged: () => void }) {
                 </td>
               </tr>
             ))}
-            {requests.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-400">No requests</td></tr>}
+            {requests.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-faint">No requests</td></tr>}
           </tbody>
         </table>
       </div>
@@ -837,31 +840,31 @@ function PayrollTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+      <div className="rounded-2xl border border-amber-200 bg-accent-soft p-3 text-sm text-amber-800">
         Payslips follow Philippine rules: SSS, PhilHealth and Pag-IBIG employee shares are deducted first, then BIR withholding tax is computed on what remains. This is a calculation guide — you still file and pay the agencies.
       </div>
-      <h2 className="text-lg font-semibold text-slate-800">Payroll</h2>
+      <h2 className="text-lg font-semibold text-ink">Payroll</h2>
       {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-        <p className="text-sm font-semibold text-slate-700">Run payroll for a period</p>
+      <div className="rounded-2xl border border-hair bg-card p-4 shadow-sm space-y-3">
+        <p className="text-sm font-semibold text-ink">Run payroll for a period</p>
         <div className="flex flex-wrap gap-2 items-end">
-          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-          <input type="date" value={form.periodStart} onChange={e => setForm({ ...form, periodStart: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-          <input type="date" value={form.periodEnd} onChange={e => setForm({ ...form, periodEnd: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-          <input placeholder="Other deductions ₱" value={form.deductions} onChange={e => setForm({ ...form, deductions: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm w-32" />
-          <button onClick={generate} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Generate</button>
+          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <input type="date" value={form.periodStart} onChange={e => setForm({ ...form, periodStart: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+          <input type="date" value={form.periodEnd} onChange={e => setForm({ ...form, periodEnd: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+          <input placeholder="Other deductions ₱" value={form.deductions} onChange={e => setForm({ ...form, deductions: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm w-32" />
+          <button onClick={generate} className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold">Generate</button>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-hair bg-card shadow-sm overflow-hidden">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-slate-100 text-slate-600"><th className="text-left p-3">Staff</th><th className="text-left p-3">Period</th><th className="text-right p-3">Hours</th><th className="text-right p-3">Gross</th><th className="text-right p-3">Net</th><th className="text-left p-3">Status</th></tr></thead>
+          <thead><tr className="border-b border-slate-100 text-muted"><th className="text-left p-3">Staff</th><th className="text-left p-3">Period</th><th className="text-right p-3">Hours</th><th className="text-right p-3">Gross</th><th className="text-right p-3">Net</th><th className="text-left p-3">Status</th></tr></thead>
           <tbody>
             {records.map(r => {
               const b = safeParse(r.breakdown);
               return (
                 <Fragment key={r.id}>
-                  <tr className="border-b border-slate-50 cursor-pointer hover:bg-slate-50" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                  <tr className="border-b border-slate-50 cursor-pointer hover:bg-page" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
                     <td className="p-3">{r.user?.name}</td>
                     <td className="p-3">{r.periodStart.slice(0,10)} → {r.periodEnd.slice(0,10)}</td>
                     <td className="p-3 text-right">{r.regularHours + r.overtimeHours}h</td>
@@ -870,7 +873,7 @@ function PayrollTab() {
                     <td className="p-3"><Badge color={r.status === 'PAID' ? 'green' : r.status === 'PROCESSED' ? 'blue' : 'amber'}>{r.status}</Badge>{r.status !== 'PAID' && <button onClick={(e) => { e.stopPropagation(); markPaid(r.id); }} className="ml-2 text-xs text-green-600 hover:underline">Mark paid</button>}</td>
                   </tr>
                   {openId === r.id && b && (
-                    <tr className="bg-slate-50">
+                    <tr className="bg-page">
                       <td colSpan={6} className="p-4 text-xs">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-w-2xl">
                           <Line label="Gross pay" value={b.grossPay} />
@@ -888,7 +891,7 @@ function PayrollTab() {
                 </Fragment>
               );
             })}
-            {records.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-slate-400">No payroll runs</td></tr>}
+            {records.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-faint">No payroll runs</td></tr>}
           </tbody>
         </table>
       </div>
@@ -898,10 +901,10 @@ function PayrollTab() {
 
 function Line({ label, value, sub, bold }: { label: string; value?: number; sub?: string; bold?: boolean }) {
   return (
-    <div className="rounded-lg bg-white border border-slate-100 p-2">
-      <p className="text-slate-400">{label}</p>
-      <p className={`${bold ? 'font-bold text-slate-800' : 'text-slate-700'}`}>₱{(value ?? 0).toFixed(2)}</p>
-      {sub && <p className="text-[10px] text-slate-400">{sub}</p>}
+    <div className="rounded-lg bg-card border border-slate-100 p-2">
+      <p className="text-faint">{label}</p>
+      <p className={`${bold ? 'font-bold text-ink' : 'text-ink'}`}>₱{(value ?? 0).toFixed(2)}</p>
+      {sub && <p className="text-[10px] text-faint">{sub}</p>}
     </div>
   );
 }
@@ -936,35 +939,35 @@ function ReviewsTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-slate-800">Reviews</h2>
+      <h2 className="text-lg font-semibold text-ink">Reviews</h2>
       {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-        <p className="text-sm font-semibold text-slate-700">New review</p>
+      <div className="rounded-2xl border border-hair bg-card p-4 shadow-sm space-y-3">
+        <p className="text-sm font-semibold text-ink">New review</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-          <input placeholder="Period (e.g. Q3 2026)" value={form.period} onChange={e => setForm({ ...form, period: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-          <select value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n} ★</option>)}</select>
-          <input placeholder="Strengths" value={form.strengths} onChange={e => setForm({ ...form, strengths: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-          <input placeholder="Improvements" value={form.improvements} onChange={e => setForm({ ...form, improvements: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-          <input placeholder="Goals" value={form.goals} onChange={e => setForm({ ...form, goals: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <input placeholder="Period (e.g. Q3 2026)" value={form.period} onChange={e => setForm({ ...form, period: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+          <select value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n} ★</option>)}</select>
+          <input placeholder="Strengths" value={form.strengths} onChange={e => setForm({ ...form, strengths: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+          <input placeholder="Improvements" value={form.improvements} onChange={e => setForm({ ...form, improvements: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+          <input placeholder="Goals" value={form.goals} onChange={e => setForm({ ...form, goals: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
         </div>
-        <button onClick={submit} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Submit review</button>
+        <button onClick={submit} className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold">Submit review</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {reviews.map(r => (
-          <div key={r.id} className="rounded-xl border border-slate-200 bg-white p-3">
+          <div key={r.id} className="rounded-xl border border-hair bg-card p-3">
             <div className="flex items-center justify-between">
-              <p className="font-medium text-slate-700">{r.user?.name}</p>
+              <p className="font-medium text-ink">{r.user?.name}</p>
               <span className="text-amber-500 font-bold">{r.rating} ★</span>
             </div>
-            <p className="text-xs text-slate-400">{r.period} · by {r.reviewer?.name}</p>
+            <p className="text-xs text-faint">{r.period} · by {r.reviewer?.name}</p>
             {r.strengths && <p className="text-xs mt-1"><span className="font-medium">Strengths:</span> {r.strengths}</p>}
             {r.improvements && <p className="text-xs"><span className="font-medium">Improve:</span> {r.improvements}</p>}
             {r.goals && <p className="text-xs"><span className="font-medium">Goals:</span> {r.goals}</p>}
           </div>
         ))}
-        {reviews.length === 0 && <p className="text-slate-400 text-sm">No reviews yet.</p>}
+        {reviews.length === 0 && <p className="text-faint text-sm">No reviews yet.</p>}
       </div>
     </div>
   );
@@ -1011,39 +1014,39 @@ function DocumentsTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-slate-800">Documents</h2>
+      <h2 className="text-lg font-semibold text-ink">Documents</h2>
       {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
-      <select value={selectedId} onChange={e => setSelectedId(e.target.value ? Number(e.target.value) : '')} className="rounded-lg border border-slate-200 px-3 py-2 text-sm max-w-xs">
+      <select value={selectedId} onChange={e => setSelectedId(e.target.value ? Number(e.target.value) : '')} className="rounded-lg border border-hair px-3 py-2 text-sm max-w-xs">
         <option value="">Select staff member…</option>
         {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
 
       {selectedId && (
         <div className="space-y-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-2">
-            <p className="text-sm font-semibold text-slate-700">Add document</p>
+          <div className="rounded-2xl border border-hair bg-card p-4 shadow-sm space-y-2">
+            <p className="text-sm font-semibold text-ink">Add document</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <input placeholder="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
+              <input placeholder="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm">
                 <option value="CONTRACT">Contract</option><option value="NDA">NDA</option><option value="CERTIFICATION">Certification</option><option value="OTHER">Other</option>
               </select>
-              <input placeholder="File URL" value={form.fileUrl} onChange={e => setForm({ ...form, fileUrl: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-              <input type="date" value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+              <input placeholder="File URL" value={form.fileUrl} onChange={e => setForm({ ...form, fileUrl: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
+              <input type="date" value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
             </div>
-            <button onClick={submit} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">Add</button>
+            <button onClick={submit} className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold">Add</button>
           </div>
 
           <div className="space-y-2">
             {docs.map(d => (
-              <div key={d.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
+              <div key={d.id} className="flex items-center justify-between rounded-xl border border-hair bg-card p-3">
                 <div>
-                  <p className="font-medium text-slate-700 text-sm">{d.name} <Badge color="purple">{d.type}</Badge></p>
-                  {d.expiryDate && <p className="text-xs text-slate-400">Expires {d.expiryDate.slice(0,10)}</p>}
+                  <p className="font-medium text-ink text-sm">{d.name} <Badge color="purple">{d.type}</Badge></p>
+                  {d.expiryDate && <p className="text-xs text-faint">Expires {d.expiryDate.slice(0,10)}</p>}
                 </div>
                 <button onClick={() => remove(d.id)} className="text-xs text-red-600 hover:underline">Delete</button>
               </div>
             ))}
-            {docs.length === 0 && <p className="text-slate-400 text-sm">No documents.</p>}
+            {docs.length === 0 && <p className="text-faint text-sm">No documents.</p>}
           </div>
         </div>
       )}
@@ -1100,20 +1103,20 @@ function TrainingTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-slate-800">Training</h2>
+      <h2 className="text-lg font-semibold text-ink">Training</h2>
       {error && <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{error}</div>}
       <div className="flex gap-2">
-        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New course name…" className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm flex-1 max-w-xs" />
-        <button onClick={addCourse} className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold">Add course</button>
+        <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New course name…" className="rounded-lg border border-hair px-3 py-1.5 text-sm flex-1 max-w-xs" />
+        <button onClick={addCourse} className="px-4 py-1.5 rounded-lg bg-accent text-white text-sm font-semibold">Add course</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {courses.map(c => (
-          <div key={c.id} className="rounded-xl border border-slate-200 bg-white p-3">
-            <p className="font-medium text-slate-700">{c.name}</p>
-            <p className="text-xs text-slate-400">{c.enrollments?.length ?? 0} enrolled</p>
+          <div key={c.id} className="rounded-xl border border-hair bg-card p-3">
+            <p className="font-medium text-ink">{c.name}</p>
+            <p className="text-xs text-faint">{c.enrollments?.length ?? 0} enrolled</p>
             <details className="mt-2">
-              <summary className="text-xs text-amber-600 cursor-pointer">Manage enrollments</summary>
+              <summary className="text-xs text-accent-text cursor-pointer">Manage enrollments</summary>
               <div className="mt-2 space-y-1">
                 {staff.map(s => {
                   const en = c.enrollments?.find((e: any) => e.userId === s.id);
@@ -1132,7 +1135,7 @@ function TrainingTab() {
             </details>
           </div>
         ))}
-        {courses.length === 0 && <p className="text-slate-400 text-sm">No courses yet.</p>}
+        {courses.length === 0 && <p className="text-faint text-sm">No courses yet.</p>}
       </div>
     </div>
   );
@@ -1142,14 +1145,14 @@ function TrainingTab() {
 function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
   return (
     <div>
-      <label className="text-xs font-medium text-slate-600">{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+      <label className="text-xs font-medium text-muted">{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="mt-1 w-full rounded-lg border border-hair px-3 py-2 text-sm" />
     </div>
   );
 }
 function Badge({ children, color }: { children: React.ReactNode; color: 'green' | 'red' | 'amber' | 'blue' | 'purple' | 'gray' }) {
   const map: Record<string, string> = {
-    green: 'bg-green-50 text-green-700', red: 'bg-red-50 text-red-600', amber: 'bg-amber-50 text-amber-700',
+    green: 'bg-green-50 text-green-700', red: 'bg-red-50 text-red-600', amber: 'bg-accent-soft text-accent-text',
     blue: 'bg-blue-50 text-blue-700', purple: 'bg-purple-50 text-purple-700', gray: 'bg-gray-100 text-gray-500',
   };
   return <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${map[color]}`}>{children}</span>;

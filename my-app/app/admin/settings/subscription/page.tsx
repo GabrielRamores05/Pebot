@@ -170,7 +170,7 @@ export default function SubscriptionManagementPage() {
                     </button>
                  ) : isUpgrading ? (
                    <div className="w-full bg-gray-200 h-2.5 rounded-full mb-2">
-                     <div className="bg-amber-600 h-2.5 rounded-full w-[33%] transition-all duration-1500"></div>
+                     <div className="bg-accent h-2.5 rounded-full w-[33%] transition-all duration-1500"></div>
                    </div>
                  ) : (
                    <p className="text-sm text-gray-500 font-medium">Current plan</p>

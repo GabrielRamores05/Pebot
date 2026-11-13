@@ -539,7 +539,7 @@ export default function Page() {
         <div className="flex gap-1">
           <button
             onClick={() => openEditProduct(p)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-600 text-sm text-white transition-colors hover:bg-amber-500"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm text-white transition-colors hover:bg-amber-500"
             title="Edit product"
           >
             ✎
@@ -607,7 +607,7 @@ export default function Page() {
     <div className="h-full overflow-y-auto bg-white p-6 space-y-6">
       {/* Notification */}
       {notification && (
-        <div className="fixed top-4 right-4 bg-amber-600 text-white px-5 py-3 rounded-xl shadow-2xl z-50 font-medium">
+        <div className="fixed top-4 right-4 bg-accent text-white px-5 py-3 rounded-xl shadow-2xl z-50 font-medium">
           {notification}
         </div>
       )}
@@ -618,25 +618,25 @@ export default function Page() {
         <div className="flex gap-2">
           <button
             onClick={() => setTab('products')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'products' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'products' ? 'bg-accent text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
           >
             🍽️ Products
           </button>
           <button
             onClick={() => setTab('all')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'all' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'all' ? 'bg-accent text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
           >
             🗂️ All Products
           </button>
           <button
             onClick={() => setTab('categories')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'categories' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'categories' ? 'bg-accent text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
           >
             🏷️ Categories
           </button>
           <button
             onClick={() => setTab('options')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'options' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'options' ? 'bg-accent text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
           >
             ⚙️ Options
           </button>
@@ -666,7 +666,7 @@ export default function Page() {
                 </select>
                 <button
                   onClick={openAddProduct}
-                  className="whitespace-nowrap rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-500"
+                  className="whitespace-nowrap rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-500"
                 >
                   ➕ Add Product
                 </button>
@@ -717,7 +717,7 @@ export default function Page() {
                 <>
                   <button
                     onClick={openAddCat}
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors"
+                    className="w-full bg-accent hover:bg-amber-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors"
                   >
                     ➕ Add Category
                   </button>
@@ -733,7 +733,7 @@ export default function Page() {
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                         <button
                           onClick={() => openEditCat(c)}
-                          className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg text-sm transition-colors font-medium"
+                          className="bg-accent hover:bg-amber-500 text-white px-3 py-2 rounded-lg text-sm transition-colors font-medium"
                         >
                           ✎ Edit
                         </button>
@@ -790,7 +790,7 @@ export default function Page() {
               <div>
                 <label className="text-slate-600 text-sm block mb-1">
                   Selling Price (₱) <span className="text-red-500">*</span>
-                  <span className="text-xs text-amber-600 ml-1">(auto-calculated)</span>
+                  <span className="text-xs text-accent-text ml-1">(auto-calculated)</span>
                 </label>
                 <input
                   type="number"
@@ -805,7 +805,7 @@ export default function Page() {
               </div>
               {/* BIR Pricing Section */}
               <div className="border-t border-slate-200 pt-4 mt-4">
-                <p className="text-amber-600 text-xs font-semibold uppercase tracking-wider mb-3">BIR Pricing</p>
+                <p className="text-accent-text text-xs font-semibold uppercase tracking-wider mb-3">BIR Pricing</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-slate-600 text-sm block mb-1">Capital Cost (₱) — auto from recipe</label>
@@ -1098,7 +1098,7 @@ export default function Page() {
               <button
                 onClick={saveProduct}
                 disabled={productSaving || !productForm.name.trim() || !productForm.categoryId}
-                className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-500 transition-colors disabled:opacity-50"
+                className="bg-accent text-white py-3 rounded-xl font-bold hover:bg-amber-500 transition-colors disabled:opacity-50"
               >
                 {productSaving ? 'Saving...' : editingProduct ? 'Update' : 'Add Product'}
               </button>
@@ -1127,7 +1127,7 @@ export default function Page() {
                   <p key={p.id} className="text-slate-600 text-xs py-0.5">• {p.name}</p>
                 ))}
               </div>
-              <p className="text-slate-600 text-sm">Type <span className="font-mono text-amber-600 font-bold">DELETE</span> to confirm:</p>
+              <p className="text-slate-600 text-sm">Type <span className="font-mono text-accent-text font-bold">DELETE</span> to confirm:</p>
               <input
                 autoFocus
                 type="text"
@@ -1229,7 +1229,7 @@ export default function Page() {
               <button
                 onClick={saveCat}
                 disabled={catSaving || !catForm.name.trim()}
-                className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-500 transition-colors disabled:opacity-50"
+                className="bg-accent text-white py-3 rounded-xl font-bold hover:bg-amber-500 transition-colors disabled:opacity-50"
               >
                 {catSaving ? 'Saving...' : editingCat ? 'Update' : 'Add Category'}
               </button>

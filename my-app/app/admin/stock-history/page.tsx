@@ -24,7 +24,7 @@ type Filter = 'ALL' | 'PURCHASE' | 'USAGE';
 const TYPE_LABELS: Record<string, { label: string; cls: string }> = {
   PURCHASE: { label: 'Purchase', cls: 'bg-green-50 text-green-700 border-green-200' },
   USAGE: { label: 'Used', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
-  ADJUSTMENT: { label: 'Correction', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  ADJUSTMENT: { label: 'Correction', cls: 'bg-amber-50 text-accent-text border-amber-200' },
   OPENING: { label: 'Opening', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
 };
 

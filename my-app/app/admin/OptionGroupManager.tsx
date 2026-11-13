@@ -257,7 +257,7 @@ export default function OptionGroupManager() {
           <button
             onClick={createGroup}
             disabled={creating || !newName.trim()}
-            className="rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+            className="rounded-xl bg-accent hover:bg-amber-500 text-white px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
           >
             Create
           </button>

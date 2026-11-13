@@ -834,7 +834,7 @@ const [shopName, setShopName] = useState('CafeOS');
             onClick={() => setActiveTab('capacity')}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
               activeTab === 'capacity'
-                ? 'bg-amber-600 text-white shadow-md'
+                ? 'bg-accent text-white shadow-md'
                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
@@ -894,7 +894,7 @@ const [shopName, setShopName] = useState('CafeOS');
                 </button>
                 <button
                   onClick={() => { setPlannerOpen(true); setCalcResult(null); setCalcProducts({}); }}
-                  className="bg-amber-50 hover:bg-amber-100 text-amber-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                  className="bg-amber-50 hover:bg-amber-100 text-accent-text px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 >
                   🧾 Plan Purchases
                 </button>
@@ -1638,7 +1638,7 @@ const [shopName, setShopName] = useState('CafeOS');
                               <button
                                 onClick={() => applyAdjustment(item.product.id)}
                                 disabled={saving}
-                                className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+                                className="bg-amber-500 hover:bg-accent text-white px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
                               >
                                 Apply
                               </button>
@@ -2111,7 +2111,7 @@ const [shopName, setShopName] = useState('CafeOS');
               <button
                 onClick={calculateIngredients}
                 disabled={calcLoading}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-semibold transition-all disabled:opacity-50"
+                className="w-full py-3 bg-amber-500 hover:bg-accent text-white rounded-2xl font-semibold transition-all disabled:opacity-50"
               >
                 {calcLoading ? 'Calculating...' : 'Calculate Ingredients'}
               </button>
@@ -2135,7 +2135,7 @@ const [shopName, setShopName] = useState('CafeOS');
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-amber-600 font-bold text-2xl">₱{calcResult.grandTotal?.toFixed(2)}</div>
+                        <div className="text-accent-text font-bold text-2xl">₱{calcResult.grandTotal?.toFixed(2)}</div>
                         <p className="text-slate-400 text-xs">Total Amount</p>
                       </div>
                     </div>
@@ -2147,7 +2147,7 @@ const [shopName, setShopName] = useState('CafeOS');
 
                   <div className="mb-1.5">
                     <p className="text-slate-400 text-xs mb-0.5">Making:</p>
-                    <div className="flex items-center py-1 bg-amber-50 rounded-t text-xs font-semibold text-amber-700">
+                    <div className="flex items-center py-1 bg-amber-50 rounded-t text-xs font-semibold text-accent-text">
                       <span className="flex-1">Product</span>
                       <span className="w-16 text-right">Qty</span>
                     </div>
@@ -2156,7 +2156,7 @@ const [shopName, setShopName] = useState('CafeOS');
                       return prod ? (
                         <div key={pid} className="flex items-center py-1 border-b border-amber-50 last:border-0 text-xs">
                           <span className="flex-1 text-slate-700">{prod.name}</span>
-                          <span className="w-16 text-right text-amber-700 font-medium">×{qty}</span>
+                          <span className="w-16 text-right text-accent-text font-medium">×{qty}</span>
                         </div>
                       ) : null;
                     })}

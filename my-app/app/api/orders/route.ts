@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listOrders, createOrder } from '@/modules/orders/service';
 import { badRequest, serverError } from '@/lib/api-response';
+import { guardStaff } from '@/lib/api-guards';
 
-// GET /api/orders – list orders
+// GET /api/orders – list orders (staff only; customers track a single order by number)
 export async function GET(req: NextRequest) {
+  const guard = await guardStaff(req);
+  if (guard.error) return guard.error;
   try {
     const { searchParams } = new URL(req.url);
     const result = await listOrders({

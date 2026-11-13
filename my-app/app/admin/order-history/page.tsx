@@ -290,7 +290,7 @@ export default function OrderHistoryPage() {
                            order.paymentMethod === 'PAYMAYA' ? '📱 PayMaya' : order.paymentMethod}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className="text-amber-600" title="View Invoice">🧾</span>
+                          <span className="text-accent-text" title="View Invoice">🧾</span>
                         </td>
                       </tr>
                     );
@@ -336,7 +336,7 @@ export default function OrderHistoryPage() {
           >
             {/* Invoice Header */}
             <div className="px-6 py-6 text-center border-b-2 border-dashed border-gray-200">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Official Receipt</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent-text">Official Receipt</p>
               <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'CaféOS Coffee Shop'}</h2>
               {businessSettings?.businessAddress && (
                 <p className="text-[10px] text-gray-500 mt-1">{businessSettings.businessAddress}</p>
@@ -514,7 +514,7 @@ export default function OrderHistoryPage() {
                     printWindow.focus();
                     setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
                   }}
-                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 bg-accent hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
                 >
                   🖨️ Thermal Print
                 </button>

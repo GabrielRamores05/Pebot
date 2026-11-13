@@ -86,7 +86,7 @@ function timeAgo(dateStr: string) {
 }
 
 const KANBAN_COLUMNS = [
-  { status: 'PENDING' as const,   label: 'Pending',   emoji: '⏳', accent: 'border-amber-300', headerBg: 'bg-amber-50', headerText: 'text-amber-700', badge: 'bg-amber-100 text-amber-700' },
+  { status: 'PENDING' as const,   label: 'Pending',   emoji: '⏳', accent: 'border-amber-300', headerBg: 'bg-amber-50', headerText: 'text-accent-text', badge: 'bg-amber-100 text-accent-text' },
   { status: 'PREPARING' as const, label: 'Preparing', emoji: '👨‍🍳', accent: 'border-blue-300',   headerBg: 'bg-blue-50',   headerText: 'text-blue-700',   badge: 'bg-blue-100 text-blue-700' },
   { status: 'COMPLETED' as const, label: 'Ready',     emoji: '✅', accent: 'border-green-300',  headerBg: 'bg-green-50',  headerText: 'text-green-700',  badge: 'bg-green-100 text-green-700' },
   { status: 'CANCELLED' as const, label: 'Cancelled', emoji: '✕',  accent: 'border-red-300',    headerBg: 'bg-red-50',    headerText: 'text-red-700',    badge: 'bg-red-100 text-red-700' },
@@ -630,7 +630,7 @@ export default function AdminPage() {
                   setSelectedOrder(selected);
                   setShowInvoice(true);
                 }}
-                className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2"
+                className="w-full py-3 bg-accent hover:bg-amber-500 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2"
               >
                 🧾 View Invoice
               </button>
@@ -882,7 +882,7 @@ export default function AdminPage() {
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
               {/* Receipt Header */}
               <div className="px-4 py-4 text-center border-b-2 border-dashed border-gray-300 bg-gray-50 rounded-t-2xl">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Official Receipt</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent-text">Official Receipt</p>
                 <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'CaféOS Coffee Shop'}</h2>
                 {businessSettings?.businessAddress && (
                   <p className="text-[10px] text-gray-500 mt-1">{businessSettings.businessAddress}</p>
@@ -1102,7 +1102,7 @@ export default function AdminPage() {
                         setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
                       }
                     }}
-                    className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2.5 bg-accent hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
                   >
                     🖨️ Thermal
                   </button>

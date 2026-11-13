@@ -1,7 +1,59 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Manrope — vendored locally (offline-first; no CDN fetch)
+   --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/xn7gYHE41ni1AdIRggqxSuXd.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/xn7gYHE41ni1AdIRggOxSuXd.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/xn7gYHE41ni1AdIRggSxSuXd.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/xn7gYHE41ni1AdIRggixSuXd.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/xn7gYHE41ni1AdIRggmxSuXd.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/xn7gYHE41ni1AdIRggexSg.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
-  --font-sans: "SF Pro Display", "SF Pro Text", "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "Manrope", "SF Pro Display", "SF Pro Text", "SF Pro Rounded", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", "SF Mono", "Menlo", "Monaco", Consolas, "Liberation Mono", monospace;
 
   --background: #f7f2ea;
@@ -38,6 +90,42 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --shadow-modal: 0 8px 30px rgba(28,25,23,0.12);
+
+  /* -------------------------------------------------------------------------
+     CaféOS admin design system (adapted from the "Coffer" template)
+     Neutral graphite/navy accents, hairline borders, soft shadows.
+     ------------------------------------------------------------------------- */
+  --a-950: #05070b;
+  --a-800: #2a303c;
+  --a-700: #111622;
+  --a-600: #3a4150;
+  --a-400: #9097a5;
+  --a-100: #e6e8ed;
+
+  --c-page: #f4f5f7;
+  --c-panel: #eceef2;
+  --c-card: #fdfdfe;
+  --c-hair: #e3e6eb;
+  --c-hair-strong: #cfd4dc;
+  --c-ink: #111622;
+  --c-muted: #4a5263;
+  --c-faint: #5c6576;
+
+  --c-accent: var(--a-700);
+  --c-accent-text: var(--a-700);
+  --c-accent-soft: var(--a-100);
+  --c-on-accent: #f6f7fd;
+
+  --c-info: #2453c7;      --c-info-bg: #e5ecfb;
+  --c-good: #1b6e44;      --c-good-bg: #e0f1e6;
+  --c-amber: #8f5300;     --c-amber-bg: #fbeed6;
+  --c-rose: #b02e2b;      --c-rose-bg: #fbe6e4;
+
+  --c-r-lg: 12px;
+  --c-r-md: 10px;
+  --c-r-sm: 8px;
+  --c-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --c-shadow-pop: 0 0 0 1px var(--c-hair), 0 16px 40px -12px rgba(16, 24, 40, 0.22);
 }
 
 @theme inline {
@@ -45,6 +133,136 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+
+  /* CaféOS admin tokens exposed as Tailwind utilities
+     (bg-page, text-ink, border-hair, bg-card, text-muted, bg-accent, ...) */
+  --color-page: var(--c-page);
+  --color-panel: var(--c-panel);
+  --color-card: var(--c-card);
+  --color-hair: var(--c-hair);
+  --color-hair-strong: var(--c-hair-strong);
+  --color-ink: var(--c-ink);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+  --color-accent: var(--c-accent);
+  --color-accent-text: var(--c-accent-text);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-on-accent: var(--c-on-accent);
+  --color-info: var(--c-info);
+  --color-info-bg: var(--c-info-bg);
+  --color-good: var(--c-good);
+  --color-good-bg: var(--c-good-bg);
+  --color-warn: var(--c-amber);
+  --color-warn-bg: var(--c-amber-bg);
+  --color-danger: var(--c-rose);
+  --color-danger-bg: var(--c-rose-bg);
+  --radius-card: var(--c-r-lg);
+  --radius-field: var(--c-r-sm);
+  --shadow-card: var(--c-shadow-card);
+  --shadow-pop: var(--c-shadow-pop);
+}
+
+/* Align Tailwind's neutral ramp with the Coffer palette, so existing
+   slate-based screens adopt the new system without per-file edits. */
+@theme {
+  --color-slate-50: #f4f5f7;
+  --color-slate-100: #eceef2;
+  --color-slate-200: #e3e6eb;
+  --color-slate-300: #cfd4dc;
+  --color-slate-400: #9097a5;
+  --color-slate-500: #5c6576;
+  --color-slate-600: #4a5263;
+  --color-slate-700: #2a303c;
+  --color-slate-800: #111622;
+  --color-slate-900: #05070b;
+}
+
+/* CaféOS admin primitives — mirror the Coffer component conventions */
+@layer components {
+  .c-card {
+    border-radius: var(--c-r-lg);
+    background: var(--c-card);
+    border: 1px solid var(--c-hair);
+    box-shadow: var(--c-shadow-card);
+  }
+  .c-hair { border-color: var(--c-hair); }
+  .c-eyebrow {
+    color: var(--c-accent-text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .c-title {
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: var(--c-ink);
+  }
+  .c-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 6px;
+    background: var(--c-panel);
+    color: var(--c-muted);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .c-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 99px;
+    background: var(--c-panel);
+    color: var(--c-muted);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .c-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    border-radius: var(--c-r-sm);
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  }
+  .c-btn--primary {
+    background: var(--c-accent);
+    color: var(--c-on-accent);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.12);
+  }
+  .c-btn--primary:hover { background: var(--a-800); }
+  .c-btn--ghost {
+    background: var(--c-card);
+    border-color: var(--c-hair-strong);
+    color: var(--c-ink);
+    box-shadow: var(--c-shadow-card);
+  }
+  .c-btn--ghost:hover { border-color: var(--c-muted); }
+  .c-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .c-table th, .c-table td {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--c-hair);
+  }
+  .c-table thead th {
+    color: var(--c-faint);
+    font-size: 12px;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--c-panel) 45%, var(--c-card));
+  }
+  .c-num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 
 * { box-sizing: border-box; }

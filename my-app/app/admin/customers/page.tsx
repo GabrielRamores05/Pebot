@@ -35,7 +35,7 @@ interface TierStats {
 }
 
 const tierConfig = {
-  VIP: { color: '#f59e0b', label: '⭐ VIP', bg: 'bg-amber-100', text: 'text-amber-700' },
+  VIP: { color: '#f59e0b', label: '⭐ VIP', bg: 'bg-amber-100', text: 'text-accent-text' },
   REGULAR: { color: '#10b981', label: '✓ Regular', bg: 'bg-emerald-100', text: 'text-emerald-700' },
   CASUAL: { color: '#6b7280', label: '○ Casual', bg: 'bg-slate-100', text: 'text-slate-600' },
   AT_RISK: { color: '#ef4444', label: '⚠ At Risk', bg: 'bg-red-100', text: 'text-red-700' },
@@ -123,7 +123,7 @@ export default function CustomerLoyaltyTiers() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
             <div className="text-slate-500 text-sm font-medium">VIP Customers</div>
-            <div className="text-3xl font-bold mt-2 text-amber-600">{stats.vipCount}</div>
+            <div className="text-3xl font-bold mt-2 text-accent-text">{stats.vipCount}</div>
             <div className="text-xs text-slate-400 mt-2">Top spenders</div>
           </div>
 

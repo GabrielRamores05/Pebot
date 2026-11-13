@@ -457,7 +457,7 @@ export default function AdminLoyaltyManagementPage() {
                       <div key={s.id} className="bg-gray-50 rounded-2xl p-5 border border-gray-100 flex items-center justify-between">
                         <div>
                           <h3 className="font-bold text-gray-900">{s.cardTitle}</h3>
-                          <p className="text-xs text-amber-600 font-medium">Target: {s.categoryName}</p>
+                          <p className="text-xs text-accent-text font-medium">Target: {s.categoryName}</p>
                           <p className="text-[10px] text-gray-400 mt-1">
                             {s.isMilestoneMode ? 'Milestone Rewards' : `${s.coffeesRequiredForFree} coffees required`}
                           </p>
@@ -506,7 +506,7 @@ export default function AdminLoyaltyManagementPage() {
                       ))}
                     </select>
                     {!isCreatingNewModule && (
-                      <p className="text-[10px] text-amber-600 mt-1 font-medium">⚠️ Changing category will reassign this module to a different set of products.</p>
+                      <p className="text-[10px] text-accent-text mt-1 font-medium">⚠️ Changing category will reassign this module to a different set of products.</p>
                     )}
                   </div>
 
@@ -663,7 +663,7 @@ export default function AdminLoyaltyManagementPage() {
                           {editingSettings.milestones.map((m, idx) => (
                             <div key={idx} className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-amber-200 shadow-sm">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center font-bold text-amber-700 text-sm">
+                                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center font-bold text-accent-text text-sm">
                                   {m.target}
                                 </div>
                                 <div>
@@ -857,7 +857,7 @@ export default function AdminLoyaltyManagementPage() {
                       <div className="flex items-center gap-3">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
                           card.rewardsAvailable > 0 
-                            ? 'bg-amber-100 text-amber-700' 
+                            ? 'bg-amber-100 text-accent-text' 
                             : 'bg-gray-100 text-gray-600'
                         }`}>
                           {card.customerName.charAt(0).toUpperCase()}
@@ -876,7 +876,7 @@ export default function AdminLoyaltyManagementPage() {
                         </div>
                       </div>
                       {card.rewardsAvailable > 0 && (
-                        <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-medium">
+                        <span className="bg-amber-100 text-accent-text text-xs px-2 py-1 rounded-full font-medium">
                           {card.rewardsAvailable} reward{card.rewardsAvailable !== 1 ? 's' : ''}
                         </span>
                       )}
@@ -908,7 +908,7 @@ export default function AdminLoyaltyManagementPage() {
                       <div className="flex items-center gap-4">
                         <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold ${
                           selectedCard.rewardsAvailable > 0 
-                            ? 'bg-amber-100 text-amber-700' 
+                            ? 'bg-amber-100 text-accent-text' 
                             : 'bg-gray-100 text-gray-600'
                         }`}>
                           {selectedCard.customerName.charAt(0).toUpperCase()}
@@ -992,8 +992,8 @@ export default function AdminLoyaltyManagementPage() {
                         <p className="text-xs text-gray-500 mt-1">Coffees</p>
                       </div>
                       <div className="bg-amber-50 rounded-2xl p-4 text-center">
-                        <p className="text-2xl font-bold text-amber-600">{selectedCard.rewardsAvailable}</p>
-                        <p className="text-xs text-amber-600 mt-1">Rewards</p>
+                        <p className="text-2xl font-bold text-accent-text">{selectedCard.rewardsAvailable}</p>
+                        <p className="text-xs text-accent-text mt-1">Rewards</p>
                       </div>
                       <div className="bg-gray-50 rounded-2xl p-4 text-center">
                         <p className="text-lg font-bold text-gray-900">
@@ -1109,7 +1109,7 @@ export default function AdminLoyaltyManagementPage() {
                         />
                       </div>
                       <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
-                        <p className="text-xs text-amber-700">Adding points will increase the customer&apos;s coffee count. If they reach the reward threshold, a voucher will be generated automatically.</p>
+                        <p className="text-xs text-accent-text">Adding points will increase the customer&apos;s coffee count. If they reach the reward threshold, a voucher will be generated automatically.</p>
                       </div>
                     </div>
                     <div className="p-6 border-t border-gray-100 flex gap-3">
@@ -1122,7 +1122,7 @@ export default function AdminLoyaltyManagementPage() {
                       <button
                         onClick={addPoints}
                         disabled={addPointsLoading || addPointsQuantity <= 0}
-                        className="flex-1 bg-amber-600 text-white py-3 rounded-xl font-semibold hover:bg-amber-500 disabled:opacity-50 transition-colors"
+                        className="flex-1 bg-accent text-white py-3 rounded-xl font-semibold hover:bg-amber-500 disabled:opacity-50 transition-colors"
                       >
                         {addPointsLoading ? 'Adding...' : 'Add Points'}
                       </button>

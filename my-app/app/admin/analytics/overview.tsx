@@ -380,7 +380,7 @@ export default function OverviewDashboard() {
                               </div>
                               <div className="flex gap-3 shrink-0">
                                 <span className="text-gray-500 text-xs">{item.count}×</span>
-                                <span className="text-amber-600 text-xs font-semibold">₱{item.revenue.toFixed(0)}</span>
+                                <span className="text-accent-text text-xs font-semibold">₱{item.revenue.toFixed(0)}</span>
                               </div>
                             </div>
                           </div>

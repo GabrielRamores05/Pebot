@@ -244,11 +244,11 @@ export async function findAllStationsUnscoped(_locationId: number = 1) {
 }
 
 export async function createManyStations(
-  data: Array<{ stationType: string; staffCount: number }>,
+  data: Array<{ stationType: string; staffCount: number; emoji?: string }>,
   locationId: number = 1,
 ) {
   return prisma.staffStationControl.createMany({
-    data: data.map((d) => ({ ...d, locationId })),
+    data: data.map((d) => ({ ...d, locationId, emoji: d.emoji ?? '📦' })),
   });
 }
 
@@ -264,7 +264,7 @@ export async function createStation(
   data: { stationType: string; staffCount: number; emoji?: string },
   locationId: number = 1,
 ) {
-  return prisma.staffStationControl.create({ data: { ...data, locationId } });
+  return prisma.staffStationControl.create({ data: { ...data, locationId, emoji: data.emoji ?? '📦' } });
 }
 
 export async function findStationById(id: number, locationId: number = 1) {
