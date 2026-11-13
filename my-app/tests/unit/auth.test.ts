@@ -5,17 +5,10 @@ const mocks = vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret-for-unit-tests-0123456789';
   return {
     cookies: vi.fn(),
-    getUserSubscription: vi.fn(),
-    hasFeatureAccess: vi.fn(),
   };
 });
 
 vi.mock('next/headers', () => ({ cookies: mocks.cookies }));
-
-vi.mock('@/lib/subscription', () => ({
-  getUserSubscription: mocks.getUserSubscription,
-  hasFeatureAccess: mocks.hasFeatureAccess,
-}));
 
 import { NextRequest } from 'next/server';
 import {
@@ -25,7 +18,6 @@ import {
   requireRole,
   signToken,
   verifyTokenAsync,
-  withSubscriptionCheck,
 } from '../../lib/auth';
 import type { JWTPayload } from '../../lib/auth';
 
@@ -39,8 +31,6 @@ function request(headers: Record<string, string> = {}) {
 
 beforeEach(() => {
   mocks.cookies.mockReset();
-  mocks.getUserSubscription.mockReset();
-  mocks.hasFeatureAccess.mockReset();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -109,56 +99,33 @@ describe('requireRole', () => {
   });
 });
 
-describe('withSubscriptionCheck', () => {
-  test('nobody signed in has no access and no subscription looked up', async () => {
-    await expect(withSubscriptionCheck(request(), 'analytics')).resolves.toEqual({
-      user: null,
-      subscription: null,
-      hasAccess: false,
-    });
-    expect(mocks.getUserSubscription).not.toHaveBeenCalled();
-  });
-
-  test('an ADMIN gets access whatever the tier says', async () => {
-    const token = await signToken(payload({ role: 'ADMIN' }));
-    mocks.getUserSubscription.mockResolvedValue(null);
-    mocks.hasFeatureAccess.mockReturnValue(false);
-
-    const result = await withSubscriptionCheck(
-      request({ cookie: `cafeos-token=${token}` }),
-      'analytics',
-    );
-
-    expect(result.hasAccess).toBe(true);
-    expect(mocks.getUserSubscription).toHaveBeenCalledWith(7);
-  });
-
-  test('other roles fall back to the subscription tier', async () => {
-    const token = await signToken(payload({ role: 'STAFF' }));
-    const subscription = { isActive: true, features: { analytics: true } };
-    mocks.getUserSubscription.mockResolvedValue(subscription);
-    mocks.hasFeatureAccess.mockReturnValue(true);
-
-    const result = await withSubscriptionCheck(
-      request({ cookie: `cafeos-token=${token}` }),
-      'analytics',
-    );
-
-    expect(result.hasAccess).toBe(true);
-    expect(result.subscription).toBe(subscription);
-    expect(mocks.hasFeatureAccess).toHaveBeenCalledWith(subscription, 'analytics');
-  });
-});
-
 describe('checkFeatureAccess', () => {
-  test('reports the caller and whether the feature is available', async () => {
-    const token = await signToken(payload({ role: 'STAFF' }));
-    mocks.getUserSubscription.mockResolvedValue(null);
-    mocks.hasFeatureAccess.mockReturnValue(false);
+  test('nobody signed in has no access', async () => {
+    await expect(checkFeatureAccess(request(), 'analytics')).resolves.toEqual({ user: null, hasAccess: false });
+  });
+
+  test('an ADMIN has every feature without any flags', async () => {
+    const token = await signToken(payload({ role: 'ADMIN' }));
+
+    const result = await checkFeatureAccess(request({ cookie: `cafeos-token=${token}` }), 'analytics');
+
+    expect(result.hasAccess).toBe(true);
+  });
+
+  test('staff have a feature only when its Staff Management flag is true', async () => {
+    const allowed = await signToken(payload({ permissions: { analytics: true } }));
+    const denied = await signToken(payload({ permissions: { analytics: false, loyalty: true } }));
+    const none = await signToken(payload());
 
     await expect(
-      checkFeatureAccess(request({ cookie: `cafeos-token=${token}` }), 'loyalty'),
-    ).resolves.toEqual({ user: expect.objectContaining({ userId: 7 }), hasAccess: false });
+      checkFeatureAccess(request({ cookie: `cafeos-token=${allowed}` }), 'analytics'),
+    ).resolves.toEqual({ user: expect.objectContaining({ userId: 7 }), hasAccess: true });
+    await expect(
+      checkFeatureAccess(request({ cookie: `cafeos-token=${denied}` }), 'analytics'),
+    ).resolves.toMatchObject({ hasAccess: false });
+    await expect(
+      checkFeatureAccess(request({ cookie: `cafeos-token=${none}` }), 'loyalty'),
+    ).resolves.toMatchObject({ hasAccess: false });
   });
 });
 

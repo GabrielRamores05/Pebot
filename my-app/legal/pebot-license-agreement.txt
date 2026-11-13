@@ -1,0 +1,292 @@
+PEBOT SOFTWARE LICENSE AGREEMENT
+Version 1.0-draft (14 November 2026)
+
+DRAFT - PENDING REVIEW BY A PHILIPPINE LAWYER. This notice will be removed once that review is done.
+
+Please read this agreement before installing Pebot. A Filipino version follows the English version. If the two versions differ, the English version applies.
+
+------------------------------------------------------------
+SUMMARY IN PLAIN WORDS (this summary is part of the agreement)
+------------------------------------------------------------
+- You pay once (PHP 4,999). You can use Pebot at ONE restaurant location for as long as Pebot is sold and maintained.
+- One license covers one main computer, plus any number of tablets, cashier terminals, kitchen screens and customer phones on that location's network.
+- Pebot works without internet. Your license key only works on the computer it was made for.
+- If you reformat or replace that computer, we re-activate your license for free, up to 3 times a year.
+- Your restaurant's data is yours. It stays on your computer and we cannot see it.
+- BACKUPS ARE YOUR RESPONSIBILITY. Pebot has backup tools. Use them regularly and keep a copy off the computer.
+- We are not responsible for data lost because a computer broke, was stolen, lost or reformatted, got a virus, or lost power.
+- Pebot is NOT accredited by the BIR. Its printouts are not official BIR invoices or receipts.
+- If Pebot cannot be made to work on your setup, you can get a refund within 7 days of purchase.
+
+------------------------------------------------------------
+1. WHO THIS AGREEMENT IS BETWEEN
+------------------------------------------------------------
+This agreement is between [SELLER NAME / BUSINESS NAME] ("we", "us", the "Seller") and the business or person who bought the Pebot license ("you", the "Customer"). Pebot is a point-of-sale and restaurant management software ("Pebot" or the "Software").
+
+------------------------------------------------------------
+2. WHAT YOU ARE ALLOWED TO DO (LICENSE GRANT)
+------------------------------------------------------------
+2.1 After you pay the license fee, we give you a non-exclusive, non-transferable right to install and use Pebot for your own business at ONE restaurant location.
+2.2 "One location" means one main computer that runs Pebot. Any number of devices on that location's own network (tablets, cashier terminals, kitchen screens and customers' phones) may connect to it.
+2.3 Each additional branch or location needs its own license.
+2.4 You buy a license to USE Pebot. You do not buy Pebot itself. We keep all rights to the Software, its name, its design and its code.
+
+------------------------------------------------------------
+3. WHAT YOU MAY NOT DO
+------------------------------------------------------------
+You may not:
+(a) copy, share, sell, rent or lend Pebot or your license key to anyone else;
+(b) use one license at more than one location at the same time;
+(c) remove, disable or get around the license check, or reverse-engineer the Software, except where Philippine law expressly allows it;
+(d) use Pebot for anything illegal.
+
+------------------------------------------------------------
+4. ACTIVATION AND MOVING TO A NEW COMPUTER
+------------------------------------------------------------
+4.1 Pebot shows a Machine Code for your computer. You send it to us, and we send you a license key that works only on that computer.
+4.2 Your license keeps working when you restart the computer and when Windows or Pebot updates. Reformatting the computer, reinstalling Windows, or changing to different hardware may need a new key.
+4.3 Re-activation is free up to 3 times in any 12-month period. If the old computer still works, use "Move to a new computer" in Pebot and send us the deactivation code it shows. If the old computer was lost, stolen or broken, send us a short written statement saying what happened.
+4.4 More than 3 re-activations in 12 months are reviewed case by case. This is to stop license sharing, not to punish honest owners.
+
+------------------------------------------------------------
+5. WHAT "LIFETIME" MEANS
+------------------------------------------------------------
+5.1 "Lifetime" means for as long as we sell and maintain Pebot. It does not mean the lifetime of a person or a business.
+5.2 If we ever stop selling and maintaining Pebot, we will give at least 12 months' notice. We will also release a final version that does not need activation, so you can keep using it.
+
+------------------------------------------------------------
+6. SUPPORT
+------------------------------------------------------------
+6.1 Support is included at no extra charge for as long as Pebot is sold and maintained.
+6.2 Channels: Facebook Messenger and email at [SUPPORT MESSENGER PAGE] / [SUPPORT EMAIL]. Remote screen-sharing sessions are available by appointment.
+6.3 Hours: Monday to Saturday, 9:00 AM to 6:00 PM Philippine time, except public holidays.
+6.4 We aim to reply within 1 business day. If you cannot take orders because of a problem with Pebot, we aim to help the same business day.
+6.5 Visits to your location are not included. If you want one, we will quote the cost before going.
+6.6 Support does not cover: hardware (computers, printers, tablets, routers), printers we have not tested, recovering data from a broken or damaged drive, your internet or network setup, and problems caused by other software.
+
+------------------------------------------------------------
+7. UPDATES
+------------------------------------------------------------
+7.1 Bug fixes and security fixes are free for as long as Pebot is maintained.
+7.2 All version 1.x updates, including new features, are free.
+7.3 A future major version (for example, version 2) may be offered as an optional upgrade at a discounted price. You never have to upgrade. Your version keeps working.
+
+------------------------------------------------------------
+8. REFUNDS
+------------------------------------------------------------
+8.1 If Pebot cannot be made to work on your setup and we cannot fix it, you may ask for a full refund within 7 days of purchase.
+8.2 After a refund, your license is cancelled. Updates released after the refund will not accept that license.
+8.3 Nothing in this agreement removes your rights under Philippine consumer law. If Pebot has a defect, we will fix it, replace it or refund you as the law requires.
+
+------------------------------------------------------------
+9. YOUR DATA AND BACKUPS
+------------------------------------------------------------
+9.1 All the data you put into Pebot (sales, menu, customers, staff and records) belongs to you and is stored only on your computer. We do not collect it and cannot access it.
+9.2 BACKUPS ARE YOUR RESPONSIBILITY. Pebot has tools to back up and restore your data. You agree to make backups regularly and keep at least one copy somewhere other than the main computer, for example a USB drive kept somewhere safe.
+9.3 Because your data stays on your computer, we cannot recover it for you if the computer or its drive is lost or damaged and you have no backup.
+
+------------------------------------------------------------
+10. DATA PRIVACY
+------------------------------------------------------------
+10.1 If you store personal information in Pebot (for example customer names, phone numbers or staff records), you are the personal information controller under the Data Privacy Act of 2012 (Republic Act No. 10173). You are responsible for collecting and using that information lawfully.
+10.2 We do not receive that personal information. During remote support you may show us your screen. We will only look at what we need to help you, and we will not copy or keep your data.
+
+------------------------------------------------------------
+11. TAXES AND THE BIR
+------------------------------------------------------------
+11.1 Pebot is NOT accredited by the Bureau of Internal Revenue (BIR) as a Cash Register Machine (CRM), Point-of-Sale (POS) system or Computerized Accounting System (CAS).
+11.2 Receipts, order slips and reports printed by Pebot are NOT official BIR invoices or official receipts.
+11.3 You are responsible for your own tax obligations, including registering your business, issuing BIR-registered invoices, and filing and paying taxes. Ask your accountant or the BIR if you are unsure.
+
+------------------------------------------------------------
+12. WHAT WE ARE NOT RESPONSIBLE FOR
+------------------------------------------------------------
+12.1 We work hard to make Pebot reliable, but no software is perfect. Pebot is provided as it is, with the support and fixes described in this agreement.
+12.2 We are NOT responsible for loss of data, sales, profit or business caused by:
+(a) a computer, drive, printer or other hardware breaking down;
+(b) a computer being stolen, lost or damaged;
+(c) reformatting, resetting or reinstalling Windows;
+(d) viruses, malware or hacking that were not caused by us;
+(e) power outages, power surges, floods, fires, typhoons, earthquakes or other events outside our control;
+(f) using Pebot in a way this agreement or our instructions do not allow;
+(g) not having a backup.
+12.3 Our total responsibility to you for anything related to Pebot is limited to the amount you paid for your license.
+12.4 Nothing in this agreement limits our responsibility for fraud, bad faith, gross negligence, or anything else that Philippine law does not allow to be limited.
+
+------------------------------------------------------------
+13. ACCEPTING THIS AGREEMENT
+------------------------------------------------------------
+13.1 You accept this agreement by clicking "I Agree" or "I accept" when installing or first opening Pebot. Under the Electronic Commerce Act of 2000 (Republic Act No. 8792), this electronic acceptance has the same effect as a signature on paper.
+13.2 If you do not agree, do not install or use Pebot. You may ask for a refund under section 8.
+
+------------------------------------------------------------
+14. CHANGES TO THIS AGREEMENT
+------------------------------------------------------------
+If we change this agreement, the new version will come with a Pebot update, and Pebot will ask you to accept it. Changes will never take away a right you already paid for, such as your license, your free updates for version 1.x, or your support.
+
+------------------------------------------------------------
+15. ENDING THE LICENSE
+------------------------------------------------------------
+Your license ends if you seriously break section 3 and do not stop after we tell you in writing, or if you receive a refund. Your data remains yours even if the license ends.
+
+------------------------------------------------------------
+16. GOVERNING LAW
+------------------------------------------------------------
+This agreement is governed by the laws of the Republic of the Philippines. We will first try to settle any disagreement by talking in good faith. If that does not work, the proper courts of [CITY], Philippines will decide, without taking away any right you have under consumer protection laws.
+
+------------------------------------------------------------
+17. CONTACT
+------------------------------------------------------------
+[SELLER NAME / BUSINESS NAME]
+[ADDRESS]
+Messenger: [SUPPORT MESSENGER PAGE]
+Email: [SUPPORT EMAIL]
+
+
+============================================================
+FILIPINO / TAGALOG
+============================================================
+
+KASUNDUAN SA LISENSYA NG PEBOT SOFTWARE
+Bersyon 1.0-draft (14 Nobyembre 2026)
+
+DRAFT - HINIHINTAY PA ANG PAGSUSURI NG ISANG ABOGADO SA PILIPINAS. Aalisin ang paalalang ito kapag tapos na ang pagsusuri.
+
+Ito ay salin ng Ingles na bersyon sa itaas. Kung magkaiba ang dalawa, ang Ingles na bersyon ang masusunod.
+
+------------------------------------------------------------
+BUOD SA SIMPLENG SALITA (bahagi ng kasunduan ang buod na ito)
+------------------------------------------------------------
+- Isang beses ka lang magbabayad (PHP 4,999). Magagamit mo ang Pebot sa ISANG lokasyon ng restawran hangga't ibinebenta at pinapanatili ang Pebot.
+- Saklaw ng isang lisensya ang isang pangunahing computer, kasama ang kahit ilang tablet, cashier terminal, kitchen screen at telepono ng customer na nasa network ng lokasyong iyon.
+- Gumagana ang Pebot kahit walang internet. Gagana lamang ang iyong license key sa computer na pinaggawan nito.
+- Kung i-reformat o papalitan mo ang computer na iyon, libre naming ire-reactivate ang lisensya mo, hanggang 3 beses sa isang taon.
+- Iyo ang datos ng iyong restawran. Nasa computer mo lamang ito at hindi namin ito nakikita.
+- IKAW ANG MANANAGOT SA BACKUP. May backup tools ang Pebot. Gamitin ito nang regular at magtabi ng kopya sa labas ng computer.
+- Hindi kami mananagot sa datos na nawala dahil nasira, nanakaw, nawala o na-reformat ang computer, nagkaroon ng virus, o nawalan ng kuryente.
+- HINDI accredited ng BIR ang Pebot. Ang mga printout nito ay hindi opisyal na BIR invoice o resibo.
+- Kung hindi mapagana ang Pebot sa iyong setup, maaari kang ma-refund sa loob ng 7 araw mula nang bumili ka.
+
+------------------------------------------------------------
+1. SINO ANG MAGKASUNDO
+------------------------------------------------------------
+Ang kasunduang ito ay sa pagitan ng [PANGALAN NG NAGBEBENTA / NEGOSYO] ("kami", ang "Nagbebenta") at ng negosyo o taong bumili ng lisensya ng Pebot ("ikaw", ang "Customer"). Ang Pebot ay isang point-of-sale at restaurant management software (ang "Pebot" o ang "Software").
+
+------------------------------------------------------------
+2. ANG PUWEDE MONG GAWIN (PAGBIBIGAY NG LISENSYA)
+------------------------------------------------------------
+2.1 Pagkatapos mong bayaran ang lisensya, binibigyan ka namin ng karapatang i-install at gamitin ang Pebot para sa sarili mong negosyo sa ISANG lokasyon ng restawran. Hindi eksklusibo at hindi maililipat sa iba ang karapatang ito.
+2.2 Ang "isang lokasyon" ay isang pangunahing computer na nagpapatakbo ng Pebot. Maaaring kumonekta rito ang kahit ilang device na nasa sariling network ng lokasyong iyon (tablet, cashier terminal, kitchen screen at telepono ng mga customer).
+2.3 Kailangan ng hiwalay na lisensya ang bawat karagdagang sangay o lokasyon.
+2.4 Ang binibili mo ay lisensyang GAMITIN ang Pebot. Hindi mo nabibili ang Pebot mismo. Sa amin pa rin ang lahat ng karapatan sa Software, sa pangalan, disenyo at code nito.
+
+------------------------------------------------------------
+3. ANG BAWAL GAWIN
+------------------------------------------------------------
+Hindi mo maaaring:
+(a) kopyahin, ibahagi, ibenta, paupahan o ipahiram ang Pebot o ang iyong license key sa iba;
+(b) gamitin ang isang lisensya sa higit sa isang lokasyon nang sabay;
+(c) alisin, i-disable o lusutan ang pagsusuri ng lisensya, o i-reverse-engineer ang Software, maliban kung tahasang pinapayagan ng batas ng Pilipinas;
+(d) gamitin ang Pebot sa anumang ilegal.
+
+------------------------------------------------------------
+4. PAG-ACTIVATE AT PAGLIPAT SA BAGONG COMPUTER
+------------------------------------------------------------
+4.1 Ipapakita ng Pebot ang Machine Code ng iyong computer. Ipapadala mo ito sa amin, at padadalhan ka namin ng license key na gagana lamang sa computer na iyon.
+4.2 Patuloy na gagana ang lisensya mo kahit i-restart ang computer at kahit mag-update ang Windows o ang Pebot. Maaaring kailanganin ng bagong key kapag ni-reformat ang computer, in-install muli ang Windows, o lumipat sa ibang hardware.
+4.3 Libre ang re-activation hanggang 3 beses sa loob ng anumang 12 buwan. Kung gumagana pa ang lumang computer, gamitin ang "Move to a new computer" sa Pebot at ipadala sa amin ang deactivation code na ipapakita nito. Kung nawala, nanakaw o nasira ang lumang computer, padalhan kami ng maikling nakasulat na pahayag kung ano ang nangyari.
+4.4 Susuriin isa-isa ang higit sa 3 re-activation sa loob ng 12 buwan. Para ito pigilan ang pagbabahagi ng lisensya, hindi para parusahan ang tapat na may-ari.
+
+------------------------------------------------------------
+5. ANG IBIG SABIHIN NG "LIFETIME"
+------------------------------------------------------------
+5.1 Ang "lifetime" ay nangangahulugang hangga't ibinebenta at pinapanatili namin ang Pebot. Hindi ito nangangahulugang habambuhay ng isang tao o ng isang negosyo.
+5.2 Kung ititigil namin ang pagbebenta at pagpapanatili ng Pebot, magbibigay kami ng abiso nang hindi bababa sa 12 buwan bago nito. Maglalabas din kami ng huling bersyon na hindi na kailangang i-activate, para patuloy mo itong magamit.
+
+------------------------------------------------------------
+6. SUPORTA
+------------------------------------------------------------
+6.1 Kasama ang suporta nang walang dagdag na bayad hangga't ibinebenta at pinapanatili ang Pebot.
+6.2 Paraan ng pakikipag-ugnayan: Facebook Messenger at email sa [SUPPORT MESSENGER PAGE] / [SUPPORT EMAIL]. May remote screen-sharing session kapag may appointment.
+6.3 Oras: Lunes hanggang Sabado, 9:00 AM hanggang 6:00 PM oras sa Pilipinas, maliban sa mga pista opisyal.
+6.4 Sisikapin naming sumagot sa loob ng 1 araw ng trabaho. Kung hindi ka makatanggap ng order dahil sa problema sa Pebot, sisikapin naming tumulong sa parehong araw ng trabaho.
+6.5 Hindi kasama ang pagbisita sa iyong lokasyon. Kung gusto mo nito, sasabihin muna namin ang halaga bago pumunta.
+6.6 Hindi saklaw ng suporta ang: hardware (computer, printer, tablet, router), printer na hindi pa namin nasubukan, pagbawi ng datos mula sa sira o nasirang drive, ang iyong internet o network setup, at mga problemang dulot ng ibang software.
+
+------------------------------------------------------------
+7. MGA UPDATE
+------------------------------------------------------------
+7.1 Libre ang pag-aayos ng bug at seguridad hangga't pinapanatili ang Pebot.
+7.2 Libre ang lahat ng update ng bersyon 1.x, kasama ang mga bagong feature.
+7.3 Ang susunod na malaking bersyon (halimbawa, bersyon 2) ay maaaring ialok bilang opsyonal na upgrade sa mas mababang presyo. Hindi ka kailanman obligadong mag-upgrade. Patuloy na gagana ang bersyon mo.
+
+------------------------------------------------------------
+8. REFUND
+------------------------------------------------------------
+8.1 Kung hindi mapagana ang Pebot sa iyong setup at hindi namin ito maayos, maaari kang humingi ng buong refund sa loob ng 7 araw mula nang bumili ka.
+8.2 Pagkatapos ng refund, kanselado na ang lisensya mo. Hindi na ito tatanggapin ng mga update na ilalabas pagkatapos ng refund.
+8.3 Walang anuman sa kasunduang ito ang nag-aalis ng iyong mga karapatan sa ilalim ng batas ng Pilipinas para sa mga mamimili. Kung may depekto ang Pebot, aayusin namin ito, papalitan, o ire-refund ka ayon sa hinihingi ng batas.
+
+------------------------------------------------------------
+9. ANG IYONG DATOS AT BACKUP
+------------------------------------------------------------
+9.1 Iyo ang lahat ng datos na inilalagay mo sa Pebot (benta, menu, customer, staff at mga rekord) at nakatago lamang ito sa iyong computer. Hindi namin ito kinokolekta at hindi namin ito maa-access.
+9.2 IKAW ANG MANANAGOT SA BACKUP. May tools ang Pebot para mag-backup at mag-restore ng datos. Pumapayag kang mag-backup nang regular at magtabi ng kahit isang kopya sa labas ng pangunahing computer, halimbawa sa USB drive na nakatago sa ligtas na lugar.
+9.3 Dahil nasa computer mo lamang ang datos mo, hindi namin ito mababawi para sa iyo kung mawala o masira ang computer o ang drive nito at wala kang backup.
+
+------------------------------------------------------------
+10. PRIVACY NG DATOS
+------------------------------------------------------------
+10.1 Kung mag-iimbak ka ng personal na impormasyon sa Pebot (halimbawa pangalan o numero ng customer, o rekord ng staff), ikaw ang personal information controller sa ilalim ng Data Privacy Act of 2012 (Republic Act No. 10173). Ikaw ang mananagot sa legal na pagkolekta at paggamit ng impormasyong iyon.
+10.2 Hindi namin natatanggap ang personal na impormasyong iyon. Sa remote support, maaari mong ipakita sa amin ang iyong screen. Titingnan lang namin ang kailangan para matulungan ka, at hindi namin kokopyahin o itatago ang iyong datos.
+
+------------------------------------------------------------
+11. BUWIS AT ANG BIR
+------------------------------------------------------------
+11.1 HINDI accredited ng Bureau of Internal Revenue (BIR) ang Pebot bilang Cash Register Machine (CRM), Point-of-Sale (POS) system o Computerized Accounting System (CAS).
+11.2 HINDI opisyal na BIR invoice o opisyal na resibo ang mga resibo, order slip at report na ipi-print ng Pebot.
+11.3 Ikaw ang mananagot sa sarili mong obligasyon sa buwis, kasama ang pagrehistro ng negosyo, pag-isyu ng BIR-registered na invoice, at pag-file at pagbabayad ng buwis. Magtanong sa iyong accountant o sa BIR kung hindi ka sigurado.
+
+------------------------------------------------------------
+12. ANG HINDI NAMIN PANANAGUTAN
+------------------------------------------------------------
+12.1 Sinisikap naming gawing maaasahan ang Pebot, pero walang software na perpekto. Ibinibigay ang Pebot kung ano ito, kasama ang suporta at pag-aayos na inilarawan sa kasunduang ito.
+12.2 HINDI kami mananagot sa pagkawala ng datos, benta, kita o negosyo na dulot ng:
+(a) pagkasira ng computer, drive, printer o iba pang hardware;
+(b) pagnanakaw, pagkawala o pagkasira ng computer;
+(c) pag-reformat, pag-reset o muling pag-install ng Windows;
+(d) virus, malware o hacking na hindi namin kagagawan;
+(e) brownout, power surge, baha, sunog, bagyo, lindol o iba pang pangyayaring wala sa aming kontrol;
+(f) paggamit ng Pebot sa paraang hindi pinapayagan ng kasunduang ito o ng aming mga tagubilin;
+(g) kawalan ng backup.
+12.3 Ang kabuuang pananagutan namin sa iyo para sa anumang may kinalaman sa Pebot ay hanggang sa halagang ibinayad mo para sa iyong lisensya.
+12.4 Walang anuman sa kasunduang ito ang naglilimita sa aming pananagutan sa pandaraya, masamang hangarin, matinding kapabayaan, o anupamang hindi pinapayagan ng batas ng Pilipinas na limitahan.
+
+------------------------------------------------------------
+13. PAGTANGGAP SA KASUNDUANG ITO
+------------------------------------------------------------
+13.1 Tinatanggap mo ang kasunduang ito sa pag-click ng "I Agree" o "I accept" habang nag-i-install o sa unang pagbukas ng Pebot. Sa ilalim ng Electronic Commerce Act of 2000 (Republic Act No. 8792), kapareho ng pirma sa papel ang bisa ng pagtanggap na ito.
+13.2 Kung hindi ka sang-ayon, huwag i-install o gamitin ang Pebot. Maaari kang humingi ng refund ayon sa seksyon 8.
+
+------------------------------------------------------------
+14. MGA PAGBABAGO SA KASUNDUANG ITO
+------------------------------------------------------------
+Kung babaguhin namin ang kasunduang ito, darating ang bagong bersyon kasama ng update ng Pebot, at hihilingin ng Pebot na tanggapin mo ito. Hindi kailanman aalisin ng mga pagbabago ang karapatang nabayaran mo na, gaya ng iyong lisensya, libreng update para sa bersyon 1.x, o suporta.
+
+------------------------------------------------------------
+15. PAGTATAPOS NG LISENSYA
+------------------------------------------------------------
+Matatapos ang lisensya mo kung malubha mong nilabag ang seksyon 3 at hindi ka tumigil pagkatapos ka naming abisuhan nang nakasulat, o kung na-refund ka na. Iyo pa rin ang datos mo kahit matapos ang lisensya.
+
+------------------------------------------------------------
+16. BATAS NA SUSUNDIN
+------------------------------------------------------------
+Ang batas ng Republika ng Pilipinas ang susundin sa kasunduang ito. Susubukan muna naming ayusin ang anumang hindi pagkakasundo sa maayos na pag-uusap. Kung hindi ito maayos, ang wastong hukuman sa [LUNGSOD], Pilipinas ang magpapasya, nang hindi inaalis ang anumang karapatan mo sa ilalim ng mga batas na nagpoprotekta sa mamimili.
+
+------------------------------------------------------------
+17. PAKIKIPAG-UGNAYAN
+------------------------------------------------------------
+[PANGALAN NG NAGBEBENTA / NEGOSYO]
+[ADDRESS]
+Messenger: [SUPPORT MESSENGER PAGE]
+Email: [SUPPORT EMAIL]

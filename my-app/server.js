@@ -18,6 +18,8 @@ const next = require('next');
 const { Server } = require('socket.io');
 const mdns = require('mdns-js');
 const os = require('os');
+const { getLicenseStore } = require('./lib/license/state.js');
+const { classifyRequest, isLocalAddress, SETUP_PAGE_HTML } = require('./lib/license/gate.js');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
@@ -81,9 +83,50 @@ function startRedirectServer() {
 }
 
 app.prepare().then(() => {
+  // ── License (spec 015, constitution VIII): fail closed until activated ────
+  const license = getLicenseStore();
+  const initial = license.refresh();
+  console.log(
+    initial.state === 'active'
+      ? `[License] Active — license #${initial.licenseNo}`
+      : `[License] NOT ACTIVATED (${initial.reason || initial.state}) — open http://localhost:${port}/activate on this PC`
+  );
+
   const httpServer = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
+
+      // Only server.js may assert that a request came from this PC.
+      const local = isLocalAddress(req.socket.remoteAddress);
+      delete req.headers['x-pebot-local'];
+      if (local) req.headers['x-pebot-local'] = '1';
+
+      const decision = classifyRequest({
+        method: req.method,
+        pathname: parsedUrl.pathname || '/',
+        local,
+        licensed: license.isActive(),
+      });
+      if (decision.action === 'redirect') {
+        res.statusCode = 302;
+        res.setHeader('Location', decision.location);
+        res.end();
+        return;
+      }
+      if (decision.action === 'json') {
+        res.statusCode = decision.status;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ error: decision.error }));
+        return;
+      }
+      if (decision.action === 'setup-page') {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(SETUP_PAGE_HTML);
+        return;
+      }
+
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
@@ -105,6 +148,14 @@ app.prepare().then(() => {
       methods: ['GET', 'POST'],
     },
     path: '/api/socket',
+    // Unlicensed: refuse the transport handshake itself (constitution II, VIII).
+    allowRequest: (req, callback) => callback(null, license.isActive()),
+  });
+
+  // Realtime gets the same license check as HTTP (constitution II, VIII).
+  io.use((socket, nextFn) => {
+    if (license.isActive()) return nextFn();
+    return nextFn(new Error('LICENSE_REQUIRED'));
   });
 
   // Attach io to global so API routes can access it

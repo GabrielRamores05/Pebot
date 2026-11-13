@@ -46,7 +46,7 @@ test('each helper answers with its own status', async () => {
   });
   expect(await read(featureUnavailable())).toEqual({
     status: 403,
-    body: { error: 'Feature not available in your subscription tier' },
+    body: { error: "You don't have permission to use this. Ask the owner to turn it on in Staff." },
   });
   expect(await read(notFound())).toEqual({ status: 404, body: { error: 'Not found' } });
   expect(await read(notFound('No such order'))).toEqual({

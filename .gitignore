@@ -3,3 +3,6 @@
 /.next/
 node_modules/
 .env
+# Pebot seller secrets — never commit
+*.pem
+PebotSeller/
