@@ -162,3 +162,9 @@ export async function closeDrawer(input: unknown, staff: Staff): Promise<DrawerV
   });
   return getDrawer(session.id);
 }
+
+/** Drawers opened within [from, to), for the end-of-day summary. */
+export async function drawersOpenedBetween(from: Date, to: Date): Promise<DrawerView[]> {
+  const sessions = await repo.findSessionsOpenedBetween(LOCATION_ID, from, to);
+  return Promise.all(sessions.map(view));
+}
