@@ -70,7 +70,7 @@ function validateCustomerName(name: string): { valid: boolean; error?: string; c
 export default function CartPage() {
   const router = useRouter();
   const cartStore = useCartStore();
-  const [branding, setBranding] = useState<BrandingState>({ shopName: 'CaféOS', logoUrl: null });
+  const [branding, setBranding] = useState<BrandingState>({ shopName: 'Pebot', logoUrl: null });
   const [tables, setTables] = useState<Table[]>([]);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
@@ -170,7 +170,7 @@ export default function CartPage() {
 
   useEffect(() => {
     fetchJson<{ shopName?: string; logoUrl?: string | null }>('/api/settings/branding')
-      .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
+      .then((d) => setBranding({ shopName: d.shopName ?? 'Pebot', logoUrl: d.logoUrl ?? null }))
       .catch((e) => console.error('Failed to load branding, using defaults:', e));
   }, []);
 
@@ -503,7 +503,7 @@ export default function CartPage() {
       try {
         const existing = JSON.parse(localStorage.getItem('cafe_orders') || '[]');
         const vouchersUsedText = loyaltyVouchers && loyaltyVouchers.codes && loyaltyVouchers.codes.length > 0 
-          ? ` with ${loyaltyVouchers.codes.length} free coffee${loyaltyVouchers.codes.length > 1 ? 's' : ''}`
+          ? ` with ${loyaltyVouchers.codes.length} free item${loyaltyVouchers.codes.length > 1 ? 's' : ''}`
           : '';
         existing.unshift({
           orderNumber: data.orderNumber,

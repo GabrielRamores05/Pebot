@@ -187,7 +187,7 @@ const [calcLoading, setCalcLoading] = useState(false);
 const [calcSearch, setCalcSearch] = useState('');
 const [calcSortToggle, setCalcSortToggle] = useState<'name' | 'name-desc'>('name');
 const invoiceRef = useRef<HTMLDivElement>(null);
-const [shopName, setShopName] = useState('CafeOS');
+const [shopName, setShopName] = useState('Pebot');
 
   // Purchase history UI removed — superseded by the Stock History page
 

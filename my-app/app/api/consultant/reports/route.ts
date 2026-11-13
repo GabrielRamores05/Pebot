@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
         };
 
         csvContent = [
-          ['Customer', 'Loyalty Points', 'Paid Coffees', 'Active Vouchers'].join(','),
+          ['Customer', 'Loyalty Points', 'Stamps', 'Active Vouchers'].join(','),
           ...cards.map((c) =>
             [
               `"${c.customerName}"`,

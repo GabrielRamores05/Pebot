@@ -9,7 +9,7 @@ interface BrandingState {
 }
 
 export default function HomePage() {
-  const [branding, setBranding] = useState<BrandingState>({ shopName: 'CaféOS', logoUrl: null });
+  const [branding, setBranding] = useState<BrandingState>({ shopName: 'Pebot', logoUrl: null });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -17,16 +17,16 @@ export default function HomePage() {
     fetch('/api/settings/branding')
       .then((r) => r.json())
       .then((d) => {
-        setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null });
+        setBranding({ shopName: d.shopName ?? 'Pebot', logoUrl: d.logoUrl ?? null });
       })
       .catch(() => {
-        setBranding({ shopName: 'CaféOS', logoUrl: null });
+        setBranding({ shopName: 'Pebot', logoUrl: null });
       });
   }, []);
 
   const featureCards = [
     { icon: '⚡', title: 'Live service', text: 'Track every order in real time from bar to table.' },
-    { icon: '☕', title: 'Smart coffee flow', text: 'Build faster sessions with faster menu decisions.' },
+    { icon: '🍽️', title: 'Faster ordering', text: 'Build faster sessions with faster menu decisions.' },
     { icon: '🎁', title: 'Rewards', text: 'Keep loyalty and promotions visible without friction.' },
   ];
 
@@ -44,11 +44,11 @@ export default function HomePage() {
               {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt="Shop Logo" className="h-full w-full rounded-2xl object-cover" />
               ) : (
-                '☕'
+                '🍽️'
               )}
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6c47]">CaféOS</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6c47]">Pebot</p>
               <h1 className="text-base font-bold tracking-tight text-stone-900">{branding.shopName}</h1>
             </div>
           </div>
@@ -70,7 +70,7 @@ export default function HomePage() {
             </h2>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-stone-600 sm:text-lg">
-              A refined café operating system for serving customers, managing live orders, rewards, and premium retail flow from one elegant command center.
+              A refined restaurant operating system for serving customers, managing live orders, rewards, and premium retail flow from one elegant command center.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">

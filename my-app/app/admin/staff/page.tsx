@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
 
-// CafeOS — Staff & HR (Philippine-friendly)
+// Pebot — Staff & HR (Philippine-friendly)
 // Tabs: Team · Schedule · Time Clock · Time Off · Payroll · Reviews · Documents · Training
 // Plus a plain-language Overview so the numbers make sense at a glance.
 
@@ -47,7 +47,7 @@ const PERMS: { key: keyof Permission; label: string; desc: string }[] = [
   { key: 'settings', label: 'Settings', desc: 'System configuration' },
 ];
 
-const POSITIONS = ['Barista', 'Cashier', 'Kitchen Staff', 'Shift Supervisor', 'Manager'];
+const POSITIONS = ['Cashier', 'Server', 'Cook', 'Kitchen Staff', 'Barista', 'Shift Supervisor', 'Manager'];
 const DEPARTMENTS = ['Front of House', 'Back of House', 'Management'];
 
 export default function StaffPage() {

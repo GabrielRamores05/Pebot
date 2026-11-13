@@ -337,7 +337,7 @@ export default function OrderHistoryPage() {
             {/* Invoice Header */}
             <div className="px-6 py-6 text-center border-b-2 border-dashed border-gray-200">
               <p className="text-[10px] font-bold uppercase tracking-widest text-accent-text">Official Receipt</p>
-              <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'CaféOS Coffee Shop'}</h2>
+              <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'My Restaurant'}</h2>
               {businessSettings?.businessAddress && (
                 <p className="text-[10px] text-gray-500 mt-1">{businessSettings.businessAddress}</p>
               )}
@@ -480,7 +480,7 @@ export default function OrderHistoryPage() {
                       <body>
                         <div class="header">
                           <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                          <h2>${bs?.businessName || 'CaféOS Coffee Shop'}</h2>
+                          <h2>${bs?.businessName || 'My Restaurant'}</h2>
                           ${bs?.businessAddress ? `<p>${bs?.businessAddress}</p>` : ''}
                           ${(bs?.tin || bs?.branchCode) ? `<p>TIN: ${bs?.tin || ''}${bs?.branchCode ? '-' + bs?.branchCode : ''}</p>` : ''}
                           <p>#${selectedOrder.orderNumber}</p>

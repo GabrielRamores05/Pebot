@@ -28,7 +28,7 @@ function MenuReviewsContent() {
     searchParams.get('productId') ? Number(searchParams.get('productId')) : null
   );
   const [branding, setBranding] = useState<{ shopName: string; logoUrl: string | null }>({
-    shopName: 'CaféOS',
+    shopName: 'Pebot',
     logoUrl: null,
   });
 
@@ -51,7 +51,7 @@ function MenuReviewsContent() {
   useEffect(() => {
     fetch('/api/settings/branding')
       .then((r) => r.json())
-      .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
+      .then((d) => setBranding({ shopName: d.shopName ?? 'Pebot', logoUrl: d.logoUrl ?? null }))
       .catch(() => {});
 
     fetch('/api/reviews')
@@ -82,7 +82,7 @@ function MenuReviewsContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-5xl mb-4 animate-bounce">☕</div>
+          <div className="text-5xl mb-4 animate-bounce">🍽️</div>
           <p className="text-amber-800 font-medium">Loading reviews...</p>
         </div>
       </div>
@@ -101,11 +101,11 @@ function MenuReviewsContent() {
               {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt="Shop Logo" className="h-full w-full object-cover" />
               ) : (
-                <span className="text-xl">☕</span>
+                <span className="text-xl">🍽️</span>
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a6c45]">Coffee bar</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a6c45]">Welcome to</p>
               <h1 className="text-[18px] font-bold -tracking-[0.3px] text-stone-900">{branding.shopName}</h1>
             </div>
           </div>
@@ -178,7 +178,7 @@ function MenuReviewsContent() {
                     />
                   ) : (
                     <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
-                      <span className="text-xl">☕</span>
+                      <span className="text-xl">🍽️</span>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">

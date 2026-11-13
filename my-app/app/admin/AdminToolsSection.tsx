@@ -9,8 +9,10 @@ import {
 
 // Account & tools section — lives in Settings ▸ Tools. Everything that used
 // to sit at the bottom of the sidebar, so the nav stays short.
-export default function AdminToolsSection({ shopName = 'CaféOS', logoUrl }: { shopName?: string; logoUrl?: string | null }) {
+export default function AdminToolsSection({ shopName = 'Pebot', logoUrl }: { shopName?: string; logoUrl?: string | null }) {
   const router = useRouter();
+  // The restaurant's name goes into print-window HTML, so escape it.
+  const safeShopName = shopName.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const [user, setUser] = useState<{ name: string; role: string } | null>(null);
   const [showQR, setShowQR] = useState(false);
   const [showExitQR, setShowExitQR] = useState(false);
@@ -58,7 +60,7 @@ export default function AdminToolsSection({ shopName = 'CaféOS', logoUrl }: { s
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Customer QR Code - CaféOS</title>
+          <title>Customer QR Code - ${safeShopName}</title>
           <style>
             body { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; margin:0; font-family:Arial,sans-serif; background:white; }
             .qr-container { padding:20px; border:2px solid #000; border-radius:10px; background:white; margin:20px; }
@@ -68,7 +70,7 @@ export default function AdminToolsSection({ shopName = 'CaféOS', logoUrl }: { s
           </style>
         </head>
         <body>
-          <div class="title">Scan to Order - CaféOS</div>
+          <div class="title">Scan to Order - ${safeShopName}</div>
           <div class="qr-container">${qrElement.outerHTML}</div>
           <div class="url">${localIp}/menu</div>
         </body>
@@ -106,7 +108,7 @@ export default function AdminToolsSection({ shopName = 'CaféOS', logoUrl }: { s
       ctx.fillStyle = '#333';
       ctx.font = 'bold 16px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('Scan to Order - CaféOS', canvas.width / 2, 30);
+      ctx.fillText(`Scan to Order - ${shopName}`, canvas.width / 2, 30);
 
       ctx.font = '12px Arial';
       ctx.fillStyle = '#666';
@@ -117,7 +119,7 @@ export default function AdminToolsSection({ shopName = 'CaféOS', logoUrl }: { s
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = 'cafe-qr-code.png';
+          a.download = 'qr-code.png';
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -368,7 +370,7 @@ export default function AdminToolsSection({ shopName = 'CaféOS', logoUrl }: { s
                   const win = window.open('', '_blank', 'width=500,height=600');
                   if (!win) return;
                   win.document.write(`
-                    <html><head><title>Exit QR Code - CaféOS</title>
+                    <html><head><title>Exit QR Code - ${safeShopName}</title>
                     <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;margin:0}img{width:300px;height:300px}h2{margin-bottom:8px}p{color:#666;margin-top:4px;font-size:14px}</style>
                     </head><body>
                     <h2>🚪 Exit QR</h2>

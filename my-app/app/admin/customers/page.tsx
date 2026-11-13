@@ -304,7 +304,7 @@ export default function CustomerLoyaltyTiers() {
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-slate-600">
                           <div className="inline-flex gap-1">
-                            <span title="Coffee Progress">{customer.coffeeProgress}/9 ☕</span>
+                            <span title="Loyalty stamps">{customer.coffeeProgress}/9 stamps</span>
                             <span title="Vouchers Redeemed">({customer.vouchersRedeemed}/{customer.vouchersIssued} 🎁)</span>
                           </div>
                         </td>

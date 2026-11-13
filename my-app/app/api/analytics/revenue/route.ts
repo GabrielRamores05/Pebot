@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { unauthorized, serverError } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
+import { loyaltyCoveredValue } from '@/lib/loyalty-utils';
+import { findLoyaltySettingsWithCategory } from '@/modules/loyalty/repository';
 
 interface RevenueMetrics {
   totalRevenue: number;
@@ -113,14 +115,12 @@ export async function GET(req: NextRequest) {
 
     // Loyalty impact
     const loyaltyOrders = orders.filter(o => o.loyaltyPromo);
-    const loyaltyRevenueImpact = loyaltyOrders.reduce((sum, o) => {
-      // Approximate discount: find coffee products and estimate
-      const coffeeItems = o.items.filter(item => 
-        item.product.category?.name?.toLowerCase() === 'coffee'
-      );
-      const coffeeDiscount = coffeeItems.reduce((s, item) => s + (item.unitPrice * item.quantity), 0);
-      return sum + coffeeDiscount;
-    }, 0);
+    // Estimate: the value of the items the loyalty program covers on those orders.
+    const loyaltySettings = loyaltyOrders.length > 0 ? await findLoyaltySettingsWithCategory() : [];
+    const loyaltyRevenueImpact = loyaltyOrders.reduce(
+      (sum, o) => sum + loyaltyCoveredValue(o.items, loyaltySettings),
+      0,
+    );
 
     // Payment methods
     const paymentMethods: { method: string; amount: number; count: number }[] = [];

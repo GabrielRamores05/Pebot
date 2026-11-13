@@ -1,4 +1,4 @@
-// Stroke-only SVG icon components for CafeOS UI
+// Stroke-only SVG icon components for Pebot UI
 // All icons use stroke, no fill. Default size 20x20, strokeWidth 1.75.
 
 type IconProps = { size?: number; strokeWidth?: number; className?: string };

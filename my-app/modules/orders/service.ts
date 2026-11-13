@@ -91,7 +91,7 @@ export async function ingestTabletOrder(payload: Record<string, unknown>) {
   for (const raw of rawItems) {
     const product = productByName.get(String(raw.productName ?? ''));
     if (!product) {
-      throw setErrorStatus(new Error(`Product "${String(raw.productName ?? '')}" is not on the café menu`), 409);
+      throw setErrorStatus(new Error(`Product "${String(raw.productName ?? '')}" is not on the menu`), 409);
     }
     const quantity = Number(raw.quantity);
     if (!Number.isInteger(quantity) || quantity <= 0) {

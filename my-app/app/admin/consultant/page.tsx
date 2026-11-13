@@ -14,7 +14,7 @@ interface ChatMessage {
 
 export default function ConsultantPage() {
   const [user, setUser] = useState<any>(null);
-  const [branding, setBranding] = useState<BrandingState>({ shopName: 'CaféOS', logoUrl: null });
+  const [branding, setBranding] = useState<BrandingState>({ shopName: 'Pebot', logoUrl: null });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,13 +39,13 @@ export default function ConsultantPage() {
 
     fetch('/api/settings/branding')
       .then((r) => r.json())
-      .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
+      .then((d) => setBranding({ shopName: d.shopName ?? 'Pebot', logoUrl: d.logoUrl ?? null }))
       .catch(() => {});
 
     setMessages([
       {
         role: 'assistant',
-        content: "Hello! I'm CaféOS Assistant — your AI consultant for coffee shop management. You can ask me about orders, inventory, staffing, sales strategies, or anything else about running your café. What would you like to discuss today?",
+        content: "Hello! I'm Pebot Assistant — your AI consultant for restaurant management. You can ask me about orders, inventory, staffing, sales strategies, or anything else about running your restaurant. What would you like to discuss today?",
       },
     ]);
   }, []);
@@ -104,7 +104,7 @@ export default function ConsultantPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">{branding.shopName} Consultant</h1>
-            <p className="text-sm text-gray-500">AI-powered assistant for your café</p>
+            <p className="text-sm text-gray-500">AI-powered assistant for your restaurant</p>
           </div>
         </div>
       </header>

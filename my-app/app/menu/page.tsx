@@ -287,7 +287,7 @@ function MyLoyaltyCardPanel({ onClose }: { onClose: () => void }) {
                 <span className="text-4xl">💳</span>
               </div>
               <p className="text-gray-800 font-medium mb-2">{settings?.cardTitle || 'Register for Loyalty Rewards'}</p>
-              <p className="text-gray-500 text-sm mb-6">{settings?.cardDescription || 'Earn 1 free coffee item for every 10 purchases'}</p>
+              <p className="text-gray-500 text-sm mb-6">{settings?.cardDescription || 'Earn 1 free item for every 10 purchases'}</p>
               <input
                 type="text"
                 value={inputName}
@@ -343,7 +343,7 @@ function MyLoyaltyCardPanel({ onClose }: { onClose: () => void }) {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-3xl">☕</span>
+                <span className="text-3xl">🍽️</span>
               </div>
               <p className="text-gray-500 text-sm">Loading...</p>
             </div>
@@ -376,7 +376,7 @@ function MyLoyaltyCardPanel({ onClose }: { onClose: () => void }) {
                     </div>
                     <div className="flex items-center justify-center gap-3 mb-4 relative z-10">
                       <div className="w-12 h-12 bg-white/20 backdrop-blur-xl rounded-xl flex items-center justify-center shadow-inner">
-                        <span className="text-2xl">☕</span>
+                        <span className="text-2xl">⭐</span>
                       </div>
                       <div className="text-4xl font-bold">{card.progress}/{card.coffeesRequiredForFree}</div>
                     </div>
@@ -730,7 +730,7 @@ interface ProductOptionGroupDTO {
 function MenuPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [branding, setBranding] = useState({ shopName: 'CaféOS', logoUrl: null as string | null });
+  const [branding, setBranding] = useState({ shopName: 'Pebot', logoUrl: null as string | null });
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<number | 'all' | null>('all');
   const [tableFromQr, setTableFromQr] = useState<string | null>(null);
@@ -775,7 +775,7 @@ function MenuPageInner() {
   useEffect(() => {
     fetch('/api/settings/branding')
       .then((r) => r.json())
-      .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
+      .then((d) => setBranding({ shopName: d.shopName ?? 'Pebot', logoUrl: d.logoUrl ?? null }))
       .catch(() => {});
   }, []);
 
@@ -1383,7 +1383,7 @@ function MenuPageInner() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="text-5xl animate-pulse">☕</div>
+          <div className="text-5xl animate-pulse">🍽️</div>
           <p className="text-gray-500 font-medium text-sm">Loading...</p>
         </div>
       </div>
@@ -1428,7 +1428,7 @@ function MenuPageInner() {
                       setEntryError('');
                     }}
                     onKeyPress={(e) => e.key === 'Enter' && handleTableEntry()}
-                    placeholder="Juan, Anna, Coffee Lover..."
+                    placeholder="Juan, Anna, Foodie..."
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black"
                     autoFocus
                   />
@@ -1485,7 +1485,7 @@ function MenuPageInner() {
                     type="text"
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
-                    placeholder="Juan, Anna, Coffee Lover..."
+                    placeholder="Juan, Anna, Foodie..."
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                   />
                 </div>
@@ -1516,7 +1516,7 @@ function MenuPageInner() {
                     value={guestMoodNote}
                     onChange={(e) => setGuestMoodNote(e.target.value)}
                     rows={2}
-                    placeholder="e.g. Tired but excited for coffee!"
+                    placeholder="e.g. Hungry and excited!"
                     className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black resize-none"
                   />
                 </div>
@@ -1594,7 +1594,7 @@ function MenuPageInner() {
                     value={guestMoodNote}
                     onChange={(e) => setGuestMoodNote(e.target.value)}
                     rows={2}
-                    placeholder="e.g. Tired but excited for coffee!"
+                    placeholder="e.g. Hungry and excited!"
                     className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                   />
                 </div>
@@ -1660,11 +1660,11 @@ function MenuPageInner() {
                 {branding.logoUrl ? (
                   <img src={branding.logoUrl} alt="Shop Logo" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-xl">☕</span>
+                  <span className="text-xl">🍽️</span>
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a6c45]">Coffee bar</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a6c45]">Welcome to</p>
                 <h1 className="text-[18px] font-bold -tracking-[0.3px] text-stone-900">{branding.shopName}</h1>
               </div>
             </div>
@@ -2147,7 +2147,7 @@ function MenuPageInner() {
                   <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-[#e9dcc8] bg-[#faf5ee] p-6 text-center">
                     <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm">🛒</div>
                     <p className="text-base font-semibold text-stone-800">Your cart is empty</p>
-                    <p className="mt-2 text-sm text-stone-500">Add a few café favorites to start checkout.</p>
+                    <p className="mt-2 text-sm text-stone-500">Add a few favorites to start checkout.</p>
                   </div>
                 ) : (
                   cartStore.items.map((item) => (

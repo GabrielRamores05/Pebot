@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [branding, setBranding] = useState<BrandingState>({ shopName: 'CaféOS', logoUrl: null });
+  const [branding, setBranding] = useState<BrandingState>({ shopName: 'Pebot', logoUrl: null });
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setMounted(true);
     fetch('/api/settings/branding')
       .then((r) => r.json())
-      .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
+      .then((d) => setBranding({ shopName: d.shopName ?? 'Pebot', logoUrl: d.logoUrl ?? null }))
       .catch(() => {});
   }, []);
 
@@ -68,21 +68,21 @@ export default function LoginPage() {
               {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt="Logo" className="h-full w-full rounded-2xl object-cover" />
               ) : (
-                '☕'
+                '🍽️'
               )}
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5c39d]">CaféOS</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5c39d]">Pebot</p>
               <h2 className="text-xl font-bold">{branding.shopName}</h2>
             </div>
           </div>
 
           <h1 className="max-w-md text-4xl font-black tracking-[-0.07em] text-white">
-            Run your coffee bar with precision.
+            Run your restaurant with precision.
           </h1>
 
           <p className="mt-5 max-w-md text-base leading-7 text-stone-300">
-            Bring service, loyalty, kitchen flow, and sales into one premium command center designed for busy café teams.
+            Bring service, loyalty, kitchen flow, and sales into one premium command center designed for busy restaurant teams.
           </p>
 
           <div className="mt-8 space-y-3">
@@ -106,7 +106,7 @@ export default function LoginPage() {
               {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt="Logo" className="h-full w-full rounded-[22px] object-cover" />
               ) : (
-                '☕'
+                '🍽️'
               )}
             </div>
           </div>
@@ -124,7 +124,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@cafe.com"
+                placeholder="you@restaurant.com"
                 required
                 className="w-full rounded-2xl border border-[#ebddc4] bg-[#faf5ee] px-4 py-3.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-[#d0ab79] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#f2dfc0]/60"
               />

@@ -92,7 +92,7 @@
   --shadow-modal: 0 8px 30px rgba(28,25,23,0.12);
 
   /* -------------------------------------------------------------------------
-     CaféOS admin design system (adapted from the "Coffer" template)
+     Pebot admin design system (adapted from the "Coffer" template)
      Neutral graphite/navy accents, hairline borders, soft shadows.
      ------------------------------------------------------------------------- */
   --a-950: #05070b;
@@ -134,7 +134,7 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
-  /* CaféOS admin tokens exposed as Tailwind utilities
+  /* Pebot admin tokens exposed as Tailwind utilities
      (bg-page, text-ink, border-hair, bg-card, text-muted, bg-accent, ...) */
   --color-page: var(--c-page);
   --color-panel: var(--c-panel);
@@ -177,7 +177,7 @@
   --color-slate-900: #05070b;
 }
 
-/* CaféOS admin primitives — mirror the Coffer component conventions */
+/* Pebot admin primitives — mirror the Coffer component conventions */
 @layer components {
   .c-card {
     border-radius: var(--c-r-lg);

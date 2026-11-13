@@ -38,17 +38,17 @@ export async function POST(req: NextRequest) {
     try {
       zip = await JSZip.loadAsync(bytes);
     } catch {
-      return badRequest('Failed to restore backup. The selected file is not a valid CafeOS backup.');
+      return badRequest('Failed to restore backup. The selected file is not a valid Pebot backup.');
     }
 
     const dbEntry = zip.file('dev.db');
     if (!dbEntry) {
-      return badRequest('Failed to restore backup. The selected file is not a valid CafeOS backup.');
+      return badRequest('Failed to restore backup. The selected file is not a valid Pebot backup.');
     }
 
     const dbData = await dbEntry.async('nodebuffer');
     if (!looksLikeSqlite(dbData)) {
-      return badRequest('Failed to restore backup. The selected file is not a valid CafeOS backup.');
+      return badRequest('Failed to restore backup. The selected file is not a valid Pebot backup.');
     }
 
     // Resolve the active database path (respects DATABASE_URL set by main.js)
