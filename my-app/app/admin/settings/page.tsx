@@ -55,6 +55,10 @@ export default function SettingsPage() {
   const [footerMessage, setFooterMessage] = useState('Thank you for your visit!');
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(true);
   const [studentPwdDiscountRate, setStudentPwdDiscountRate] = useState(20);
+  // Spec 017: VAT registration and service charge
+  const [vatRegistered, setVatRegistered] = useState(true);
+  const [serviceChargeRate, setServiceChargeRate] = useState(0);
+  const [serviceChargeOrderTypes, setServiceChargeOrderTypes] = useState<string[]>(['DINE_IN']);
   // Payment method settings
   const [gcashAccountName, setGcashAccountName] = useState('');
   const [gcashQrImage, setGcashQrImage] = useState<string | null>(null);
@@ -136,6 +140,9 @@ export default function SettingsPage() {
           setFooterMessage(d.footerMessage || 'Thank you for your visit!');
           setLoyaltyEnabled(d.loyaltyEnabled ?? true);
           setStudentPwdDiscountRate(d.studentPwdDiscountRate != null ? Number(d.studentPwdDiscountRate) : 20);
+          setVatRegistered(d.vatRegistered ?? true);
+          setServiceChargeRate(d.serviceChargeRate != null ? Number(d.serviceChargeRate) : 0);
+          setServiceChargeOrderTypes(String(d.serviceChargeOrderTypes || 'DINE_IN').split(',').filter(Boolean));
           setGcashAccountName(d.gcashAccountName || '');
           setGcashQrImage(d.gcashQrImage || null);
           setPaymayaAccountName(d.paymayaAccountName || '');
@@ -168,6 +175,9 @@ export default function SettingsPage() {
           footerMessage: footerMessage || 'Thank you for your visit!',
           loyaltyEnabled,
           studentPwdDiscountRate: studentPwdDiscountRate != null ? Number(studentPwdDiscountRate) : 20,
+          vatRegistered,
+          serviceChargeRate: Number(serviceChargeRate) || 0,
+          serviceChargeOrderTypes: serviceChargeOrderTypes.join(','),
           gcashAccountName: gcashAccountName || null,
           gcashQrImage: gcashQrImage || null,
           paymayaAccountName: paymayaAccountName || null,
@@ -515,9 +525,58 @@ export default function SettingsPage() {
               </select>
             </div>
 
-            {/* Student / PWD Discount Rate */}
+            {/* VAT registration (spec 017) */}
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Student / PWD Discount Rate (%)</label>
+              <label className="flex items-center gap-3 text-sm font-medium text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={vatRegistered}
+                  onChange={(e) => setVatRegistered(e.target.checked)}
+                  className="h-4 w-4 accent-amber-600"
+                />
+                VAT-registered business
+              </label>
+              <p className="text-gray-500 text-xs mt-1">
+                Turn off if you are not VAT-registered. Senior Citizen and PWD discounts then take 20% off the price without removing VAT.
+              </p>
+            </div>
+
+            {/* Service charge (spec 017) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Service Charge (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={serviceChargeRate}
+                onChange={(e) => setServiceChargeRate(parseFloat(e.target.value) || 0)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
+                placeholder="0"
+              />
+              <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
+                {[['DINE_IN', 'Dine-in'], ['TAKEOUT', 'Takeout'], ['DELIVERY', 'Delivery']].map(([type, label]) => (
+                  <label key={type} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={serviceChargeOrderTypes.includes(type)}
+                      onChange={(e) =>
+                        setServiceChargeOrderTypes((prev) =>
+                          e.target.checked ? [...prev, type] : prev.filter((t) => t !== type),
+                        )
+                      }
+                      className="h-4 w-4 accent-amber-600"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-gray-500 text-xs mt-1">0 turns it off. Added after discounts, as its own line on the bill.</p>
+            </div>
+
+            {/* Student Discount Rate (Senior/PWD is fixed at 20% by law) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Student Discount Rate (%)</label>
               <input
                 type="number"
                 min={0}
@@ -528,7 +587,7 @@ export default function SettingsPage() {
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
                 placeholder="20"
               />
-              <p className="text-gray-500 text-xs mt-1">Statutory discount applied via the terminal&apos;s Student/PWD button (e.g., 20 for 20%).</p>
+              <p className="text-gray-500 text-xs mt-1">Used by the terminal&apos;s Student button. Senior Citizen and PWD are fixed at 20% with VAT removed, as the law requires.</p>
             </div>
 
             {/* Receipt Prefix */}
