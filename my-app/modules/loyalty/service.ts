@@ -132,7 +132,7 @@ export async function registerCustomer(input: unknown) {
 
   if (isMilestoneMode && milestones.length > 0) {
     coffeesRequired = Math.max(...milestones.map((m: any) => m.target));
-    message = `Welcome! Complete ${milestones.length} milestones up to ${coffeesRequired} coffees to earn multiple rewards!`;
+    message = `Welcome! Complete ${milestones.length} milestones up to ${coffeesRequired} stamps to earn multiple rewards!`;
   } else {
     const rewardType = settings?.rewardType || 'FREE';
     const rewardValue = settings?.rewardValue || 0;
@@ -141,7 +141,7 @@ export async function registerCustomer(input: unknown) {
       : rewardType === 'PERCENTAGE'
         ? `${rewardValue}% off`
         : `₱${rewardValue} off`;
-    message = `Welcome to our loyalty program! Every ${coffeesRequired} coffees earns you ${rewardStr} on your next order!`;
+    message = `Welcome to our loyalty program! Every ${coffeesRequired} stamps earns you ${rewardStr} on your next order!`;
   }
 
   return {

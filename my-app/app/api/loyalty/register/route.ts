@@ -71,12 +71,12 @@ export async function POST(req: NextRequest) {
     
     if (isMilestoneMode && milestones.length > 0) {
       coffeesRequired = Math.max(...milestones.map(m => m.target));
-      message = `Welcome! Complete ${milestones.length} milestones up to ${coffeesRequired} coffees to earn multiple rewards!`;
+      message = `Welcome! Complete ${milestones.length} milestones up to ${coffeesRequired} stamps to earn multiple rewards!`;
     } else {
       const rewardType = settings?.rewardType || 'FREE';
       const rewardValue = settings?.rewardValue || 0;
       const rewardStr = rewardType === 'FREE' ? 'a free item' : rewardType === 'PERCENTAGE' ? `${rewardValue}% off` : `₱${rewardValue} off`;
-      message = `Welcome to our loyalty program! Every ${coffeesRequired} coffees earns you ${rewardStr} on your next order!`;
+      message = `Welcome to our loyalty program! Every ${coffeesRequired} stamps earns you ${rewardStr} on your next order!`;
     }
 
     return NextResponse.json({

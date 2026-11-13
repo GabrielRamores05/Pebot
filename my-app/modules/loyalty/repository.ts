@@ -288,7 +288,7 @@ export async function createLoyaltyVoucher(
       cardId: data.cardId ?? null,
       discountType: data.discountType ?? 'FREE',
       discountValue: data.discountValue ?? 0,
-      rewardName: data.rewardName ?? 'Free Coffee',
+      rewardName: data.rewardName ?? 'Free Item',
       minPurchase: data.minPurchase ?? 0,
       maxRedemptions: data.maxRedemptions ?? 1,
       usedCount: data.usedCount ?? 0,

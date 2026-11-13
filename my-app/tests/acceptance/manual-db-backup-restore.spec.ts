@@ -106,6 +106,6 @@ test('rejects an invalid backup file', async ({ page }) => {
   await fileChooser.setFiles('tests/fixtures/invalid-backup.zip')
 
   await expect(
-    page.getByText('Failed to restore backup. The selected file is not a valid CafeOS backup.')
+    page.getByText('Failed to restore backup. The selected file is not a valid Pebot backup.')
   ).toBeVisible()
 })

@@ -1,5 +1,5 @@
 /**
- * CaféOS – Electron Main Process
+ * Pebot – Electron Main Process
  *
  * Production paths (asar: false, electron-builder):
  *   resources/app/               ← files bundle (.next, node_modules, server.js, etc.)
@@ -13,6 +13,15 @@ const { spawn } = require('child_process');
 const http = require('http');
 const fs = require('fs');
 const crypto = require('crypto');
+
+// ─── Keep existing data after the CaféOS → Pebot rename (spec 016, constitution VII) ──
+// Must run before anything reads app.getPath('userData').
+try {
+  const { pickUserDataDir } = require('./legacy-user-data.js');
+  const current = app.getPath('userData');
+  const picked = pickUserDataDir({ current, appData: app.getPath('appData'), exists: fs.existsSync });
+  if (picked !== current) app.setPath('userData', picked);
+} catch (_) {}
 
 const PORT = 3000;
 const isDev = !app.isPackaged;
@@ -386,7 +395,7 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    title: 'CafeOS',
+    title: 'Pebot',
     backgroundColor: '#92400e',
     show: false,
     webPreferences: {
@@ -420,7 +429,7 @@ function openLogWindow() {
     height: 600,
     minWidth: 600,
     minHeight: 400,
-    title: 'CafeOS - Console Log',
+    title: 'Pebot - Console Log',
     backgroundColor: '#1e1e1e',
     show: false,
     webPreferences: {
@@ -435,7 +444,7 @@ function openLogWindow() {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>CafeOS Console Log</title>
+  <title>Pebot Console Log</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -520,7 +529,7 @@ function openLogWindow() {
 </head>
 <body>
   <div class="header">
-    <h1>📋 CafeOS Console Log</h1>
+    <h1>📋 Pebot Console Log</h1>
     <div class="controls">
       <span id="status" class="status">Loading...</span>
       <button id="autoRefreshBtn" class="btn btn-secondary" onclick="toggleAutoRefresh()">Auto-refresh: ON</button>
@@ -642,17 +651,17 @@ function createTray() {
     : nativeImage.createEmpty();
 
   tray = new Tray(icon);
-  tray.setToolTip('CafeOS - POS System');
+  tray.setToolTip('Pebot - POS System');
 
   const menu = Menu.buildFromTemplate([
-    { label: 'Open CafeOS',   click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    { label: 'Open Pebot',   click: () => { mainWindow?.show(); mainWindow?.focus(); } },
     { type: 'separator' },
     { label: 'Admin POS',     click: () => mainWindow?.loadURL(`http://localhost:${PORT}/admin`) },
     { label: 'Kitchen',       click: () => mainWindow?.loadURL(`http://localhost:${PORT}/kitchen`) },
     { label: 'Customer Menu', click: () => mainWindow?.loadURL(`http://localhost:${PORT}/menu`) },
     { label: 'Analytics',     click: () => mainWindow?.loadURL(`http://localhost:${PORT}/admin/analytics`) },
     { type: 'separator' },
-    { label: 'Quit CafeOS',   role: 'quit' },
+    { label: 'Quit Pebot',   role: 'quit' },
   ]);
 
   tray.setContextMenu(menu);
@@ -663,7 +672,7 @@ function createTray() {
 function buildAppMenu() {
   const template = [
     {
-      label: 'CafeOS',
+      label: 'Pebot',
       submenu: [
         { label: 'Home',          click: () => mainWindow?.loadURL(`http://localhost:${PORT}`) },
         { label: 'Customer Menu', click: () => mainWindow?.loadURL(`http://localhost:${PORT}/menu`) },
@@ -703,7 +712,7 @@ function buildAppMenu() {
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
-  log('CafeOS starting... isDev=' + isDev);
+  log('Pebot starting... isDev=' + isDev);
   log('execPath: ' + process.execPath);
   log('resourcesPath: ' + (process.resourcesPath || 'N/A'));
 
@@ -714,7 +723,7 @@ app.whenReady().then(async () => {
   } catch (err) {
     log('FATAL: Database migration failed: ' + err.message);
     dialog.showErrorBox(
-      'CafeOS - Database Migration Error',
+      'Pebot - Database Migration Error',
       `Failed to migrate database:\n${err.message}\n\nSee log file:\n${LOG_FILE}`
     );
     app.quit();
@@ -727,7 +736,7 @@ app.whenReady().then(async () => {
   } catch (err) {
     log('FATAL: Database seeding failed: ' + err.message);
     dialog.showErrorBox(
-      'CafeOS - Database Seeding Error',
+      'Pebot - Database Seeding Error',
       `Failed to seed database:\n${err.message}\n\nSee log file:\n${LOG_FILE}`
     );
     app.quit();
@@ -751,7 +760,7 @@ app.whenReady().then(async () => {
       align-items:center;justify-content:center;height:100vh;margin:0;
       font-family:sans-serif;color:white;user-select:none">
       <div style="font-size:72px;margin-bottom:8px">&#x2615;</div>
-      <h1 style="margin:0 0 8px;font-size:26px;font-weight:700">CafeOS</h1>
+      <h1 style="margin:0 0 8px;font-size:26px;font-weight:700">Pebot</h1>
       <p style="opacity:0.8;margin:0;font-size:14px">Starting server, please wait...</p>
     </body></html>`);
 
@@ -761,7 +770,7 @@ app.whenReady().then(async () => {
     log('FATAL: ' + err.message);
     const logPath = LOG_FILE;
     dialog.showErrorBox(
-      'CafeOS - Startup Error',
+      'Pebot - Startup Error',
       `Failed to start server:\n${err.message}\n\nSee log file:\n${logPath}`
     );
     app.quit();

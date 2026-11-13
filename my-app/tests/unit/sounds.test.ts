@@ -263,7 +263,7 @@ describe('announcements', () => {
     await vi.runAllTimersAsync();
 
     const spoken = synth.speak.mock.calls[0][0] as FakeUtterance;
-    expect(spoken.text).toContain('CaféOS');
+    expect(spoken.text).toContain('Pebot');
     expect(spoken.voice).toBeNull();
   });
 

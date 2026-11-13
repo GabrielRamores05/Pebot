@@ -15,7 +15,7 @@ export async function GET() {
     // Create default settings if none exist
     if (!settings) {
       settings = await createBusinessSettings({
-        businessName: 'CaféOS Coffee Shop',
+        businessName: 'My Restaurant',
         businessAddress: '',
         tin: '',
         branchCode: '0000',
@@ -96,7 +96,7 @@ export async function PUT(req: NextRequest) {
     } else {
       settings = await prisma.businessSettings.create({
         data: {
-          businessName: String(businessName) || 'CaféOS Coffee Shop',
+          businessName: String(businessName) || 'My Restaurant',
           businessAddress: String(businessAddress) || '',
           tin: String(tin) || '',
           branchCode: String(branchCode) || '0000',
@@ -112,7 +112,7 @@ export async function PUT(req: NextRequest) {
           paymayaQrImage: paymayaQrImage ?? null,
           aiApiKey: aiApiKey ?? null,
           aiModel: aiModel ?? 'google/gemma-4-31b-it',
-          aiSystemPrompt: aiSystemPrompt ?? 'You are CaféOS Assistant, a helpful AI consultant for coffee shop management.',
+          aiSystemPrompt: aiSystemPrompt ?? 'You are Pebot Assistant, a helpful AI consultant for restaurant management.',
           aiFolderAccess: aiFolderAccess ?? false,
           aiReadBirPricing: aiReadBirPricing ?? false,
         },
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
       if (!settings) {
         settings = await prisma.businessSettings.create({
           data: {
-            businessName: 'CaféOS Coffee Shop',
+            businessName: 'My Restaurant',
             businessAddress: '',
             tin: '',
             branchCode: '0000',

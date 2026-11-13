@@ -49,8 +49,9 @@ support. It must stay fully offline (Principle I). The aim is to make an owner's
 
 ## Step 1: plan only, no code changes
 
-Scan the whole repo (my-app/ and cafeos-tablet/). Then write one plan document and stop for my
-approval. The plan must have:
+Scan my-app/ and tools/. The Android tablet app is a separate product in its own repository (it
+was removed from this repo on 2026-11-14) and is out of scope. Leave the server's tablet endpoints
+working as they are. Then write one plan document and stop for my approval. The plan must have:
 
 1. An inventory of current features, each tagged keep / upgrade / missing for restaurants.
    **No feature gets removed.** Upgrades only.
@@ -216,8 +217,7 @@ Mark the document "draft — for review by a Philippine lawyer before sale."
 
 ### G. Clean up unused code
 
-Find dead files, unused exports and unused dependencies (e.g. knip), in both my-app and
-cafeos-tablet. Remove them only when lint, tsc, tests and the build prove they're unused. Never
+Find dead files, unused exports and unused dependencies (e.g. knip) in my-app only. Remove them only when lint, tsc, tests and the build prove they're unused. Never
 remove a feature this way.
 
 ## Definition of done

@@ -156,7 +156,7 @@ export default function ExpensesPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Expenses</h1>
-              <p className="text-xs text-gray-500">Track your café expenses</p>
+              <p className="text-xs text-gray-500">Track your restaurant expenses</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

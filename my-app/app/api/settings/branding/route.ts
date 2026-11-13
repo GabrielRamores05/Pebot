@@ -14,7 +14,7 @@ export async function GET() {
   const logoUrl = rawLogoUrl && rawLogoUrl !== 'null' ? rawLogoUrl : null;
 
   return NextResponse.json({
-    shopName: map.shopName ?? 'CaféOS',
+    shopName: map.shopName ?? 'Pebot',
     logoUrl,
   });
 }

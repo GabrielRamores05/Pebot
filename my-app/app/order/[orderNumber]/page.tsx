@@ -200,7 +200,7 @@ function InvoiceDisplay({ order, branding }: { order: Order; branding: BrandingS
 
 export default function OrderStatusPage({ params }: { params: { orderNumber: string } }) {
   const { orderNumber } = params;
-  const [branding, setBranding] = useState<BrandingState>({ shopName: 'CaféOS', logoUrl: null });
+  const [branding, setBranding] = useState<BrandingState>({ shopName: 'Pebot', logoUrl: null });
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -231,7 +231,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
 
   useEffect(() => {
     fetchJson<{ shopName?: string; logoUrl?: string | null }>('/api/settings/branding')
-      .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
+      .then((d) => setBranding({ shopName: d.shopName ?? 'Pebot', logoUrl: d.logoUrl ?? null }))
       .catch((e) => console.error('Failed to load branding, using defaults:', e));
     // Pre-fetch voice settings so customer hears admin's custom messages
     fetchVoiceSettings();
@@ -487,7 +487,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4 animate-bounce">☕</div>
+          <div className="text-6xl mb-4 animate-bounce">🍽️</div>
           <p className="text-amber-800 font-medium">Loading your order...</p>
         </div>
       </div>

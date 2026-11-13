@@ -2,8 +2,8 @@
   "name": "cafeos",
   "version": "1.0.4",
   "private": true,
-  "description": "Enterprise QR Ordering & POS System for coffee shops",
-  "author": "CaféOS",
+  "description": "QR ordering and POS system for restaurants",
+  "author": "Pebot",
   "main": "electron/main.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=development HOME=C:\\Users\\Public\\cafeos-home USERPROFILE=C:\\Users\\Public\\cafeos-home APPDATA=C:\\Users\\Public\\cafeos-home\\AppData\\Roaming node --max-old-space-size=4096 server.js",
@@ -27,8 +27,8 @@
   },
   "build": {
     "appId": "com.cafeos.pos",
-    "productName": "CaféOS",
-    "copyright": "Copyright © 2026 CaféOS",
+    "productName": "Pebot",
+    "copyright": "Copyright © 2026 Pebot",
     "electronVersion": "40.7.0",
     "asar": false,
     "directories": {
@@ -106,7 +106,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "CaféOS POS",
+      "shortcutName": "Pebot",
       "license": "legal/pebot-license-agreement.txt"
     },
     "compression": "store"

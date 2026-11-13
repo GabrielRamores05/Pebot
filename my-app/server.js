@@ -204,7 +204,7 @@ app.prepare().then(() => {
       console.log(`[mDNS] Service registered as "SMART CafeOS" on ${os.hostname()}.local`);
 
       console.log('\n==================================================');
-      console.log('           CafeOS - LAN POS System               ');
+      console.log('            Pebot - LAN POS System               ');
       console.log('==================================================');
       console.log(`  Local:       http://localhost:${port}`);
       console.log(`  LAN IP:      http://${lanIp}:${port}`);

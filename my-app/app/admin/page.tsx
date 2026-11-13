@@ -547,7 +547,7 @@ export default function AdminPage() {
                             {unreadOrders.has(order.orderNumber) && (
                               <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
                             )}
-                            {order.loyaltyPromo && <span className="text-[9px]">☕</span>}
+                            {order.loyaltyPromo && <span className="text-[9px]">⭐</span>}
                             {order.paymentMethod && order.paymentMethod !== 'CASH' && (
                               <span className="text-[9px]">{order.paymentMethod === 'GCASH' ? '📱' : order.paymentMethod === 'PAYMAYA' ? '📱' : '💵'}</span>
                             )}
@@ -883,7 +883,7 @@ export default function AdminPage() {
               {/* Receipt Header */}
               <div className="px-4 py-4 text-center border-b-2 border-dashed border-gray-300 bg-gray-50 rounded-t-2xl">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-accent-text">Official Receipt</p>
-                <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'CaféOS Coffee Shop'}</h2>
+                <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'My Restaurant'}</h2>
                 {businessSettings?.businessAddress && (
                   <p className="text-[10px] text-gray-500 mt-1">{businessSettings.businessAddress}</p>
                 )}
@@ -1066,7 +1066,7 @@ export default function AdminPage() {
                           <body>
                             <div class="header">
                               <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                              <h2>${businessSettings?.businessName || 'CaféOS Coffee Shop'}</h2>
+                              <h2>${businessSettings?.businessName || 'My Restaurant'}</h2>
                               ${businessSettings?.businessAddress ? `<p>${businessSettings.businessAddress}</p>` : ''}
                               ${(businessSettings?.tin || businessSettings?.branchCode) ? `<p>TIN: ${businessSettings.tin || ''}${businessSettings?.branchCode ? '-' + businessSettings.branchCode : ''}</p>` : ''}
                               <p>#${selectedOrder.orderNumber}</p>

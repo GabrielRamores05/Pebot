@@ -32,7 +32,7 @@ export interface StationOrder {
 export type StationKey = 'coffee' | 'kitchen' | 'bar' | 'pastry' | 'general';
 
 export const STATIONS: { key: StationKey; icon: string; label: string; border: string; bg: string; badge: string }[] = [
-  { key: 'coffee',  icon: '☕', label: 'Coffee',  border: 'border-amber-500/50', bg: 'bg-amber-500/10', badge: 'bg-amber-500' },
+  { key: 'coffee',  icon: '☕', label: 'Drinks',  border: 'border-amber-500/50', bg: 'bg-amber-500/10', badge: 'bg-amber-500' },
   { key: 'kitchen', icon: '🍳', label: 'Kitchen', border: 'border-red-500/50',   bg: 'bg-red-500/10',   badge: 'bg-red-500' },
   { key: 'bar',     icon: '🥤', label: 'Bar',     border: 'border-blue-500/50',  bg: 'bg-blue-500/10',  badge: 'bg-blue-500' },
   { key: 'pastry',  icon: '🧁', label: 'Pastry',  border: 'border-pink-500/50',  bg: 'bg-pink-500/10',  badge: 'bg-pink-500' },

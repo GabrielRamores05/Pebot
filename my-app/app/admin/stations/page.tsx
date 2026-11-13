@@ -12,7 +12,7 @@ interface Station {
 }
 
 const STATION_META: Record<string, { icon: string; label: string; color: string }> = {
-  coffee:  { icon: '☕', label: 'Coffee Bar',  color: 'amber' },
+  coffee:  { icon: '☕', label: 'Drinks',  color: 'amber' },
   kitchen: { icon: '🍳', label: 'Kitchen',     color: 'red' },
   bar:     { icon: '🥤', label: 'Drinks Bar',  color: 'blue' },
   pastry:  { icon: '🧁', label: 'Pastry',      color: 'pink' },

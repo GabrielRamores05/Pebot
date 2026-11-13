@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { badRequest, notFound, serverError } from '@/lib/api-response';
 
 // POST /api/loyalty/vouchers/claim
-// Customer claims free coffee voucher (sequential system)
+// Customer claims a reward voucher (sequential system)
 // After claiming, progress resets to 0
 export async function POST(req: NextRequest) {
   try {
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       const progress = Math.min(card.paidCoffeesCount, coffeesRequired);
       const coffeesUntilFree = coffeesRequired - progress;
       return NextResponse.json({
-        error: `No free coffee available yet. You need ${coffeesUntilFree} more coffee(s).`,
+        error: `No reward available yet. You need ${coffeesUntilFree} more stamp(s).`,
         progress: progress,
         coffeesUntilFree: coffeesUntilFree,
         hasUnclaimedVoucher: false,
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       voucherCode: voucherCode,
       progressReset: true,
       newProgress: 0,
-      message: `Successfully claimed your free coffee! Progress reset to 0. Use your voucher (${voucherCode}) on your next order.`,
+      message: `Successfully claimed your reward! Progress reset to 0. Use your voucher (${voucherCode}) on your next order.`,
     });
   } catch (e) {
     return serverError(e, 'Failed to claim voucher');

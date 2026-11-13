@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       hasAccess: true,
-      businessName: settings?.businessName || 'CaféOS',
+      businessName: settings?.businessName || 'Pebot',
       businessInfo: {
         businessName: settings?.businessName,
         businessAddress: settings?.businessAddress,
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     const settings = await prisma.businessSettings.findFirst();
     const apiKey = settings?.aiApiKey;
     const model = overrideModel || settings?.aiModel || 'google/gemma-2-27b-it';
-    const systemPrompt = settings?.aiSystemPrompt || 'You are CaféOS Assistant, a helpful AI consultant for coffee shop management.';
+    const systemPrompt = settings?.aiSystemPrompt || 'You are Pebot Assistant, a helpful AI consultant for restaurant management.';
     const aiFolderAccess = settings?.aiFolderAccess ?? false;
 
     if (!apiKey) {
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     if (aiFolderAccess) {
       const context = await fetch(`${req.nextUrl.origin}/api/consultant/chat`, { headers: { cookie: req.headers.get('cookie') || '' } }).then((r) => r.ok ? r.json() : null);
       if (context && context.hasAccess) {
-        let businessContext = `You have access to the following business data for this coffee shop:\n\n`;
+        let businessContext = `You have access to the following business data for this restaurant:\n\n`;
         businessContext += `Business Name: ${context.businessName}\n\n`;
         businessContext += `Menu (${context.menu.length} items):\n${context.menu.map((p: any) => `- ${p.name} (₱${p.price}) - ${p.category}`).join('\n')}\n\n`;
 
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://caferep.app',
-        'X-Title': 'CaféOS Consultant',
+        'X-Title': 'Pebot Consultant',
       },
       body: JSON.stringify({
         model,

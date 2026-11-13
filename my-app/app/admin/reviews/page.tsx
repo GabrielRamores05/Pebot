@@ -182,7 +182,7 @@ export default function AdminReviewsPage() {
                         {review.product.imageUrl ? (
                           <img src={review.product.imageUrl} alt={review.product.name} className="w-8 h-8 rounded object-cover" />
                         ) : (
-                          <span className="text-xl">☕</span>
+                          <span className="text-xl">🍽️</span>
                         )}
                         <p className="text-gray-900 font-medium text-sm">{review.product.name}</p>
                       </div>

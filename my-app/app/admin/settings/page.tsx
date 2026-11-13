@@ -37,7 +37,7 @@ export default function SettingsPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   // Branding
-  const [shopName, setShopName] = useState('CaféOS');
+  const [shopName, setShopName] = useState('Pebot');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [brandingSaving, setBrandingSaving] = useState(false);
@@ -46,7 +46,7 @@ export default function SettingsPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   // BIR Business Settings
-  const [businessName, setBusinessName] = useState('CaféOS Coffee Shop');
+  const [businessName, setBusinessName] = useState('My Restaurant');
   const [businessAddress, setBusinessAddress] = useState('');
   const [tin, setTin] = useState('');
   const [branchCode, setBranchCode] = useState('0000');
@@ -63,7 +63,7 @@ export default function SettingsPage() {
   // AI Consultant settings
   const [aiApiKey, setAiApiKey] = useState('');
   const [aiModel, setAiModel] = useState('google/gemma-4-31b-it');
-  const [aiSystemPrompt, setAiSystemPrompt] = useState('You are CaféOS Assistant, a helpful AI consultant for coffee shop management.');
+  const [aiSystemPrompt, setAiSystemPrompt] = useState('You are Pebot Assistant, a helpful AI consultant for restaurant management.');
   const [aiFolderAccess, setAiFolderAccess] = useState(false);
   const [aiReadBirPricing, setAiReadBirPricing] = useState(false);
   const [businessSaving, setBusinessSaving] = useState(false);
@@ -105,7 +105,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchJson<{ shopName?: string; logoUrl?: string | null }>('/api/settings/branding')
       .then((d) => {
-        setShopName(d.shopName ?? 'CaféOS');
+        setShopName(d.shopName ?? 'Pebot');
         setLogoUrl(d.logoUrl ?? null);
       })
       .catch((e) => {
@@ -127,7 +127,7 @@ export default function SettingsPage() {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (d) {
-          setBusinessName(d.businessName || 'CaféOS Coffee Shop');
+          setBusinessName(d.businessName || 'My Restaurant');
           setBusinessAddress(d.businessAddress || '');
           setTin(d.tin || '');
           setBranchCode(d.branchCode || '0000');
@@ -142,7 +142,7 @@ export default function SettingsPage() {
           setPaymayaQrImage(d.paymayaQrImage || null);
           setAiApiKey(d.aiApiKey || '');
           setAiModel(d.aiModel || 'google/gemma-4-31b-it');
-          setAiSystemPrompt(d.aiSystemPrompt || 'You are CaféOS Assistant, a helpful AI consultant for coffee shop management.');
+          setAiSystemPrompt(d.aiSystemPrompt || 'You are Pebot Assistant, a helpful AI consultant for restaurant management.');
           setAiFolderAccess(d.aiFolderAccess ?? false);
           setAiReadBirPricing(d.aiReadBirPricing ?? false);
         }
@@ -159,7 +159,7 @@ export default function SettingsPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          businessName: businessName || 'CaféOS Coffee Shop',
+          businessName: businessName || 'My Restaurant',
           businessAddress: businessAddress || '',
           tin: tin || '',
           branchCode: branchCode || '0000',
@@ -380,7 +380,7 @@ export default function SettingsPage() {
                 <div className="w-20 h-20 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
                   {logoUrl
                     ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                    : <span className="text-3xl">☕</span>}
+                    : <span className="text-3xl">🍽️</span>}
                 </div>
                 <div className="flex flex-col gap-2">
                   <input
@@ -459,7 +459,7 @@ export default function SettingsPage() {
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-amber-500"
-                placeholder="CaféOS Coffee Shop"
+                placeholder="My Restaurant"
               />
             </div>
 

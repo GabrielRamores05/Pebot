@@ -1,7 +1,7 @@
 {
-  "name": "CaféOS – QR Ordering & POS System",
-  "short_name": "CaféOS",
-  "description": "Smart QR ordering and POS system for coffee shops and restaurants",
+  "name": "Pebot – QR Ordering & POS",
+  "short_name": "Pebot",
+  "description": "QR ordering and POS system for restaurants",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#92400e",

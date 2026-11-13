@@ -55,7 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [branding, setBranding] = useState<BrandingState>({ shopName: 'CaféOS', logoUrl: null });
+  const [branding, setBranding] = useState<BrandingState>({ shopName: 'Pebot', logoUrl: null });
   const [notifQueue, setNotifQueue] = useState<Array<{ orderNumber: string; customerName: string; tableName?: string; id: number }>>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -120,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     fetch('/api/settings/branding')
       .then((r) => r.json())
-      .then((d) => setBranding({ shopName: d.shopName ?? 'CaféOS', logoUrl: d.logoUrl ?? null }))
+      .then((d) => setBranding({ shopName: d.shopName ?? 'Pebot', logoUrl: d.logoUrl ?? null }))
       .catch(() => {});
 
     return () => {

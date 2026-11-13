@@ -22,6 +22,24 @@ export function voucherCode(...prefixParts: (string | number)[]): string {
   return [...prefixParts, issued, random].join('-');
 }
 
+/**
+ * Value of the items on an order that the loyalty program covers: the items in
+ * each enabled program's category, or every item when an enabled program covers
+ * the whole menu (no category). Used to estimate what rewards cost the business.
+ */
+export function loyaltyCoveredValue(
+  items: { unitPrice: number; quantity: number; product: { categoryId: number | null } }[],
+  settings: { enabled: boolean; categoryId: number | null }[],
+): number {
+  const enabled = settings.filter((s) => s.enabled);
+  if (enabled.length === 0) return 0;
+  const wholeMenu = enabled.some((s) => s.categoryId === null);
+  const covered = new Set(enabled.map((s) => s.categoryId));
+  return items
+    .filter((item) => wholeMenu || covered.has(item.product.categoryId))
+    .reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+}
+
 export function findOrCreateCardData(customerName: string, categoryId: number | null) {
   return {
     customerName: normalizeMemberName(customerName),

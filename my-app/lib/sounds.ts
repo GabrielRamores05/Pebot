@@ -147,7 +147,7 @@ async function speak(text: string) {
 
 /** Preview — speak arbitrary text with current settings */
 export async function previewVoice(text?: string) {
-  const defaultText = 'Hello! This is your CaféOS AI voice assistant.';
+  const defaultText = 'Hello! This is your Pebot AI voice assistant.';
   speak(text ?? defaultText);
 }
 

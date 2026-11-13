@@ -395,7 +395,7 @@ export default function AdminLoyaltyManagementPage() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-linear-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center text-xl shadow-sm">
-              ☕
+              ⭐
             </div>
             <div>
               <h1 className="text-xl font-semibold text-gray-900 -tracking-[0.3px]">Loyalty Program</h1>
@@ -459,7 +459,7 @@ export default function AdminLoyaltyManagementPage() {
                           <h3 className="font-bold text-gray-900">{s.cardTitle}</h3>
                           <p className="text-xs text-accent-text font-medium">Target: {s.categoryName}</p>
                           <p className="text-[10px] text-gray-400 mt-1">
-                            {s.isMilestoneMode ? 'Milestone Rewards' : `${s.coffeesRequiredForFree} coffees required`}
+                            {s.isMilestoneMode ? 'Milestone Rewards' : `${s.coffeesRequiredForFree} stamps required`}
                           </p>
                         </div>
                         <div className="flex gap-2">
@@ -734,7 +734,7 @@ export default function AdminLoyaltyManagementPage() {
                       : editingSettings.coffeesRequiredForFree) 
                     }).map((_, i) => (
                       <div key={i} className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border-2 ${i < 3 ? 'bg-white text-gray-900' : 'bg-transparent border-white/20'}`}>
-                        {editingSettings.isMilestoneMode && editingSettings.milestones.find(m => m.target === i + 1) ? '✨' : '☕'}
+                        {editingSettings.isMilestoneMode && editingSettings.milestones.find(m => m.target === i + 1) ? '✨' : '⭐'}
                       </div>
                     ))}
                   </div>
@@ -783,11 +783,11 @@ export default function AdminLoyaltyManagementPage() {
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 border border-amber-200/50 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                    <span className="text-lg">☕</span>
+                    <span className="text-lg">⭐</span>
                   </div>
                   <p className="text-gray-500 text-sm font-medium">{totalCoffees}</p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">Coffees Earned</p>
+                <p className="text-2xl font-bold text-gray-900">Stamps Earned</p>
               </div>
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 border border-green-200/50 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
@@ -836,7 +836,7 @@ export default function AdminLoyaltyManagementPage() {
             ) : filteredCards.length === 0 ? (
               <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-gray-200/50 p-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">☕</span>
+                  <span className="text-3xl">⭐</span>
                 </div>
                 <p className="text-gray-500 font-medium">No customers found</p>
                 <p className="text-gray-400 text-sm mt-1">Customers will appear here when they join the loyalty program</p>
@@ -989,7 +989,7 @@ export default function AdminLoyaltyManagementPage() {
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-gray-50 rounded-2xl p-4 text-center">
                         <p className="text-2xl font-bold text-gray-900">{selectedCard.coffeesCompleted}</p>
-                        <p className="text-xs text-gray-500 mt-1">Coffees</p>
+                        <p className="text-xs text-gray-500 mt-1">Stamps</p>
                       </div>
                       <div className="bg-amber-50 rounded-2xl p-4 text-center">
                         <p className="text-2xl font-bold text-accent-text">{selectedCard.rewardsAvailable}</p>
@@ -1023,7 +1023,7 @@ export default function AdminLoyaltyManagementPage() {
                       </div>
                       <p className="text-xs text-gray-400 mt-2">
                         {selectedCard.coffeesRequiredForFree - selectedCard.coffeesCompleted > 0 
-                          ? `${selectedCard.coffeesRequiredForFree - selectedCard.coffeesCompleted} more coffee${selectedCard.coffeesRequiredForFree - selectedCard.coffeesCompleted !== 1 ? 's' : ''} until reward`
+                          ? `${selectedCard.coffeesRequiredForFree - selectedCard.coffeesCompleted} more stamp${selectedCard.coffeesRequiredForFree - selectedCard.coffeesCompleted !== 1 ? 's' : ''} until reward`
                           : 'Reward available!'
                         }
 
@@ -1109,7 +1109,7 @@ export default function AdminLoyaltyManagementPage() {
                         />
                       </div>
                       <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
-                        <p className="text-xs text-accent-text">Adding points will increase the customer&apos;s coffee count. If they reach the reward threshold, a voucher will be generated automatically.</p>
+                        <p className="text-xs text-accent-text">Adding points will increase the customer&apos;s stamp count. If they reach the reward threshold, a voucher will be generated automatically.</p>
                       </div>
                     </div>
                     <div className="p-6 border-t border-gray-100 flex gap-3">

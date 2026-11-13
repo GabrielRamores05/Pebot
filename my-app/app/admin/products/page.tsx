@@ -45,7 +45,7 @@ export default function Page() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<string | null>(null);
-  const [shopName, setShopName] = useState('CafeOS');
+  const [shopName, setShopName] = useState('Pebot');
   const [tab, setTab] = useState<'products'|'all'|'categories'|'options'>('products');
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState<'ALL' | number>('ALL');
@@ -915,7 +915,7 @@ export default function Page() {
                       ))
                     ) : (
                       <>
-                        <option value="coffee">☕ Coffee</option>
+                        <option value="coffee">☕ Drinks</option>
                         <option value="kitchen">🍳 Kitchen</option>
                         <option value="bar">🥤 Bar</option>
                         <option value="pastry">🧁 Pastry</option>

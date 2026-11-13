@@ -429,7 +429,7 @@ export default function PosTerminalPage() {
         } else {
           // Use defaults if not configured
           setBusinessSettings({
-            businessName: 'CaféOS Coffee Shop',
+            businessName: 'My Restaurant',
             businessAddress: '',
             tin: '',
             branchCode: '0000',
@@ -1071,7 +1071,7 @@ export default function PosTerminalPage() {
                             </p>
                           )}
                           <p className="mt-0.5 text-[10px] text-[var(--pos-ink-soft)]">
-                            ☕ {card.coffeesCompleted} coffees • 🎁 {card.rewardsAvailable} rewards
+                            {card.coffeesCompleted} stamps • 🎁 {card.rewardsAvailable} rewards
                           </p>
                         </div>
                         <span className="rounded-full bg-[var(--pos-accent-soft)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--pos-accent)]">
@@ -1405,7 +1405,7 @@ export default function PosTerminalPage() {
             {/* Receipt Header */}
             <div className="px-4 py-4 text-center border-b-2 border-dashed border-gray-300 bg-gray-50 rounded-t-2xl">
               <p className="text-[10px] font-bold uppercase tracking-widest text-accent-text">Official Receipt</p>
-              <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'CaféOS Coffee Shop'}</h2>
+              <h2 className="text-lg font-bold text-gray-900 mt-1">{businessSettings?.businessName || 'My Restaurant'}</h2>
               {businessSettings?.businessAddress && (
                 <p className="text-[10px] text-gray-500 mt-1">{businessSettings.businessAddress}</p>
               )}
@@ -1622,7 +1622,7 @@ export default function PosTerminalPage() {
                         <body>
                           <div class="header">
                             <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                            <h2>${businessSettings?.businessName || 'CaféOS Coffee Shop'}</h2>
+                            <h2>${businessSettings?.businessName || 'My Restaurant'}</h2>
                             ${businessSettings?.businessAddress ? `<p>${businessSettings.businessAddress}</p>` : ''}
                             ${(businessSettings?.tin || businessSettings?.branchCode) ? `<p>TIN: ${businessSettings.tin || ''}${businessSettings?.branchCode ? '-' + businessSettings.branchCode : ''}</p>` : ''}
         
@@ -1710,7 +1710,7 @@ export default function PosTerminalPage() {
                         <body>
                           <div class="header">
                             <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                            <h2>${escapeHtml(businessSettings?.businessName || 'CaféOS Coffee Shop')}</h2>
+                            <h2>${escapeHtml(businessSettings?.businessName || 'My Restaurant')}</h2>
                             ${businessSettings?.businessAddress ? `<p>${escapeHtml(businessSettings.businessAddress)}</p>` : ''}
                             ${(businessSettings?.tin || businessSettings?.branchCode) ? `<p>TIN: ${escapeHtml(businessSettings.tin || '')}${businessSettings?.branchCode ? '-' + escapeHtml(businessSettings.branchCode) : ''}</p>` : ''}
                             <p>#${escapeHtml(receipt.orderNumber)}</p>
