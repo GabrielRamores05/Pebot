@@ -11,6 +11,7 @@ function alertPrint(error?: string) {
 }
 
 import { useState, useEffect, useCallback } from 'react';
+import { downloadCsv } from '@/lib/csv';
 import { useRouter } from 'next/navigation';
 
 interface OrderItem {
@@ -159,8 +160,8 @@ export default function OrderHistoryPage() {
 
   if (loading || !authorized) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-950">
-        <div className="text-amber-400 text-lg">Loading order history...</div>
+      <div className="flex-1 flex items-center justify-center bg-page">
+        <div className="text-sm text-muted">Loading order history…</div>
       </div>
     );
   }
@@ -175,7 +176,26 @@ export default function OrderHistoryPage() {
             {orders.length > 0 && ` · showing ${Math.min(itemsPerPage, filteredOrders.length)} of ${filteredOrders.length}`}
           </p>
         </div>
-        <button onClick={fetchOrders} className="c-btn c-btn--ghost">Refresh</button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => downloadCsv('orders', filteredOrders, [
+              { label: 'Order', value: (o) => o.orderNumber },
+              { label: 'Date', value: (o) => new Date(o.createdAt).toLocaleString('en-PH') },
+              { label: 'Customer', value: (o) => o.loyaltyCustomerName || o.customerName },
+              { label: 'Type', value: (o) => o.orderType },
+              { label: 'Table', value: (o) => o.table?.name ?? '' },
+              { label: 'Status', value: (o) => o.status },
+              { label: 'Payment', value: (o) => o.paymentMethod },
+              { label: 'Items', value: (o) => o.items.map((i) => `${i.quantity}× ${i.product?.name ?? 'Item'}`).join('; ') },
+              { label: 'Total (PHP)', value: (o) => o.totalAmount.toFixed(2) },
+            ])}
+            disabled={filteredOrders.length === 0}
+            className="c-btn c-btn--ghost disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+          <button onClick={fetchOrders} className="c-btn c-btn--ghost">Refresh</button>
+        </div>
       </header>
 
       <div className="space-y-4 px-6 pb-8 pt-2">

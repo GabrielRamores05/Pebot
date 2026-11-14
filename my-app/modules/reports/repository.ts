@@ -33,3 +33,33 @@ export async function findBusinessIdentity() {
     select: { businessName: true, businessAddress: true, tin: true, vatRegistered: true },
   });
 }
+
+// ── Profit report (spec 022) ─────────────────────────────────────────────
+export async function findOrdersForProfit(locationId: number, from: Date, to: Date) {
+  return prisma.order.findMany({
+    where: { locationId, createdAt: { gte: from, lt: to } },
+    select: { status: true, paidAt: true, totalAmount: true, refundAmount: true, serviceCharge: true },
+  });
+}
+
+/** USAGE and ADJUSTMENT ledger rows in the range, with the ingredient's cost. */
+export async function findStockMovementsForProfit(locationId: number, from: Date, to: Date) {
+  return prisma.ingredientTransaction.findMany({
+    where: { locationId, createdAt: { gte: from, lt: to }, type: { in: ['USAGE', 'ADJUSTMENT'] } },
+    select: { type: true, quantity: true, unitCost: true, notes: true, ingredient: { select: { costPerUnit: true } } },
+  });
+}
+
+export async function findExpensesForProfit(from: Date, to: Date) {
+  return prisma.expense.findMany({
+    where: { expenseDate: { gte: from, lt: to } },
+    select: { amount: true, category: { select: { name: true } } },
+  });
+}
+
+export async function findPayrollForProfit(from: Date, to: Date) {
+  return prisma.payroll.findMany({
+    where: { periodEnd: { gte: from, lt: to } },
+    select: { grossPay: true, breakdown: true },
+  });
+}

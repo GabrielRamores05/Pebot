@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { downloadCsv } from '@/lib/csv';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
 
 interface Category {
@@ -158,6 +159,20 @@ export default function ExpensesPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">Total: ₱{totalAmount.toFixed(2)}</span>
+            <button
+              onClick={() => downloadCsv('expenses', expenses, [
+                { label: 'Date', value: (e) => new Date(e.expenseDate).toLocaleDateString('en-PH') },
+                { label: 'Category', value: (e) => e.category.name },
+                { label: 'Description', value: (e) => e.description ?? '' },
+                { label: 'Supplier', value: (e) => e.supplier?.name ?? '' },
+                { label: 'Amount (PHP)', value: (e) => e.amount.toFixed(2) },
+                { label: 'Recorded by', value: (e) => e.user.name },
+              ])}
+              disabled={expenses.length === 0}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              Export CSV
+            </button>
             <button
               onClick={() => {
                 setEditing(null);

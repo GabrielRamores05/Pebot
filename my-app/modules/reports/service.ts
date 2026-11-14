@@ -58,3 +58,40 @@ export async function endOfDay(date: string): Promise<EndOfDayReport> {
     generatedAt: new Date().toISOString(),
   };
 }
+
+// ── Profit report (spec 022) ─────────────────────────────────────────────
+import { summarizeProfit, type ProfitSummary } from '@/lib/profit';
+import { isWasteNote } from '@/lib/stock-count';
+
+/** Profit for the local dates [from, to] inclusive (YYYY-MM-DD). */
+export async function profitReport(fromDate: string, toDate: string): Promise<ProfitSummary & { from: string; to: string }> {
+  const from = dayRange(fromDate).from;
+  const to = dayRange(toDate).to;
+  if (to <= from) {
+    const e = new Error('The end date is before the start date.');
+    (e as unknown as { status: number }).status = 400;
+    throw e;
+  }
+  const [orders, moves, expenses, payroll] = await Promise.all([
+    repo.findOrdersForProfit(LOCATION_ID, from, to),
+    repo.findStockMovementsForProfit(LOCATION_ID, from, to),
+    repo.findExpensesForProfit(from, to),
+    repo.findPayrollForProfit(from, to),
+  ]);
+  const cost = (m: (typeof moves)[number]) => m.unitCost ?? m.ingredient?.costPerUnit ?? 0;
+  return {
+    from: fromDate,
+    to: toDate,
+    ...summarizeProfit({
+      orders: orders.map((o) => ({ ...o, paid: isPaid(o.status, o.paidAt) })),
+      usage: moves.filter((m) => m.type === 'USAGE').map((m) => ({ quantity: m.quantity, unitCost: cost(m) })),
+      waste: moves.filter((m) => m.type === 'ADJUSTMENT' && m.quantity < 0 && isWasteNote(m.notes)).map((m) => ({ quantity: m.quantity, unitCost: cost(m) })),
+      expenses: expenses.map((e) => ({ amount: e.amount, category: e.category?.name ?? 'Other' })),
+      payroll: payroll.map((p) => {
+        let b: { serviceChargeShare?: number; employerCost?: number } = {};
+        try { b = p.breakdown ? JSON.parse(p.breakdown) : {}; } catch { b = {}; }
+        return { grossPay: p.grossPay, serviceChargeShare: b.serviceChargeShare ?? 0, employerCost: b.employerCost ?? 0 };
+      }),
+    }),
+  };
+}

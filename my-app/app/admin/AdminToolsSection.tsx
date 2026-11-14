@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
+import AutoBackupPanel from './AutoBackupPanel';
 import {
   IconQR, IconLogout, IconCoffee, IconDownload, IconUpload,
 } from '@/lib/assets';
@@ -274,11 +275,13 @@ export default function AdminToolsSection({ shopName = 'Pebot', logoUrl }: { sho
         <input
           ref={restoreFileRef}
           type="file"
-          accept=".zip,application/zip"
+          accept=".zip,.db,application/zip"
           className="hidden"
           onChange={handleRestoreFileChange}
         />
       </div>
+
+      <AutoBackupPanel />
 
       {/* Tablet Import */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

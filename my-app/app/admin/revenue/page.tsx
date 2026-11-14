@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatPeso } from '@/lib/format';
 import { BarList, CHART, Delta, Loading, Panel, Segmented, StatRow, StatTile } from '@/components/pebot-ui';
+import ProfitPanel from './ProfitPanel';
 
 interface RevenueMetrics {
   totalRevenue: number;
@@ -103,6 +104,8 @@ export default function RevenueDashboard() {
         <StatTile tone="sage" label="Orders" value={data.totalOrders} note={<Delta value={orderGrowth} />} />
         <StatTile tone="sky" label="Loyalty rewards given" value={formatPeso(data.loyaltyRevenueImpact)} note="Value of covered items on reward orders" />
       </StatRow>
+
+      <ProfitPanel filter={filter} />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Panel title="Revenue trend" subtitle="Revenue per day in the period" className="xl:col-span-2">

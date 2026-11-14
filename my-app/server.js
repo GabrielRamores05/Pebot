@@ -20,6 +20,7 @@ const mdns = require('mdns-js');
 const os = require('os');
 const { getLicenseStore } = require('./lib/license/state.js');
 const { classifyRequest, isLocalAddress, SETUP_PAGE_HTML } = require('./lib/license/gate.js');
+const { startScheduler: startBackupScheduler } = require('./lib/auto-backup.js');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
@@ -183,6 +184,8 @@ app.prepare().then(() => {
   httpServer
     .once('error', (err) => { console.error(err); process.exit(1); })
     .listen(port, hostname, () => {
+      // Spec 022: daily automatic backup of the database.
+      startBackupScheduler();
       const interfaces = os.networkInterfaces();
       const lanIp = Object.values(interfaces)
         .flat()

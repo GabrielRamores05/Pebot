@@ -34,19 +34,23 @@ export async function POST(req: NextRequest) {
     // Read and validate the archive
     const bytes = Buffer.from(await file.arrayBuffer());
 
-    let zip: JSZip;
-    try {
-      zip = await JSZip.loadAsync(bytes);
-    } catch {
-      return badRequest('Failed to restore backup. The selected file is not a valid Pebot backup.');
+    // A downloaded .zip (Save Data) or an automatic daily copy (.db, spec 022).
+    let dbData: Buffer;
+    if (looksLikeSqlite(bytes)) {
+      dbData = bytes;
+    } else {
+      let zip: JSZip;
+      try {
+        zip = await JSZip.loadAsync(bytes);
+      } catch {
+        return badRequest('Failed to restore backup. The selected file is not a valid Pebot backup.');
+      }
+      const dbEntry = zip.file('dev.db');
+      if (!dbEntry) {
+        return badRequest('Failed to restore backup. The selected file is not a valid Pebot backup.');
+      }
+      dbData = await dbEntry.async('nodebuffer');
     }
-
-    const dbEntry = zip.file('dev.db');
-    if (!dbEntry) {
-      return badRequest('Failed to restore backup. The selected file is not a valid Pebot backup.');
-    }
-
-    const dbData = await dbEntry.async('nodebuffer');
     if (!looksLikeSqlite(dbData)) {
       return badRequest('Failed to restore backup. The selected file is not a valid Pebot backup.');
     }

@@ -5,6 +5,7 @@ import { fetchJson, userMessage } from '@/lib/fetch-json';
 import { StatTile } from '@/components/pebot-ui';
 import { renderPayslipHtml } from '@/lib/payslip';
 import { printHtml } from '@/lib/print-client';
+import { downloadCsv } from '@/lib/csv';
 
 // Pebot — Staff & HR (Philippine-friendly)
 // Tabs: Team · Schedule · Time Clock · Time Off · Payroll · Reviews · Documents · Training
@@ -1030,6 +1031,29 @@ function PayrollTab() {
       </div>
 
       <div className="c-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-hair px-4 py-3">
+          <p className="text-sm font-semibold text-ink">Payroll runs</p>
+          <button
+            disabled={records.length === 0}
+            onClick={() => downloadCsv('payroll', records as any[], [
+              { label: 'Staff', value: (r) => r.user?.name ?? '' },
+              { label: 'Period start', value: (r) => new Date(r.periodStart).toLocaleDateString('en-PH') },
+              { label: 'Period end', value: (r) => new Date(r.periodEnd).toLocaleDateString('en-PH') },
+              { label: 'Regular hours', value: (r) => r.regularHours },
+              { label: 'Overtime hours', value: (r) => r.overtimeHours },
+              ...(['basicPay', 'holidayPremium', 'overtimePay', 'nightDiff', 'serviceChargeShare'] as const).map((k) => ({
+                label: { basicPay: 'Basic pay', holidayPremium: 'Holiday premium', overtimePay: 'Overtime pay', nightDiff: 'Night differential', serviceChargeShare: 'Service charge share' }[k],
+                value: (r: any) => { try { return JSON.parse(r.breakdown || '{}')[k] ?? ''; } catch { return ''; } },
+              })),
+              { label: 'Gross (PHP)', value: (r) => r.grossPay },
+              { label: 'Net (PHP)', value: (r) => r.netPay },
+              { label: 'Status', value: (r) => r.status },
+            ])}
+            className="c-btn c-btn--ghost text-sm disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+        </div>
         <table className="c-table">
           <thead><tr className="border-b border-slate-100 text-muted"><th className="text-left p-3">Staff</th><th className="text-left p-3">Period</th><th className="text-right p-3">Hours</th><th className="text-right p-3">Gross</th><th className="text-right p-3">Net</th><th className="text-left p-3">Status</th></tr></thead>
           <tbody>
