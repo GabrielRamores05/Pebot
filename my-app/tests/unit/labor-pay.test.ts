@@ -150,3 +150,26 @@ describe('periodPay (spec 021)', () => {
     expect(p).toMatchObject({ regularHours: 16, overtimeHours: 2, grossPay: 1850 });
   });
 });
+
+import { periodFraction } from '@/lib/labor-pay';
+import { computePhilippinePayroll } from '@/lib/philippine-payroll';
+
+describe('semi-monthly payroll (QA fix)', () => {
+  it('knows how much of a month a period covers', () => {
+    expect(periodFraction('2026-11-01', '2026-11-15')).toBe(0.5);
+    expect(periodFraction('2026-11-16', '2026-11-30')).toBe(0.5);
+    expect(periodFraction('2026-12-16', '2026-12-31')).toBe(0.5);
+    expect(periodFraction('2026-11-01', '2026-11-30')).toBe(1);
+    expect(periodFraction('2026-11-01', '2026-11-07')).toBeCloseTo(7 / 30, 5);
+  });
+
+  it('two half-month runs deduct the same as one monthly run', () => {
+    const monthly = computePhilippinePayroll({ grossPay: 30000, base: 30000 });
+    const half = computePhilippinePayroll({ grossPay: 15000, base: 30000, periodFraction: 0.5 });
+    expect(half.sss.employee * 2).toBeCloseTo(monthly.sss.employee, 2);
+    expect(half.philHealth.employee * 2).toBeCloseTo(monthly.philHealth.employee, 2);
+    expect(half.pagIbig.employee * 2).toBeCloseTo(monthly.pagIbig.employee, 2);
+    expect(half.withholdingTax * 2).toBeCloseTo(monthly.withholdingTax, 1);
+    expect(half.netPay * 2).toBeCloseTo(monthly.netPay, 1);
+  });
+});

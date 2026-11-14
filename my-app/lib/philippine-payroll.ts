@@ -3,6 +3,8 @@
 // Rates reflect: SSS RA 11199 (15%, final tranche since Jan 2025), PhilHealth
 // RA 11223 (5%), Pag-IBIG HDMF Circular 460, and the BIR/TRAIN withholding table.
 
+import { DEFAULT_PAYROLL_RATES, type PayrollRates } from '@/lib/payroll-rates';
+
 export interface SSSResult {
   msc: number; // Monthly Salary Credit used
   employee: number;
@@ -12,16 +14,16 @@ export interface SSSResult {
 
 // Map a monthly basic salary to the SSS Monthly Salary Credit (₱500 brackets,
 // floored at ₱5,000 and capped at ₱35,000).
-export function sssMSC(salary: number): number {
-  const rounded = Math.round(salary / 500) * 500;
-  return Math.min(35000, Math.max(5000, rounded));
+export function sssMSC(salary: number, r: PayrollRates['sss'] = DEFAULT_PAYROLL_RATES.sss): number {
+  const rounded = Math.round(salary / r.mscStep) * r.mscStep;
+  return Math.min(r.mscMax, Math.max(r.mscMin, rounded));
 }
 
-export function computeSSS(monthlyBasic: number): SSSResult {
-  const msc = sssMSC(monthlyBasic);
-  const employee = msc * 0.05;
-  const employer = msc * 0.1;
-  const ec = msc < 15000 ? 10 : 30; // employer-paid only
+export function computeSSS(monthlyBasic: number, r: PayrollRates['sss'] = DEFAULT_PAYROLL_RATES.sss): SSSResult {
+  const msc = sssMSC(monthlyBasic, r);
+  const employee = msc * r.employeeRate;
+  const employer = msc * r.employerRate;
+  const ec = msc < r.ecThreshold ? r.ecLow : r.ecHigh; // employer-paid only
   return {
     msc,
     employee: round2(employee),
@@ -37,10 +39,10 @@ export interface PhilHealthResult {
   employer: number;
 }
 
-export function computePhilHealth(monthlyBasic: number): PhilHealthResult {
-  // Floor ₱10,000 (min premium ₱500), ceiling ₱100,000 (max premium ₱5,000).
-  const base = Math.min(100000, Math.max(10000, monthlyBasic));
-  const premium = base * 0.05;
+export function computePhilHealth(monthlyBasic: number, r: PayrollRates['philHealth'] = DEFAULT_PAYROLL_RATES.philHealth): PhilHealthResult {
+  // 2026: floor ₱10,000 (min premium ₱500), ceiling ₱100,000 (max premium ₱5,000).
+  const base = Math.min(r.ceiling, Math.max(r.floor, monthlyBasic));
+  const premium = base * r.rate;
   return {
     base: round2(base),
     premium: round2(premium),
@@ -55,10 +57,10 @@ export interface PagIbigResult {
   employer: number;
 }
 
-export function computePagIbig(monthlyCompensation: number): PagIbigResult {
-  const fundSalary = Math.min(10000, monthlyCompensation); // capped
-  const employee = fundSalary <= 1500 ? fundSalary * 0.01 : fundSalary * 0.02;
-  const employer = fundSalary * 0.02;
+export function computePagIbig(monthlyCompensation: number, r: PayrollRates['pagIbig'] = DEFAULT_PAYROLL_RATES.pagIbig): PagIbigResult {
+  const fundSalary = Math.min(r.cap, monthlyCompensation); // capped
+  const employee = fundSalary <= r.lowThreshold ? fundSalary * r.employeeLowRate : fundSalary * r.employeeRate;
+  const employer = fundSalary * r.employerRate;
   return {
     fundSalary: round2(fundSalary),
     employee: round2(employee),
@@ -68,14 +70,12 @@ export function computePagIbig(monthlyCompensation: number): PagIbigResult {
 
 // BIR monthly withholding tax on compensation (TRAIN Law brackets).
 // Input is taxable income = gross pay minus mandatory employee contributions.
-export function computeWithholdingTax(monthlyTaxable: number): number {
+export function computeWithholdingTax(monthlyTaxable: number, brackets: PayrollRates['tax'] = DEFAULT_PAYROLL_RATES.tax): number {
   const t = monthlyTaxable;
-  if (t <= 20833) return 0;
-  if (t <= 33333) return (t - 20833) * 0.15;
-  if (t <= 66666) return 2500 + (t - 33333) * 0.2;
-  if (t <= 166666) return 10833.33 + (t - 66666) * 0.25;
-  if (t <= 666666) return 40833.33 + (t - 166666) * 0.3;
-  return 200833.33 + (t - 666666) * 0.35;
+  let row = brackets[0];
+  for (const b of brackets) if (t > b.over) row = b;
+  if (t <= row.over) return 0;
+  return Math.max(0, row.base + (t - row.over) * row.rate);
 }
 
 export interface PayrollBreakdown {
@@ -99,15 +99,28 @@ export function computePhilippinePayroll(opts: {
   base: number; // monthly pay basis used for statutory contributions
   otherDeductions?: number;
   overtimeHours?: number; // informational only
+  /** Share of a month this run covers (0.5 for semi-monthly). Default 1. */
+  periodFraction?: number;
+  /** Government rates; the 2026 defaults when not given. */
+  rates?: PayrollRates;
 }): PayrollBreakdown {
+  const rates = opts.rates ?? DEFAULT_PAYROLL_RATES;
   const { grossPay, base, otherDeductions = 0, overtimeHours = 0 } = opts;
-  const sss = computeSSS(base);
-  const philHealth = computePhilHealth(base);
-  const pagIbig = computePagIbig(base);
+  const f = opts.periodFraction && opts.periodFraction > 0 ? opts.periodFraction : 1;
+  // Contributions are monthly: work them out on the monthly basis, then take this run's share.
+  const scale = <T extends object>(r: T, keys: (keyof T)[]): T => {
+    const out = { ...r };
+    for (const k of keys) (out as Record<keyof T, unknown>)[k] = round2((r[k] as unknown as number) * f);
+    return out;
+  };
+  const sss = scale(computeSSS(base, rates.sss), ['employee', 'employer', 'ec']);
+  const philHealth = scale(computePhilHealth(base, rates.philHealth), ['premium', 'employee', 'employer']);
+  const pagIbig = scale(computePagIbig(base, rates.pagIbig), ['employee', 'employer']);
 
   const statutoryEmployeeTotal = round2(sss.employee + philHealth.employee + pagIbig.employee);
   const taxableIncome = round2(grossPay - statutoryEmployeeTotal);
-  const withholdingTax = round2(computeWithholdingTax(taxableIncome));
+  // The BIR table is monthly: tax the monthly equivalent, then take this run's share.
+  const withholdingTax = round2(computeWithholdingTax(taxableIncome / f, rates.tax) * f);
 
   const employerCost = round2(sss.employer + sss.ec + philHealth.employer + pagIbig.employer);
   const netPay = round2(grossPay - statutoryEmployeeTotal - withholdingTax - otherDeductions);

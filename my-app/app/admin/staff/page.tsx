@@ -6,6 +6,7 @@ import { StatTile } from '@/components/pebot-ui';
 import { renderPayslipHtml } from '@/lib/payslip';
 import { printHtml } from '@/lib/print-client';
 import { downloadCsv } from '@/lib/csv';
+import PayrollRatesCard from './PayrollRatesCard';
 
 // Pebot — Staff & HR (Philippine-friendly)
 // Tabs: Team · Schedule · Time Clock · Time Off · Payroll · Reviews · Documents · Training
@@ -1022,10 +1023,10 @@ function PayrollTab() {
       <div className="c-card p-5 space-y-3">
         <p className="text-sm font-semibold text-ink">Run payroll for one person</p>
         <div className="flex flex-wrap gap-2 items-end">
-          <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-          <input type="date" value={form.periodStart} onChange={e => setForm({ ...form, periodStart: e.target.value })} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" />
-          <input type="date" value={form.periodEnd} onChange={e => setForm({ ...form, periodEnd: e.target.value })} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" />
-          <input placeholder="Other deductions ₱" value={form.deductions} onChange={e => setForm({ ...form, deductions: e.target.value })} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent w-40" />
+          <label className="text-xs font-semibold text-muted">Staff<select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="mt-1 block h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent"><option value="">Choose…</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          <label className="text-xs font-semibold text-muted">From<input type="date" value={form.periodStart} onChange={e => setForm({ ...form, periodStart: e.target.value })} className="mt-1 block h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" /></label>
+          <label className="text-xs font-semibold text-muted">To<input type="date" value={form.periodEnd} onChange={e => setForm({ ...form, periodEnd: e.target.value })} className="mt-1 block h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" /></label>
+          <label className="text-xs font-semibold text-muted">Other deductions (₱)<input inputMode="decimal" placeholder="0" value={form.deductions} onChange={e => setForm({ ...form, deductions: e.target.value })} className="mt-1 block h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent w-40" /></label>
           <button onClick={generate} className="c-btn c-btn--primary">Generate</button>
         </div>
       </div>
@@ -1097,6 +1098,8 @@ function PayrollTab() {
           </tbody>
         </table>
       </div>
+
+      <PayrollRatesCard />
 
       <div className="c-card p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

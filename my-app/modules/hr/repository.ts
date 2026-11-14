@@ -415,7 +415,7 @@ export async function sumServiceCharge(from: string, to: string, locationId: num
 
 export async function listPayableStaff() {
   return prisma.user.findMany({
-    where: { active: true, paymentType: { not: null } },
+    where: { active: true },
     select: { id: true, name: true, paymentType: true, hourlyRate: true, monthlySalary: true },
     orderBy: { name: 'asc' },
   });

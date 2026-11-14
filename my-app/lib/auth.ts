@@ -3,20 +3,26 @@ import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-const configuredSecret = process.env.JWT_SECRET?.trim() || null;
-const JWT_SECRET = configuredSecret ?? (
-  process.env.NODE_ENV === 'production'
-    ? (() => { throw new Error('JWT_SECRET must be set in production'); })()
-    : (() => {
-        const cached = (globalThis as any).__cafeos_jwt_secret;
-        if (cached) return cached;
-        const generatedSecret = randomBytes(32).toString('hex');
-        console.warn('[AUTH] JWT_SECRET is not set; generated a development-only secret. Tokens will not survive a server restart.');
-        (globalThis as any).__cafeos_jwt_secret = generatedSecret;
-        return generatedSecret;
-      })()
-);
-const secret = new TextEncoder().encode(JWT_SECRET);
+// Resolved on first use, not at import: `next build` loads every route without
+// a secret, and a production server must still refuse to run without one.
+let secretBytes: Uint8Array | null = null;
+function getSecret(): Uint8Array {
+  if (secretBytes) return secretBytes;
+  const configured = process.env.JWT_SECRET?.trim() || null;
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set in production');
+  }
+  const value = configured ?? (() => {
+    const cached = (globalThis as any).__cafeos_jwt_secret;
+    if (cached) return cached as string;
+    const generatedSecret = randomBytes(32).toString('hex');
+    console.warn('[AUTH] JWT_SECRET is not set; generated a development-only secret. Tokens will not survive a server restart.');
+    (globalThis as any).__cafeos_jwt_secret = generatedSecret;
+    return generatedSecret;
+  })();
+  secretBytes = new TextEncoder().encode(value);
+  return secretBytes;
+}
 
 export interface JWTPayload {
   userId: number;
@@ -30,12 +36,12 @@ export async function signToken(payload: JWTPayload): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('12h')
-    .sign(secret);
+    .sign(getSecret());
 }
 
 export async function verifyTokenAsync(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, getSecret());
     return payload as unknown as JWTPayload;
   } catch (err) {
     console.error('[JWT VERIFY ERROR]', err);

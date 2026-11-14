@@ -192,3 +192,19 @@ export function periodPay(opts: {
     grossPay: round2(basicPay + holidayPremium + overtimePay + nightDiff),
   };
 }
+
+/**
+ * How much of a month a pay period covers: 1–15 or 16–end is 0.5, a calendar
+ * month is 1, anything else is days ÷ 30. Monthly contributions and the monthly
+ * tax table are scaled by this, so semi-monthly payroll does not deduct twice.
+ */
+export function periodFraction(periodStart: string, periodEnd: string): number {
+  const s = new Date(periodStart + 'T00:00:00');
+  const e = new Date(periodEnd + 'T00:00:00');
+  const monthEnd = new Date(s.getFullYear(), s.getMonth() + 1, 0).getDate();
+  const sameMonth = s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth();
+  if (sameMonth && s.getDate() === 1 && e.getDate() === monthEnd) return 1;
+  if (sameMonth && ((s.getDate() === 1 && e.getDate() === 15) || (s.getDate() === 16 && e.getDate() === monthEnd))) return 0.5;
+  const days = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
+  return Math.max(1 / 30, days / 30);
+}

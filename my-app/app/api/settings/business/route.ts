@@ -11,8 +11,13 @@ const ORDER_TYPES = ['DINE_IN', 'TAKEOUT', 'DELIVERY'];
 /** Spec 019 printing settings. Returns an error message or the values. */
 function parsePrintSettings(body: Record<string, unknown>):
   | { error: string }
-  | { receiptPrinter?: string | null; kitchenPrinter?: string | null; paperWidth?: string; autoPrintInvoice?: boolean; autoPrintKitchen?: boolean } {
-  const out: { receiptPrinter?: string | null; kitchenPrinter?: string | null; paperWidth?: string; autoPrintInvoice?: boolean; autoPrintKitchen?: boolean } = {};
+  | { receiptPrinter?: string | null; kitchenPrinter?: string | null; paperWidth?: string; autoPrintInvoice?: boolean; autoPrintKitchen?: boolean; birPermitNumber?: string | null } {
+  const out: { receiptPrinter?: string | null; kitchenPrinter?: string | null; paperWidth?: string; autoPrintInvoice?: boolean; autoPrintKitchen?: boolean; birPermitNumber?: string | null } = {};
+  if (body.birPermitNumber !== undefined) {
+    if (body.birPermitNumber === null || body.birPermitNumber === '') out.birPermitNumber = null;
+    else if (typeof body.birPermitNumber !== 'string' || body.birPermitNumber.trim().length > 60) return { error: 'The BIR permit number is not valid.' };
+    else out.birPermitNumber = body.birPermitNumber.trim();
+  }
   for (const key of ['receiptPrinter', 'kitchenPrinter'] as const) {
     if (body[key] === undefined) continue;
     if (body[key] === null || body[key] === '') { out[key] = null; continue; }

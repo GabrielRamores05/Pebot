@@ -9,3 +9,7 @@ PebotSeller/
 
 # Built installers (tools/release/build-pebot.cmd)
 /Pebot 1.0/
+
+# Playwright output
+/my-app/test-results/
+/my-app/playwright-report/
