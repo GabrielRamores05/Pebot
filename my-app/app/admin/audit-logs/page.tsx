@@ -85,10 +85,10 @@ export default function AuditLogsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <div className="border-b border-gray-200 bg-white px-6 py-4">
-        <h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1>
-        <p className="text-sm text-gray-500 mt-1">Track all actions taken in the system</p>
+    <div className="h-screen flex flex-col bg-page">
+      <div className="px-6 pb-2 pt-6">
+        <h1 className="c-title">Audit Logs</h1>
+        <p className="mt-1.5 text-sm text-muted">Track all actions taken in the system</p>
       </div>
 
       <div className="p-6 border-b border-gray-200 bg-white">

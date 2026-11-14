@@ -562,7 +562,7 @@ export default function CartPage() {
           <p><span className="font-medium">Name:</span> {cartStore.customerName}</p>
           <p><span className="font-medium">Payment:</span> {paymentMethod === 'CASH' ? 'Cash' : paymentMethod === 'GCASH' ? 'GCash' : 'PayMaya'}</p>
           {cartStore.tableNumber && <p><span className="font-medium">Table:</span> {cartStore.tableNumber}</p>}
-          {isNameFromLoyalty && <p className="text-green-600 font-medium">✓ Loyalty member registered</p>}
+          {isNameFromLoyalty && <p className="text-green-600 font-medium">Loyalty member registered</p>}
         </div>
 
         {/* Warning: order cannot be canceled once placed */}
@@ -688,7 +688,7 @@ export default function CartPage() {
                         onClick={() => openEditor(item)}
                         className="mt-1 text-xs font-medium text-amber-600 hover:text-amber-700 underline"
                       >
-                        ⭐ Change size / options
+                        Change size / options
                       </button>
                     </div>
                     <div className="flex items-center gap-2 rounded-full bg-slate-100 p-1">
@@ -842,7 +842,7 @@ export default function CartPage() {
                       ))}
                     </div>
                     {voucherValidationErrors.length > 0 && (
-                      <p className="mt-3 text-xs font-medium text-red-100">⚠️ {voucherValidationErrors.join(', ')}</p>
+                      <p className="mt-3 text-xs font-medium text-red-100">{voucherValidationErrors.join(', ')}</p>
                     )}
                   </div>
                   <button
@@ -887,13 +887,13 @@ export default function CartPage() {
                     />
                   )}
                   {error && !cartStore.customerName.trim() && (
-                    <p className="mt-2 text-sm font-medium text-red-600">⚠️ {error}</p>
+                    <p className="mt-2 text-sm font-medium text-red-600">{error}</p>
                   )}
                 </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-600">Table Number</label>
-                  {cartStore.tableNumber && <p className="mb-1 text-xs text-blue-600">📱 Table set from QR scan</p>}
+                  {cartStore.tableNumber && <p className="mb-1 text-xs text-blue-600">Table set from QR scan</p>}
                   <select
                     value={cartStore.tableNumber}
                     onChange={(e) => cartStore.setTableNumber(e.target.value)}
@@ -944,7 +944,7 @@ export default function CartPage() {
               {(paymentMethod === 'GCASH' || paymentMethod === 'PAYMAYA') && (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                   <p className="mb-2 text-sm font-medium text-slate-700">
-                    📸 Upload payment screenshot {paymentMethod === 'GCASH' ? '(GCash)' : '(PayMaya)'}
+                    Upload payment screenshot {paymentMethod === 'GCASH' ? '(GCash)' : '(PayMaya)'}
                   </p>
                   <p className="mb-3 text-xs text-slate-500">Attach proof of payment or continue and upload it later.</p>
 
@@ -983,7 +983,7 @@ export default function CartPage() {
                           }
                         }}
                       />
-                      {uploading ? 'Uploading...' : '📤 Tap to upload screenshot'}
+                      {uploading ? 'Uploading...' : 'Tap to upload screenshot'}
                     </label>
                   )}
                 </div>

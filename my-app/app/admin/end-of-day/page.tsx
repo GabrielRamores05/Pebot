@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatPeso } from '@/lib/format';
+import { StatTile } from '@/components/pebot-ui';
 
 // End-of-day summary (spec 017, US5). A management report, not a BIR Z-reading.
 
@@ -48,8 +49,8 @@ function localDate(d = new Date()) {
 
 function Row({ label, value, strong, minus }: { label: string; value: number; strong?: boolean; minus?: boolean }) {
   return (
-    <div className={`flex justify-between gap-4 py-1 ${strong ? 'border-t border-gray-300 font-semibold' : ''}`}>
-      <span className={strong ? '' : 'text-gray-600'}>{label}</span>
+    <div className={`flex justify-between gap-4 py-1 ${strong ? 'border-t border-hair-strong font-semibold' : ''}`}>
+      <span className={strong ? '' : 'text-muted'}>{label}</span>
       <span className="tabular-nums">{minus && value > 0 ? '−' : ''}{formatPeso(value)}</span>
     </div>
   );
@@ -57,8 +58,8 @@ function Row({ label, value, strong, minus }: { label: string; value: number; st
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="break-inside-avoid rounded-xl border border-gray-200 bg-white p-4 print:rounded-none print:border-0 print:border-t print:p-0 print:pt-2">
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">{title}</h2>
+    <section className="c-card break-inside-avoid p-5 print:rounded-none print:border-0 print:border-t print:p-0 print:pt-2 print:shadow-none">
+      <h2 className="mb-2 text-base font-bold">{title}</h2>
       <div className="text-sm">{children}</div>
     </section>
   );
@@ -106,36 +107,36 @@ export default function EndOfDayPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6 print:max-w-none print:p-0 print:text-black">
+    <div className="space-y-4 px-6 pb-8 pt-6 print:p-0 print:text-black">
       <div className="flex flex-wrap items-end justify-between gap-3 print:hidden">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">End of day</h1>
-          <p className="text-sm text-gray-500">Sales, discounts, VAT and cash for one day.</p>
+          <h1 className="c-title">End of day</h1>
+          <p className="mt-1.5 text-sm text-muted">Sales, discounts, VAT and cash for one day. Print it for your books.</p>
         </div>
         <div className="flex items-end gap-2">
-          <label className="text-sm text-gray-600">
+          <label className="text-xs font-semibold text-muted">
             <span className="mb-1 block">Date</span>
             <input
               type="date"
               value={date}
               max={localDate()}
               onChange={(e) => e.target.value && setDate(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"
+              className="h-10 rounded-xl border border-hair bg-card px-3 text-ink outline-none focus:border-accent"
             />
           </label>
           <button
             type="button"
             onClick={() => window.print()}
             disabled={!report}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="c-btn c-btn--primary disabled:opacity-50"
           >
             Print
           </button>
         </div>
       </div>
 
-      {loading && <p className="text-sm text-gray-500">Loading…</p>}
-      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}
+      {loading && <p className="text-sm text-faint">Loading…</p>}
+      {error && <p className="rounded-lg bg-danger-bg p-3 text-sm text-danger" role="alert">{error}</p>}
 
       {report && s && (
         <>
@@ -146,6 +147,13 @@ export default function EndOfDayPage() {
             <p className="mt-1 text-sm font-semibold">End-of-day summary — {report.date}</p>
           </header>
 
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:hidden">
+            <StatTile tone="peach" label="Net sales" value={formatPeso(s.net)} note={`${s.orderCount} paid orders`} />
+            <StatTile tone="sand" label="Discounts given" value={formatPeso(Object.values(s.discounts).reduce((a, b) => a + b, 0) + s.vatRemoved + s.loyaltyDiscount)} note={`${s.statutory.length} Senior/PWD sales`} />
+            <StatTile tone="sky" label="VAT" value={formatPeso(s.vat.vatAmount)} note={report.business.vatRegistered ? 'On VAT-able sales' : 'Not VAT-registered'} />
+            <StatTile tone={report.drawers.some((d) => (d.totals.overShort ?? 0) < 0) ? 'danger' : 'sage'} label="Cash drawers" value={report.drawers.length} note={report.drawers.length ? report.drawers.map((d) => d.totals.overShort == null ? 'open' : d.totals.overShort === 0 ? 'balanced' : (d.totals.overShort < 0 ? 'short ' : 'over ') + formatPeso(Math.abs(d.totals.overShort))).join(' · ') : 'None opened'} />
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <Section title="Sales">
               <Row label={`Gross sales (${s.orderCount} orders)`} value={s.gross} />
@@ -155,22 +163,22 @@ export default function EndOfDayPage() {
               {s.serviceCharge > 0 && <Row label="Service charge" value={s.serviceCharge} />}
               <Row label="Net sales" value={s.net} strong />
               {s.unpaid.count > 0 && (
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-faint">
                   {s.unpaid.count} order{s.unpaid.count === 1 ? '' : 's'} not yet paid ({formatPeso(s.unpaid.amount)}) not counted.
                 </p>
               )}
               {s.cancelled.count > 0 && (
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-faint">
                   {s.cancelled.count} cancelled order{s.cancelled.count === 1 ? '' : 's'} ({formatPeso(s.cancelled.amount)}) not counted.
                 </p>
               )}
             </Section>
 
             <Section title="Payments">
-              {s.payments.length === 0 && <p className="text-gray-500">No sales.</p>}
+              {s.payments.length === 0 && <p className="text-faint">No sales.</p>}
               {s.payments.map((p) => <Row key={p.method} label={`${p.method} (${p.count})`} value={p.amount} />)}
               {s.payments.length > 0 && <Row label="Total collected" value={s.net} strong />}
-              <h3 className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Order types</h3>
+              <h3 className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-faint">Order types</h3>
               {s.orderTypes.map((t) => (
                 <Row key={t.type} label={`${ORDER_TYPE_LABELS[t.type] ?? t.type} (${t.count})`} value={t.amount} />
               ))}
@@ -186,19 +194,19 @@ export default function EndOfDayPage() {
               ) : (
                 <Row label="Sales (not VAT-registered)" value={s.vat.vatExemptSales} />
               )}
-              {s.serviceCharge > 0 && <p className="mt-1 text-xs text-gray-500">Service charge is shown separately and not included above.</p>}
+              {s.serviceCharge > 0 && <p className="mt-1 text-xs text-faint">Service charge is shown separately and not included above.</p>}
               {s.ordersWithoutVatBreakdown > 0 && (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-faint">
                   {s.ordersWithoutVatBreakdown} order{s.ordersWithoutVatBreakdown === 1 ? '' : 's'} from before the update have no VAT breakdown and are not included above.
                 </p>
               )}
             </Section>
 
             <Section title="Cash drawers">
-              {report.drawers.length === 0 && <p className="text-gray-500">No drawer was opened this day.</p>}
+              {report.drawers.length === 0 && <p className="text-faint">No drawer was opened this day.</p>}
               {report.drawers.map((d) => (
-                <div key={d.id} className="mb-2 border-b border-gray-100 pb-2 last:border-0">
-                  <p className="text-xs text-gray-500">
+                <div key={d.id} className="mb-2 border-b border-hair pb-2 last:border-0">
+                  <p className="text-xs text-faint">
                     #{d.id} · {new Date(d.openedAt).toLocaleTimeString()} – {d.closedAt ? new Date(d.closedAt).toLocaleTimeString() : 'still open'} · {d.openedByName}
                   </p>
                   <Row label="Expected" value={d.totals.expectedCash} />
@@ -216,11 +224,11 @@ export default function EndOfDayPage() {
 
           <Section title={`Senior Citizen and PWD sales (${s.statutory.length})`}>
             {s.statutory.length === 0 ? (
-              <p className="text-gray-500">None.</p>
+              <p className="text-faint">None.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[560px] text-left text-sm">
-                  <thead className="text-xs uppercase text-gray-500">
+                  <thead className="text-xs uppercase text-faint">
                     <tr>
                       <th className="py-1 pr-2 font-medium">Order</th>
                       <th className="py-1 pr-2 font-medium">ID holder</th>
@@ -232,9 +240,9 @@ export default function EndOfDayPage() {
                   </thead>
                   <tbody>
                     {s.statutory.map((r) => (
-                      <tr key={r.orderNumber} className="border-t border-gray-100 align-top">
+                      <tr key={r.orderNumber} className="border-t border-hair align-top">
                         <td className="py-1 pr-2">{r.orderNumber}</td>
-                        <td className="py-1 pr-2">{r.holders.map((h, i) => <div key={i}>{h.name} <span className="text-gray-500">({HOLDER_LABELS[h.type] ?? h.type})</span></div>)}</td>
+                        <td className="py-1 pr-2">{r.holders.map((h, i) => <div key={i}>{h.name} <span className="text-faint">({HOLDER_LABELS[h.type] ?? h.type})</span></div>)}</td>
                         <td className="py-1 pr-2">{r.holders.map((h, i) => <div key={i}>{h.idNumber}</div>)}</td>
                         <td className="py-1 pr-2 text-right tabular-nums">{formatPeso(r.vatRemoved)}</td>
                         <td className="py-1 pr-2 text-right tabular-nums">{formatPeso(r.discount)}</td>
@@ -247,7 +255,7 @@ export default function EndOfDayPage() {
             )}
           </Section>
 
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-faint">
             Management report generated {new Date(report.generatedAt).toLocaleString()}. Not an official BIR reading. Pebot is not BIR-accredited.
           </p>
         </>

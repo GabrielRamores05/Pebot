@@ -77,23 +77,19 @@ export default function AdminReviewsPage() {
   });
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 min-h-screen">
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 shadow-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+    <div className="flex-1 overflow-y-auto bg-page min-h-screen">
+      <header className="px-6 pb-2 pt-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center text-xl">
-              ⭐
-            </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Reviews</h1>
-              <p className="text-xs text-gray-500">Manage customer product reviews</p>
+              <h1 className="c-title">Reviews</h1>
+              <p className="mt-1.5 text-sm text-muted">Manage customer product reviews</p>
             </div>
           </div>
           <button
             onClick={fetchReviews}
             className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm border border-gray-200 transition-all hover:shadow-md"
           >
-            <span>🔄</span>
             Refresh
           </button>
         </div>
@@ -116,7 +112,7 @@ export default function AdminReviewsPage() {
                 : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
             }`}
           >
-            ⭐ Reviews
+            Reviews
           </button>
           <button
             onClick={() => setView('suggestions')}
@@ -126,7 +122,7 @@ export default function AdminReviewsPage() {
                 : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
             }`}
           >
-            💡 Taste Suggestions
+            Taste Suggestions
           </button>
         </div>
 
@@ -182,7 +178,7 @@ export default function AdminReviewsPage() {
                         {review.product.imageUrl ? (
                           <img src={review.product.imageUrl} alt={review.product.name} className="w-8 h-8 rounded object-cover" />
                         ) : (
-                          <span className="text-xl">🍽️</span>
+                          <span className="h-8 w-8 rounded bg-panel" aria-hidden />
                         )}
                         <p className="text-gray-900 font-medium text-sm">{review.product.name}</p>
                       </div>
@@ -201,7 +197,7 @@ export default function AdminReviewsPage() {
                         {review.comment && <p>{review.comment}</p>}
                         {review.tasteSuggestion && (
                           <p className="text-xs text-accent-text bg-amber-50 px-2 py-1 rounded">
-                            💡 {review.tasteSuggestion}
+                            {review.tasteSuggestion}
                           </p>
                         )}
                       </div>

@@ -137,7 +137,7 @@ export default function ExitPage() {
       localStorage.removeItem('customerMood');
       localStorage.removeItem('customerMoodNote');
       
-      setMessage(data.message || 'Thank you! Have a great day! 🎉');
+      setMessage(data.message || 'Thank you! Have a great day!');
       
       // Show success for 3 seconds then redirect to menu
       setTimeout(() => {

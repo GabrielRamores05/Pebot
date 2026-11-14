@@ -149,7 +149,7 @@ export default function ProductReviews({
             onClick={() => setShowWrite(true)}
             className="w-full rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
           >
-            ⭐ Write a Review
+            Write a Review
           </button>
         ) : (
           <div className="space-y-2">

@@ -677,7 +677,7 @@ export default function AdminPage() {
                 }}
                 className="w-full py-3 bg-accent hover:bg-amber-500 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2"
               >
-                🧾 View Invoice
+                View Invoice
               </button>
 
               {/* Order Items - Collapsible Dropdown */}
@@ -718,8 +718,8 @@ export default function AdminPage() {
 
               {/* Order Info - Premium Style */}
               <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm text-gray-600">
-                <p className="flex items-center gap-2">🕐 {new Date(selected.createdAt).toLocaleString()}</p>
-                {selected.table && <p className="flex items-center gap-2">📍 {selected.table.name}</p>}
+                <p className="flex items-center gap-2">{new Date(selected.createdAt).toLocaleString()}</p>
+                {selected.table && <p className="flex items-center gap-2">{selected.table.name}</p>}
                 {selected.paymentMethod && (
                   <p className="flex items-center gap-2">💳 <span className={`font-semibold ${
                   selected.paymentMethod === 'CASH' ? 'text-green-600' :
@@ -741,7 +741,7 @@ export default function AdminPage() {
               {/* Messages - Premium Style */}
               <div className="bg-gray-50 rounded-2xl p-4">
                 <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-gray-700">
-                  💬 Messages
+                  Messages
                   {orderMessages.length > 0 && (
                     <span className="text-[10px] bg-gray-900 text-white px-2 py-0.5 rounded-full">{orderMessages.length}</span>
                   )}
@@ -757,7 +757,7 @@ export default function AdminPage() {
                           : 'bg-white border border-gray-200'
                       }`}>
                         <div className="flex items-center gap-1 mb-1 text-[10px] text-gray-500">
-                          <span>{m.sender === 'staff' || m.sender === currentUser?.name ? `💼 ${m.sender}` : `🙋 ${m.sender}`}</span>
+                          <span>{m.sender === 'staff' || m.sender === currentUser?.name ? `${m.sender}` : `${m.sender}`}</span>
                           <span>·</span>
                           <span>{new Date(m.createdAt).toLocaleTimeString()}</span>
                         </div>
@@ -799,7 +799,7 @@ export default function AdminPage() {
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowVoicePanel(false)} />
           <div className="relative ml-auto w-full max-w-md bg-white border-l border-gray-200 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0 bg-gray-50/50">
-              <h3 className="font-bold text-lg text-gray-900">🔊 AI Voice Settings</h3>
+              <h3 className="font-bold text-lg text-gray-900">AI Voice Settings</h3>
               <button onClick={() => setShowVoicePanel(false)} className="text-gray-400 hover:text-gray-600 text-xl transition w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -1149,13 +1149,13 @@ export default function AdminPage() {
                     }}
                     className="flex-1 py-2.5 bg-accent hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
                   >
-                    🖨️ Thermal
+                    Thermal
                   </button>
                   <button
                     onClick={() => window.print()}
                     className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
                   >
-                    📄 A4/Plain
+                    A4/Plain
                   </button>
                 </div>
               </div>

@@ -70,12 +70,12 @@ export default function StockHistoryPage() {
     .reduce((s, t) => s + (t.purchaseCost || 0), 0);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 min-h-screen">
-      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+    <div className="flex-1 overflow-y-auto bg-page min-h-screen">
+      <div className="p-4 md:p-6 space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Stock History</h1>
-        <p className="text-xs text-gray-500">Every ingredient movement — purchases in, orders out</p>
+        <h1 className="c-title">Stock History</h1>
+        <p className="mt-1.5 text-sm text-muted">Every ingredient movement — purchases in, orders out</p>
       </div>
 
       {/* Summary Cards */}
@@ -134,8 +134,7 @@ export default function StockHistoryPage() {
       ) : visible.length === 0 ? (
         <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-gray-200/50 p-12 text-center">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">📜</span>
-          </div>
+            </div>
           <p className="text-gray-500 font-medium">No stock movements found</p>
           <p className="text-gray-400 text-sm mt-1">Recorded purchases and order usage will appear here.</p>
         </div>

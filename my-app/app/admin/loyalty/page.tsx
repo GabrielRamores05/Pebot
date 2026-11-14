@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { StatTile } from '@/components/pebot-ui';
 import { useSocket } from '@/hooks/useSocket';
 
 interface LoyaltyCard {
@@ -389,17 +390,14 @@ export default function AdminLoyaltyManagementPage() {
   const activeVouchers = vouchers.filter(v => v.status === 'ACTIVE').length;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 min-h-screen">
+    <div className="flex-1 overflow-y-auto bg-page min-h-screen">
       {/* Apple-inspired Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 shadow-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="px-6 pb-2 pt-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-linear-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center text-xl shadow-sm">
-              ⭐
-            </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 -tracking-[0.3px]">Loyalty Program</h1>
-              <p className="text-xs text-gray-500">Manage customers & rewards</p>
+              <h1 className="c-title">Loyalty Program</h1>
+              <p className="mt-1.5 text-sm text-muted">Manage customers & rewards</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -411,14 +409,12 @@ export default function AdminLoyaltyManagementPage() {
                   : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
               }`}
             >
-              <span>⚙️</span>
               Settings
             </button>
             <button
               onClick={fetchAllCards}
               className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm border border-gray-200 transition-all hover:shadow-md"
             >
-              <span>🔄</span>
               Refresh
             </button>
           </div>
@@ -433,7 +429,6 @@ export default function AdminLoyaltyManagementPage() {
               <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-gray-200/50 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">⚙️</span>
                     <h2 className="text-xl font-semibold text-gray-900">Loyalty Modules</h2>
                   </div>
                   <button
@@ -506,7 +501,7 @@ export default function AdminLoyaltyManagementPage() {
                       ))}
                     </select>
                     {!isCreatingNewModule && (
-                      <p className="text-[10px] text-accent-text mt-1 font-medium">⚠️ Changing category will reassign this module to a different set of products.</p>
+                      <p className="text-[10px] text-accent-text mt-1 font-medium">Changing category will reassign this module to a different set of products.</p>
                     )}
                   </div>
 
@@ -613,7 +608,7 @@ export default function AdminLoyaltyManagementPage() {
                     <div className="col-span-full space-y-4">
                       <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
                         <h3 className="text-amber-900 font-semibold text-sm mb-3 flex items-center gap-2">
-                          <span>🏆</span> Milestone Configuration
+                          Milestone Configuration
                         </h3>
                         
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-4 bg-white/50 p-3 rounded-xl border border-amber-200/50">
@@ -668,7 +663,7 @@ export default function AdminLoyaltyManagementPage() {
                                 </div>
                                 <div>
                                   <p className="text-sm font-bold text-gray-900">
-                                    {m.rewardType === 'FREE' ? '🎁 Free Piece' : m.rewardType === 'PERCENTAGE' ? `💰 ${m.rewardValue}% Off` : `💵 ₱${m.rewardValue} Off`}
+                                    {m.rewardType === 'FREE' ? 'Free Piece' : m.rewardType === 'PERCENTAGE' ? `${m.rewardValue}% Off` : `💵 ₱${m.rewardValue} Off`}
                                   </p>
                                   <p className="text-[10px] text-gray-400">Target: {m.target}</p>
                                 </div>
@@ -770,50 +765,17 @@ export default function AdminLoyaltyManagementPage() {
 
 
             {/* Stats - Apple Card Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 border border-gray-200/50 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <span className="text-lg">👥</span>
-                  </div>
-                  <p className="text-gray-500 text-sm font-medium">{cards.length}</p>
-                </div>
-                <p className="text-2xl font-bold text-gray-900">Total Customers</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 border border-amber-200/50 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                    <span className="text-lg">⭐</span>
-                  </div>
-                  <p className="text-gray-500 text-sm font-medium">{totalCoffees}</p>
-                </div>
-                <p className="text-2xl font-bold text-gray-900">Stamps Earned</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 border border-green-200/50 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                    <span className="text-lg">🎁</span>
-                  </div>
-                  <p className="text-gray-500 text-sm font-medium">{totalRewards}</p>
-                </div>
-                <p className="text-2xl font-bold text-green-600">Rewards Available</p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-5 border border-purple-200/50 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                    <span className="text-lg">🎫</span>
-                  </div>
-                  <p className="text-gray-500 text-sm font-medium">{activeVouchers}</p>
-                </div>
-                <p className="text-2xl font-bold text-purple-600">Active Vouchers</p>
-              </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatTile tone="peach" label="Members" value={cards.length} note="Loyalty cards" />
+              <StatTile tone="sand" label="Stamps earned" value={totalCoffees} note="All members" />
+              <StatTile tone="sage" label="Rewards available" value={totalRewards} note="Ready to use" />
+              <StatTile tone="sky" label="Active vouchers" value={activeVouchers} note="Issued, not yet used" />
             </div>
 
             {/* Search and Filter */}
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 border border-gray-200/50 shadow-sm">
               <div className="flex gap-3 items-center">
                 <div className="flex-1 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                   <input
                     type="text"
                     placeholder="Search customers..."
@@ -961,14 +923,14 @@ export default function AdminLoyaltyManagementPage() {
                           onClick={() => { setEditingCustomerName(true); setEditedName(selectedCard.customerName); }}
                           className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                         >
-                          ✎ Edit Name
+                          Edit Name
                         </button>
                         <button
                           onClick={deleteCustomer}
                           disabled={deletingCustomer}
                           className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                         >
-                          🗑 Delete
+                          Delete
                         </button>
                       </div>
                       <div className="mt-3">

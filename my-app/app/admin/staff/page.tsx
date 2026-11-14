@@ -946,7 +946,7 @@ function ReviewsTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
           <input placeholder="Period (e.g. Q3 2026)" value={form.period} onChange={e => setForm({ ...form, period: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
-          <select value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n} ★</option>)}</select>
+          <select value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm">{[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}</select>
           <input placeholder="Strengths" value={form.strengths} onChange={e => setForm({ ...form, strengths: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
           <input placeholder="Improvements" value={form.improvements} onChange={e => setForm({ ...form, improvements: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
           <input placeholder="Goals" value={form.goals} onChange={e => setForm({ ...form, goals: e.target.value })} className="rounded-lg border border-hair px-2 py-1.5 text-sm" />
@@ -959,7 +959,7 @@ function ReviewsTab() {
           <div key={r.id} className="rounded-xl border border-hair bg-card p-3">
             <div className="flex items-center justify-between">
               <p className="font-medium text-ink">{r.user?.name}</p>
-              <span className="text-amber-500 font-bold">{r.rating} ★</span>
+              <span className="text-amber-500 font-bold">{r.rating}</span>
             </div>
             <p className="text-xs text-faint">{r.period} · by {r.reviewer?.name}</p>
             {r.strengths && <p className="text-xs mt-1"><span className="font-medium">Strengths:</span> {r.strengths}</p>}

@@ -145,7 +145,7 @@ function MyOrdersPanel({ onClose }: { onClose: () => void }) {
                     </span>
                     {loyaltyPromo && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        🎁 Loyalty
+                        Loyalty
                       </span>
                     )}
                   </div>
@@ -546,7 +546,7 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
             <h3 className="truncate text-left text-[12.5px] font-semibold leading-tight text-stone-900">{product.name}</h3>
             {bestSeller && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-amber-800">
-                🔥 Best Seller
+                Best Seller
               </span>
             )}
             {lowStock && (
@@ -584,8 +584,8 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
             >
               <span className={`text-[10px] font-medium ${reviewSummary && reviewSummary.total > 0 ? 'text-amber-600' : 'text-stone-400'}`}>
                 {reviewSummary && reviewSummary.total > 0
-                  ? `⭐ ${reviewSummary.avg.toFixed(1)} · ${reviewSummary.total} review${reviewSummary.total > 1 ? 's' : ''}`
-                  : '☆☆☆☆☆ Be first to review'}
+                  ? `${reviewSummary.avg.toFixed(1)} · ${reviewSummary.total} review${reviewSummary.total > 1 ? 's' : ''}`
+                  : 'Be first to review'}
               </span>
               <span className="text-[9px] text-stone-400 underline decoration-dotted">Rate it ›</span>
             </div>
@@ -1401,12 +1401,12 @@ function MenuPageInner() {
             <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2 text-center">Welcome! 👋</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-2 text-center">Welcome!</h2>
               <p className="text-gray-500 text-center mb-4">Enter your name and group size</p>
 
               {entryError && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm">
-                  ❌ {entryError}
+                  {entryError}
                 </div>
               )}
 
@@ -1416,7 +1416,7 @@ function MenuPageInner() {
                 </label>
                 {customerName ? (
                   <div className="w-full border-2 border-green-300 bg-green-50 rounded-xl px-4 py-3 text-sm font-medium text-green-800">
-                    👤 {customerName}
+                    {customerName}
                     <p className="text-[10px] text-green-600 mt-1">Registered member • Name cannot be changed. Ask staff to update.</p>
                   </div>
                 ) : (
@@ -1462,7 +1462,7 @@ function MenuPageInner() {
                 disabled={entryLoading || !entryName.trim()}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-lg transition-colors"
               >
-                {entryLoading ? '⏳ Checking In...' : '✅ Start Ordering'}
+                {entryLoading ? 'Checking In...' : 'Start Ordering'}
               </button>
             </div>
           </div>
@@ -1731,7 +1731,7 @@ function MenuPageInner() {
                         <option value="" disabled>Select a table...</option>
                         {availableTables.map(table => {
                           const availableChairs = table.capacity - table.currentOccupants;
-                          const statusLabel = table.status === 'AVAILABLE' ? '✅ Available' : table.status === 'OCCUPIED' ? '⏳ Occupied' : '🧹 Needs Cleaning';
+                          const statusLabel = table.status === 'AVAILABLE' ? 'Available' : table.status === 'OCCUPIED' ? 'Occupied' : 'Needs Cleaning';
                           return (
                             <option key={table.id} value={table.name}>
                               {statusLabel} - Table {table.name} ({availableChairs} chairs available)
@@ -1766,7 +1766,7 @@ function MenuPageInner() {
           {/* Reviews entrance */}
           <div className="flex w-full items-center gap-2 px-4 pb-3 sm:px-6 lg:px-8">
             <Link href="/menu/reviews" className="inline-flex items-center gap-1.5 rounded-full border border-[#f0e0ca] bg-white/90 px-4 py-2 text-[13px] font-medium text-stone-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
-              ⭐ Reviews
+              Reviews
             </Link>
           </div>
 
@@ -1792,7 +1792,7 @@ function MenuPageInner() {
 
             {tableFromQr && (
               <div className="mt-2 text-center flex items-center justify-center gap-2">
-                <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full text-sm font-medium">🍽️ Ordering from {tableFromQr}</span>
+                <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full text-sm font-medium">Ordering from {tableFromQr}</span>
                 <button
                   onClick={async () => {
                     if (!tableFromQr) return;
@@ -1823,7 +1823,7 @@ function MenuPageInner() {
                   }}
                   className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-red-200 transition-colors"
                 >
-                  🚪 Leave
+                  Leave
                 </button>
               </div>
             )}

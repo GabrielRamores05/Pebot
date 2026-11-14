@@ -78,15 +78,15 @@ export default function KitchenPage() {
             </span>
             {order.orderType && order.orderType !== 'DINE_IN' && (
               <p className="text-xs mt-1 font-semibold">
-                {order.orderType === 'DELIVERY' ? '🛵 Delivery' : '🥡 Takeout'}
+                {order.orderType === 'DELIVERY' ? 'Delivery' : 'Takeout'}
               </p>
             )}
-            {order.table && <p className="text-gray-500 text-xs mt-1">📍 {order.table.name}</p>}
-            {order.deliveryAddress && <p className="text-gray-500 text-xs mt-1">📍 {order.deliveryAddress}</p>}
+            {order.table && <p className="text-gray-500 text-xs mt-1">{order.table.name}</p>}
+            {order.deliveryAddress && <p className="text-gray-500 text-xs mt-1">{order.deliveryAddress}</p>}
           </div>
         </div>
 
-        <p className="text-gray-500 text-xs mb-3">⏱ {timeSince(order.createdAt)}</p>
+        <p className="text-gray-500 text-xs mb-3">{timeSince(order.createdAt)}</p>
 
         {msgs.length > 0 && (
           <button
@@ -96,10 +96,10 @@ export default function KitchenPage() {
             }`}
           >
             <span className={`text-[11px] font-bold uppercase tracking-wide ${hasUnanswered ? 'text-amber-300' : 'text-gray-400'}`}>
-              💬 {msgs.length} message{msgs.length > 1 ? 's' : ''}{hasUnanswered ? ' · waiting' : ''}
+              {msgs.length} message{msgs.length > 1 ? 's' : ''}{hasUnanswered ? ' · waiting' : ''}
             </span>
             <p className={`text-sm truncate mt-0.5 ${lastMsg.sender === order.customerName ? 'text-gray-200' : 'text-gray-400'}`}>
-              {lastMsg.type === 'voice' ? '🎤 Voice message' : lastMsg.content}
+              {lastMsg.type === 'voice' ? 'Voice message' : lastMsg.content}
             </p>
           </button>
         )}
@@ -120,7 +120,7 @@ export default function KitchenPage() {
                 disabled={updating === order.id}
                 className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-lg transition"
               >
-                🔥 Start Preparing
+                Start Preparing
               </button>
             )}
             {isPreparing && (
@@ -129,7 +129,7 @@ export default function KitchenPage() {
                 disabled={updating === order.id}
                 className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-lg transition"
               >
-                ✅ Mark Ready
+                Mark Ready
               </button>
             )}
           </div>
@@ -159,7 +159,7 @@ export default function KitchenPage() {
       <header className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between lg:p-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Back of house</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white lg:text-3xl">🍳 Staff Queue</h1>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white lg:text-3xl">Staff Queue</h1>
           <p className="mt-1 text-sm text-slate-400">{new Date().toLocaleDateString()} &middot; {new Date().toLocaleTimeString()}</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -296,8 +296,8 @@ export default function KitchenPage() {
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-lg w-full mx-4 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-xl font-bold">💬 {ticketCode(threadOrder.orderNumber)}</h3>
-                <p className="text-gray-400 text-sm">{threadOrder.customerName}{threadOrder.table ? ` · 📍 ${threadOrder.table.name}` : ''}</p>
+                <h3 className="text-xl font-bold">{ticketCode(threadOrder.orderNumber)}</h3>
+                <p className="text-gray-400 text-sm">{threadOrder.customerName}{threadOrder.table ? ` · ${threadOrder.table.name}` : ''}</p>
               </div>
               <button onClick={() => setThreadOrder(null)} className="text-gray-400 hover:text-gray-200 text-xl px-2">✕</button>
             </div>
@@ -309,7 +309,7 @@ export default function KitchenPage() {
                 (threadOrder.messages || []).map((m) => (
                   <div key={m.id} className={`p-3 rounded-xl text-sm max-w-[85%] ${m.sender === threadOrder.customerName ? 'bg-gray-800 text-gray-100 mr-auto' : 'bg-blue-600 text-white ml-auto'}`}>
                     <div className="flex items-center gap-2 mb-1 text-xs text-gray-400">
-                      <span>{m.sender === threadOrder.customerName ? `🙋 ${m.sender}` : `👨‍🍳 ${m.sender}`}</span>
+                      <span>{m.sender === threadOrder.customerName ? `${m.sender}` : `${m.sender}`}</span>
                       <span>·</span>
                       <span>{new Date(m.createdAt).toLocaleTimeString()}</span>
                     </div>
@@ -344,7 +344,7 @@ export default function KitchenPage() {
               </div>
             ) : (
               <a href="/login?next=/kitchen" className="block w-full text-center bg-white/10 text-gray-200 py-3 rounded-xl font-semibold text-sm hover:bg-white/20 transition-colors">
-                🔒 Sign in to reply
+                Sign in to reply
               </a>
             )}
           </div>

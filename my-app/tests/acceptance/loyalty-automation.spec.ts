@@ -141,7 +141,7 @@ test('terminal order awards points at placement', async ({ page }) => {
   // Add the first product to the cart and place the order; payment is taken at
   // the terminal, so points land immediately.
   await page.getByPlaceholder(/search products/i).fill('')
-  await page.locator('button', { hasText: '✅ Place Order' }).click()
+  await page.locator('button', { hasText: 'Charge' }).click()
 
   await expect(async () => {
     const count = await loyaltyCardCount(page, CUSTOMER_NAME)

@@ -766,24 +766,20 @@ const [shopName, setShopName] = useState('Pebot');
     : [];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 min-h-screen">
+    <div className="flex-1 overflow-y-auto bg-page min-h-screen">
       {/* Apple-inspired Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 shadow-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="px-6 pb-2 pt-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center text-xl shadow-sm">
-              📦
-            </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 -tracking-[0.3px]">Inventory</h1>
-              <p className="text-xs text-gray-500">Manage your stock levels</p>
+              <h1 className="c-title">Inventory</h1>
+              <p className="mt-1.5 text-sm text-muted">Manage your stock levels</p>
             </div>
           </div>
           <button
             onClick={fetchInventory}
             className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm border border-gray-200 transition-all hover:shadow-md"
           >
-            <span>🔄</span>
             Refresh
           </button>
         </div>
@@ -806,7 +802,7 @@ const [shopName, setShopName] = useState('Pebot');
                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            📦 Products
+            Products
           </button>
           <button
             onClick={() => setActiveTab('ingredients')}
@@ -816,7 +812,7 @@ const [shopName, setShopName] = useState('Pebot');
                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            🥄 Ingredients
+            Ingredients
           </button>
           <button
             onClick={() => setActiveTab('suppliers')}
@@ -828,7 +824,7 @@ const [shopName, setShopName] = useState('Pebot');
               }
             `}
           >
-            🏢 Suppliers
+            Suppliers
           </button>
           <button
             onClick={() => setActiveTab('capacity')}
@@ -838,7 +834,7 @@ const [shopName, setShopName] = useState('Pebot');
                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            📊 Production Capacity
+            Production Capacity
           </button>
         </div>
 
@@ -890,20 +886,19 @@ const [shopName, setShopName] = useState('Pebot');
                   onClick={() => setBulkOpen(true)}
                   className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 >
-                  ⚖ Bulk Adjust
+                  Bulk Adjust
                 </button>
                 <button
                   onClick={() => { setPlannerOpen(true); setCalcResult(null); setCalcProducts({}); }}
                   className="bg-amber-50 hover:bg-amber-100 text-accent-text px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 >
-                  🧾 Plan Purchases
+                  Plan Purchases
                 </button>
               </div>
               <button
                 onClick={fetchIngredients}
                 className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm border border-gray-200 transition-all hover:shadow-md"
               >
-                <span>🔄</span>
                 Refresh
               </button>
             </div>
@@ -915,8 +910,7 @@ const [shopName, setShopName] = useState('Pebot');
             ) : ingredients.length === 0 ? (
               <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-gray-200/50 p-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">🥄</span>
-                </div>
+                  </div>
                 <p className="text-gray-500 font-medium">No ingredients found</p>
                 <button
                   onClick={openAddIngredient}
@@ -1305,8 +1299,7 @@ const [shopName, setShopName] = useState('Pebot');
              {suppliers.length === 0 ? (
                <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-gray-200/50 p-12 text-center">
                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                   <span className="text-3xl">🏢</span>
-                 </div>
+                   </div>
                  <p className="text-gray-500 font-medium">No suppliers found</p>
                  <button
                    onClick={() => { setEditingSupplier(null); setShowSupplierModal(true); }}
@@ -1475,7 +1468,6 @@ const [shopName, setShopName] = useState('Pebot');
         {lowStock.length > 0 && (
           <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-red-200/50 p-5 shadow-lg">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">⚠️</span>
               <p className="text-red-600 font-semibold">Low Stock Alert ({lowStock.length} items)</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -2127,8 +2119,7 @@ const [shopName, setShopName] = useState('Pebot');
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white text-lg">🧾</span>
-                        </div>
+                          </div>
                         <div>
                           <h4 className="text-slate-800 font-bold text-base">Purchase Invoice</h4>
                           <p className="text-slate-400 text-xs">#{Math.random().toString(36).substring(2, 8).toUpperCase()}</p>
@@ -2225,7 +2216,7 @@ const [shopName, setShopName] = useState('Pebot');
                   )}
 
                   <div className="bg-slate-50 px-4 py-3 border-t border-slate-200 text-center">
-                    <p className="text-slate-600 text-xs font-medium">Thank you for your business! 🙏</p>
+                    <p className="text-slate-600 text-xs font-medium">Thank you for your business!</p>
                     <p className="text-slate-400 text-xs mt-0.5">{shopName} • Purchase Request</p>
                   </div>
                 </div>

@@ -354,7 +354,7 @@ export default function AdminToolsSection({ shopName = 'Pebot', logoUrl }: { sho
             >
               ✕
             </button>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">🚪 Exit QR</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Exit QR</h2>
             <p className="text-gray-500 text-sm mb-6">Customers scan this when leaving to free up their table.</p>
 
             <div className="bg-white p-4 rounded-2xl inline-block shadow-sm border border-gray-200" ref={exitQrRef}>
@@ -373,7 +373,7 @@ export default function AdminToolsSection({ shopName = 'Pebot', logoUrl }: { sho
                     <html><head><title>Exit QR Code - ${safeShopName}</title>
                     <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;margin:0}img{width:300px;height:300px}h2{margin-bottom:8px}p{color:#666;margin-top:4px;font-size:14px}</style>
                     </head><body>
-                    <h2>🚪 Exit QR</h2>
+                    <h2>Exit QR</h2>
                     <p>Scan when leaving</p>
                     ${qrElement.outerHTML}
                     <script>window.onload=function(){window.print();window.close()}</script>
@@ -419,7 +419,7 @@ export default function AdminToolsSection({ shopName = 'Pebot', logoUrl }: { sho
       {showRestoreConfirm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative">
-            <h2 className="text-2xl font-bold text-red-600 mb-3">⚠️ Restore Backup?</h2>
+            <h2 className="text-2xl font-bold text-red-600 mb-3">Restore Backup?</h2>
             <p className="text-gray-600 mb-6">Current database will be permanently lost. Are you sure?</p>
             <p className="text-5xl font-bold text-slate-800 mb-6">{restoreCountdown}s</p>
             <div className="flex gap-3 justify-center">
@@ -446,7 +446,7 @@ export default function AdminToolsSection({ shopName = 'Pebot', logoUrl }: { sho
       {restoreError && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative">
-            <h2 className="text-2xl font-bold text-red-600 mb-3">❌ Restore Failed</h2>
+            <h2 className="text-2xl font-bold text-red-600 mb-3">Restore Failed</h2>
             <p className="text-gray-600 mb-6">{restoreError}</p>
             <button
               onClick={() => setRestoreError(null)}

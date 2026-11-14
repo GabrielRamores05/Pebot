@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconHistory } from '@/lib/assets';
 
 interface OrderItem {
   id: number;
@@ -156,34 +155,21 @@ export default function OrderHistoryPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-linear-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center text-xl">
-              <IconHistory size={20} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Order History</h1>
-              <p className="text-xs text-gray-500">
-                {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} found
-                {orders.length > 0 && ` (showing ${Math.min(itemsPerPage, filteredOrders.length)} of ${filteredOrders.length})`}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={fetchOrders}
-            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 rounded-xl text-sm font-medium text-white transition"
-          >
-            ↻ Refresh
-          </button>
+    <div className="flex-1 overflow-y-auto bg-page text-ink">
+      <header className="flex flex-wrap items-end justify-between gap-4 px-6 pb-2 pt-6">
+        <div>
+          <h1 className="c-title">Order history</h1>
+          <p className="mt-1.5 text-sm text-muted">
+            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} found
+            {orders.length > 0 && ` · showing ${Math.min(itemsPerPage, filteredOrders.length)} of ${filteredOrders.length}`}
+          </p>
         </div>
-      </div>
+        <button onClick={fetchOrders} className="c-btn c-btn--ghost">Refresh</button>
+      </header>
 
-      <div className="p-6 space-y-6">
+      <div className="space-y-4 px-6 pb-8 pt-2">
         {/* Filters */}
-        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-wrap gap-4 items-end">
+        <div className="c-card p-4 border border-gray-200 shadow-sm flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-64">
             <label className="block text-sm font-medium text-gray-600 mb-1">Search</label>
             <input
@@ -236,7 +222,7 @@ export default function OrderHistoryPage() {
         </div>
 
         {/* Orders Table */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="c-card border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -285,12 +271,12 @@ export default function OrderHistoryPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">
-                          {order.paymentMethod === 'CASH' ? '💵 Cash' :
-                           order.paymentMethod === 'GCASH' ? '📱 GCash' :
-                           order.paymentMethod === 'PAYMAYA' ? '📱 PayMaya' : order.paymentMethod}
+                          {order.paymentMethod === 'CASH' ? 'Cash' :
+                           order.paymentMethod === 'GCASH' ? 'GCash' :
+                           order.paymentMethod === 'PAYMAYA' || order.paymentMethod === 'MAYA' ? 'Maya' : order.paymentMethod}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className="text-accent-text" title="View Invoice">🧾</span>
+                          <span className="text-xs font-semibold text-accent-text" title="View receipt">Receipt</span>
                         </td>
                       </tr>
                     );
@@ -331,7 +317,7 @@ export default function OrderHistoryPage() {
       {selectedOrder && showInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowInvoice(false)}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+            className="c-card shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Invoice Header */}
@@ -516,13 +502,13 @@ export default function OrderHistoryPage() {
                   }}
                   className="flex-1 py-2.5 bg-accent hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
                 >
-                  🖨️ Thermal Print
+                  Thermal print
                 </button>
                 <button
                   onClick={() => window.print()}
                   className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
                 >
-                  📄 A4 / Plain
+                  A4 / plain
                 </button>
               </div>
             </div>

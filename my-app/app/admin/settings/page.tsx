@@ -191,15 +191,15 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setBusinessMsg('✅ Business settings saved!')
+        setBusinessMsg('Business settings saved!')
         setAiFolderAccess(data.aiFolderAccess ? true : false)
         setAiReadBirPricing(data.aiReadBirPricing ? true : false);
       } else {
-        setBusinessMsg('❌ Failed: ' + (data.error || 'Unknown error'));
+        setBusinessMsg('Failed: ' + (data.error || 'Unknown error'));
       }
     } catch (err) {
       console.error('Save error:', err);
-      setBusinessMsg('❌ Network error');
+      setBusinessMsg('Network error');
     } finally {
       setBusinessSaving(false);
     }
@@ -354,13 +354,13 @@ export default function SettingsPage() {
   // ────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 min-h-screen p-4 md:p-6">
+    <div className="flex-1 overflow-y-auto bg-page min-h-screen p-4 md:p-6">
       <div className="max-w-3xl mx-auto">
 
          {/* Header */}
          <div className="mb-4">
-           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-           <p className="text-gray-500 text-sm mt-1">Manage branding and user accounts</p>
+           <h1 className="c-title">Settings</h1>
+           <p className="mt-1.5 text-sm text-muted">Manage branding and user accounts</p>
          </div>
          {usersError && <div className="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3">{usersError}</div>}
 
@@ -374,7 +374,7 @@ export default function SettingsPage() {
                 tab === t ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {t === 'business' ? '🏢 Business' : t === 'branding' ? 'Branding' : t === 'loyalty' ? 'Loyalty' : t === 'payments' ? '💳 Payments' : t === 'tools' ? '🧰 Account & Data' : t === 'license' ? 'License' : '🤖 AI Consultant'}
+              {t === 'business' ? 'Business' : t === 'branding' ? 'Branding' : t === 'loyalty' ? 'Loyalty' : t === 'payments' ? 'Payments' : t === 'tools' ? 'Account & Data' : t === 'license' ? 'License' : 'AI Consultant'}
             </button>
           ))}
         </div>
@@ -390,7 +390,7 @@ export default function SettingsPage() {
                 <div className="w-20 h-20 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
                   {logoUrl
                     ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                    : <span className="text-3xl">🍽️</span>}
+                    : <span className="text-xs text-faint">No logo</span>}
                 </div>
                 <div className="flex flex-col gap-2">
                   <input
@@ -457,7 +457,7 @@ export default function SettingsPage() {
         {tab === 'business' && (
           <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
             <div className="border-b border-gray-200 pb-4">
-              <h3 className="text-lg font-bold text-gray-900">🏢 BIR Business Settings</h3>
+              <h3 className="text-lg font-bold text-gray-900">BIR Business Settings</h3>
               <p className="text-gray-500 text-sm mt-1">Business information for BIR-compliant receipts/invoices</p>
             </div>
 
@@ -622,7 +622,7 @@ export default function SettingsPage() {
                 disabled={businessSaving}
                 className="bg-accent hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
-                {businessSaving ? 'Saving...' : '💾 Save Business Settings'}
+                {businessSaving ? 'Saving...' : 'Save Business Settings'}
               </button>
               {businessMsg && (
                 <span className="text-emerald-600 text-sm font-medium">{businessMsg}</span>
@@ -635,7 +635,7 @@ export default function SettingsPage() {
         {tab === 'loyalty' && (
           <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
             <div className="border-b border-gray-200 pb-4">
-              <h3 className="text-lg font-bold text-gray-900">🎁 Loyalty Program</h3>
+              <h3 className="text-lg font-bold text-gray-900">Loyalty Program</h3>
               <p className="text-gray-500 text-sm mt-1">Enable or disable the loyalty program globally</p>
             </div>
 
@@ -658,7 +658,7 @@ export default function SettingsPage() {
                 disabled={businessSaving}
                 className="bg-accent hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
-                {businessSaving ? 'Saving...' : '💾 Save Loyalty Settings'}
+                {businessSaving ? 'Saving...' : 'Save Loyalty Settings'}
               </button>
               {businessMsg && (
                 <span className="text-emerald-600 text-sm font-medium">{businessMsg}</span>
@@ -667,11 +667,11 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* 💳 PAYMENTS TAB */}
+        {/* PAYMENTS TAB */}
         {tab === 'payments' && (
           <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
             <div className="border-b border-gray-200 pb-4">
-              <h3 className="text-lg font-bold text-gray-900">💳 Payment Methods</h3>
+              <h3 className="text-lg font-bold text-gray-900">Payment Methods</h3>
               <p className="text-gray-500 text-sm mt-1">Configure QR codes for GCash and PayMaya</p>
             </div>
 
@@ -716,7 +716,7 @@ export default function SettingsPage() {
                         if (data.url) setGcashQrImage(data.url);
                       }}
                     />
-                    📤 Upload GCash QR
+                    Upload GCash QR
                   </label>
                 )}
               </div>
@@ -763,7 +763,7 @@ export default function SettingsPage() {
                         if (data.url) setPaymayaQrImage(data.url);
                       }}
                     />
-                    📤 Upload PayMaya QR
+                    Upload PayMaya QR
                   </label>
                 )}
               </div>
@@ -775,7 +775,7 @@ export default function SettingsPage() {
                 disabled={businessSaving}
                 className="bg-accent hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
-                {businessSaving ? 'Saving...' : '💾 Save Payment Settings'}
+                {businessSaving ? 'Saving...' : 'Save Payment Settings'}
               </button>
               {businessMsg && (
                 <span className="text-emerald-600 text-sm font-medium">{businessMsg}</span>
@@ -784,11 +784,11 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* 🤖 AI CONSULTANT TAB */}
+        {/* AI CONSULTANT TAB */}
         {tab === 'ai' && (
           <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-4">
             <div className="border-b border-gray-200 pb-4">
-              <h3 className="text-lg font-bold text-gray-900">🤖 AI Consultant</h3>
+              <h3 className="text-lg font-bold text-gray-900">AI Consultant</h3>
               <p className="text-gray-500 text-sm mt-1">Configure your AI assistant powered by OpenRouter</p>
             </div>
 
@@ -896,7 +896,7 @@ export default function SettingsPage() {
                 disabled={businessSaving}
                 className="bg-accent hover:bg-amber-500 disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-medium transition-colors"
               >
-                {businessSaving ? 'Saving...' : '💾 Save AI Settings'}
+                {businessSaving ? 'Saving...' : 'Save AI Settings'}
               </button>
               {businessMsg && (
                 <span className="text-emerald-600 text-sm font-medium">{businessMsg}</span>
@@ -1072,7 +1072,7 @@ export default function SettingsPage() {
 
       {tab === 'license' && <LicensePanel />}
 
-      {/* 🧰 TOOLS TAB — account, QR codes, backup/restore */}
+      {/* TOOLS TAB — account, QR codes, backup/restore */}
       {tab === 'tools' && (
         <AdminToolsSection shopName={shopName} logoUrl={logoUrl} />
       )}
