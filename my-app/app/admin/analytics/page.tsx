@@ -6,11 +6,11 @@ import dynamic from 'next/dynamic';
 type TabType = 'overview' | 'revenue' | 'customers' | 'fulfillment' | 'vouchers';
 
 const TABS: { id: TabType; label: string }[] = [
-  { id: 'overview', label: '📊 Overview' },
-  { id: 'revenue', label: '💰 Revenue' },
-  { id: 'customers', label: '👥 Customers' },
-  { id: 'fulfillment', label: '⚡ Fulfillment' },
-  { id: 'vouchers', label: '🎟️ Vouchers' },
+  { id: 'overview', label: 'Overview' },
+  { id: 'revenue', label: 'Revenue' },
+  { id: 'customers', label: 'Customers' },
+  { id: 'fulfillment', label: 'Fulfillment' },
+  { id: 'vouchers', label: 'Vouchers' },
 ];
 
 // Dynamically import dashboard components to avoid circular dependencies
@@ -45,28 +45,28 @@ export default function AnalyticsMaster() {
   if (!mounted) return null;
 
   return (
-    <div className="w-full h-full flex flex-col bg-gradient-to-br from-gray-100 to-gray-200">
-      {/* Sticky Tab Navigation */}
-      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 flex-shrink-0" style={{ scrollBehavior: 'smooth' }}>
-        <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+    <div className="flex h-full w-full flex-col bg-page">
+      <header className="flex flex-wrap items-end justify-between gap-4 px-6 pb-4 pt-6">
+        <div>
+          <h1 className="c-title">Analytics</h1>
+          <p className="mt-1.5 text-sm text-muted">How the restaurant is doing, by period.</p>
+        </div>
+        <nav className="flex border-b border-hair" aria-label="Analytics sections">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-4 font-medium text-sm border-b-2 transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'border-amber-500 text-accent-text'
-                  : 'border-transparent text-gray-500 hover:text-gray-900'
-              }`}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
+              className={`-mb-px whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-semibold transition ${activeTab === tab.id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'}`}
             >
               {tab.label}
             </button>
           ))}
-        </div>
-      </div>
+        </nav>
+      </header>
 
       {/* Tab Content - Scrollable */}
-      <div className="flex-1 w-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+      <div className="w-full flex-1 overflow-y-auto">
         {activeTab === 'overview' && <OverviewDashboard />}
         {activeTab === 'revenue' && <RevenueDashboard />}
         {activeTab === 'customers' && <CustomersDashboard />}

@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatPeso } from '@/lib/format';
 import { useSocket } from '@/hooks/useSocket';
 import html2canvas from 'html2canvas';
 
@@ -32,8 +30,9 @@ interface InventorySummaryData {
   totalStockValue: number;
 }
 
-const COLORS = ['#d97706', '#b45309', '#92400e', '#78350f', '#f59e0b', '#fbbf24', '#fcd34d'];
-const STATUS_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#ef4444'];
+const ACCENT = '#B4472A';
+const GRID = '#E7E1D8';
+const AXIS = '#7B7369';
 
 const FILTERS = [
   { key: 'today',     label: 'Today' },
@@ -59,7 +58,7 @@ function getFilterSubtitle(filter: string): string {
   return '';
 }
 
-const tooltipStyle = { backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' };
+const tooltipStyle = { backgroundColor: '#FFFDFA', border: '1px solid #E7E1D8', borderRadius: 12, boxShadow: '0 12px 30px -16px rgba(45,30,20,0.35)' };
 
 export default function OverviewDashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -67,6 +66,7 @@ export default function OverviewDashboard() {
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState<InventorySummaryData | null>(null);
   const [inventoryLoaded, setInventoryLoaded] = useState(false);
+  const [measure, setMeasure] = useState<'sales' | 'orders'>('sales');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -127,275 +127,233 @@ export default function OverviewDashboard() {
   }
 
   const showDailyChart = filter === 'week' || filter === 'month' || filter === 'year';
+  const chartData = showDailyChart
+    ? (data?.salesByDay ?? [])
+    : (data?.salesByHour ?? []).filter((h) => h.sales > 0 || h.orders > 0);
+  const chartKey = showDailyChart ? 'sales' : measure;
+  const statusRows = [
+    { name: 'Waiting', value: data?.pendingOrders ?? 0, color: 'bg-[#C9A35B]' },
+    { name: 'Preparing', value: data?.preparingOrders ?? 0, color: 'bg-accent' },
+    { name: 'Completed', value: data?.completedOrders ?? 0, color: 'bg-good' },
+    { name: 'Cancelled', value: data?.cancelledOrders ?? 0, color: 'bg-hair-strong' },
+  ];
+  const statusTotal = statusRows.reduce((n, r) => n + r.value, 0);
+  const categoryTotal = (data?.salesByCategory ?? []).reduce((n, c) => n + c.sales, 0);
+  const saveBtn = (id: string, name: string) => (
+    <button onClick={() => downloadChart(id, name)} className="text-xs font-semibold text-faint hover:text-ink" title="Save as image">
+      Save image
+    </button>
+  );
 
   return (
-    <div className="w-full h-auto bg-gradient-to-br from-gray-100 to-gray-200 text-gray-900 min-h-screen">
-      {/* Header with filters - Apple Style */}
-      <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-xl border-b border-gray-100 px-6 py-4 flex-shrink-0 -mx-6 -mt-4 mb-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Sales Overview</h2>
-            <p className="text-gray-500 text-sm mt-0.5">{getFilterSubtitle(filter)}</p>
-          </div>
-          {/* Segmented filter */}
-          <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5 flex-wrap">
-            {FILTERS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  filter === f.key
-                    ? 'bg-gray-900 text-white shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+    <div className="space-y-4 px-6 pb-8">
+      {/* Period */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted">{getFilterSubtitle(filter)}</p>
+        <div className="flex flex-wrap rounded-xl bg-panel p-1">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`h-9 rounded-[10px] px-3.5 text-[13px] font-semibold transition ${filter === f.key ? 'bg-card text-ink shadow-card' : 'text-muted hover:text-ink'}`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="p-6 space-y-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-24 text-gray-500">Loading...</div>
-        ) : (
-          <>
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { label: 'Total Sales',  value: `₱${(data?.totalSales ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`, icon: '💰', accent: 'text-amber-500' },
-                { label: 'Total Orders', value: data?.totalOrders ?? 0,       icon: '📋', accent: 'text-blue-500' },
-                { label: 'Completed',    value: data?.completedOrders ?? 0,   icon: '✅', accent: 'text-green-500' },
-                { label: 'Avg Order',    value: `₱${(data?.avgOrderValue ?? 0).toFixed(2)}`, icon: '📈', accent: 'text-purple-500' },
-              ].map((kpi) => (
-                <div key={kpi.label} className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-2xl ${kpi.accent}`}>{kpi.icon}</span>
-                  </div>
-                  <p className="text-3xl font-bold tabular-nums text-gray-900">{kpi.value}</p>
-                  <p className="text-gray-500 text-xs font-medium">{kpi.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Spec 014 US5 — Inventory health summary (threshold-driven) */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900">Inventory Summary</h3>
-                <span className="text-gray-400 text-xs">
-                  {inventory != null ? `${inventory.totalIngredients} ingredients · thresholds` : '—'}
-                </span>
+      {loading ? (
+        <div className="flex items-center justify-center py-24 text-sm text-faint">Loading…</div>
+      ) : (
+        <>
+          {/* Headline tiles */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: 'Sales', value: formatPeso(data?.totalSales ?? 0), note: `From ${data?.completedOrders ?? 0} completed orders`, tile: 'bg-tile-peach' },
+              { label: 'Orders', value: String(data?.totalOrders ?? 0), note: `All placed · ${data?.cancelledOrders ?? 0} cancelled`, tile: 'bg-tile-sage' },
+              { label: 'Average order', value: formatPeso(data?.avgOrderValue ?? 0), note: 'Per completed order', tile: 'bg-tile-sand' },
+              { label: 'Completed', value: String(data?.completedOrders ?? 0), note: `${(data?.pendingOrders ?? 0) + (data?.preparingOrders ?? 0)} still open`, tile: 'bg-tile-sky' },
+            ].map((t) => (
+              <div key={t.label} className={`rounded-[20px] px-5 py-4 ${t.tile}`}>
+                <p className="text-[13px] font-semibold text-muted">{t.label}</p>
+                <p className="mt-1 truncate text-[28px] font-bold leading-tight tabular-nums tracking-[-0.03em]">{t.value}</p>
+                <p className="text-xs text-muted">{t.note}</p>
               </div>
-              {inventory == null && !inventoryLoaded ? (
-                <p className="text-gray-400 text-sm py-2">Loading inventory health…</p>
-              ) : inventory == null ? (
-                <p className="text-gray-400 text-sm py-2">Inventory summary is unavailable right now.</p>
-              ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-green-50 rounded-2xl p-4">
-                    <p className="text-2xl font-bold text-green-600 tabular-nums">{inventory.healthy}</p>
-                    <p className="text-gray-500 text-xs font-medium mt-0.5">Healthy</p>
-                  </div>
-                  <div className="bg-orange-50 rounded-2xl p-4">
-                    <p className="text-2xl font-bold text-orange-500 tabular-nums">{inventory.low}</p>
-                    <p className="text-gray-500 text-xs font-medium mt-0.5">Low Stock</p>
-                  </div>
-                  <div className="bg-red-50 rounded-2xl p-4">
-                    <p className="text-2xl font-bold text-red-500 tabular-nums">{inventory.out}</p>
-                    <p className="text-gray-500 text-xs font-medium mt-0.5">Out of Stock</p>
-                  </div>
-                  <div className="bg-amber-50 rounded-2xl p-4">
-                    <p className="text-2xl font-bold text-gray-900 tabular-nums">
-                      ₱{inventory.totalStockValue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-gray-500 text-xs font-medium mt-0.5">Total Stock Value</p>
-                  </div>
+            ))}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            {/* Sales chart */}
+            <section id="chart-sales-trend" className="c-card p-5 xl:col-span-2">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold">{showDailyChart ? 'Sales by day' : measure === 'sales' ? 'Sales by hour' : 'Orders by hour'}</h3>
+                  <p className="text-xs text-faint">{showDailyChart ? 'Each day in the period' : 'Busy hours at a glance'}</p>
                 </div>
-              )}
-            </div>
-
-            {/* Sales trend chart */}
-            <div id="chart-sales-trend" className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 flex items-center justify-between">
-                <span>{showDailyChart ? 'Sales by Day' : 'Sales by Hour'}</span>
-                <button onClick={() => downloadChart('chart-sales-trend', 'sales-trend.png')} className="text-gray-400 hover:text-gray-700 text-sm">📥 Download</button>
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={showDailyChart
-                  ? (data?.salesByDay ?? [])
-                  : (data?.salesByHour?.filter((h) => h.sales > 0) ?? [])
-                }>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="label" stroke="#6b7280" tick={{ fontSize: 11 }} />
-                  <YAxis stroke="#6b7280" tick={{ fontSize: 11 }} tickFormatter={(v) => `₱${v}`} />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    labelStyle={{ color: '#6b7280' }}
-                    formatter={(v) => [`₱${Number(v ?? 0).toFixed(2)}`, 'Sales'] as [string, string]}
-                    cursor={{ fill: 'rgba(251, 191, 36, 0.1)' }}
-                  />
-                  <Bar dataKey="sales" fill="#d97706" radius={[4, 4, 0, 0]} maxBarSize={48} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Second Row - 3 Columns */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {/* Order Status Breakdown */}
-              <div id="chart-order-status" className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-bold mb-4 text-gray-900 flex items-center justify-between">
-                  <span>Order Status</span>
-                  <button onClick={() => downloadChart('chart-order-status', 'order-status.png')} className="text-gray-400 hover:text-gray-700 text-sm">📥 Download</button>
-                </h3>
-                {data && (data.pendingOrders || data.preparingOrders || data.completedOrders || data.cancelledOrders) ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Pending', value: data.pendingOrders || 0 },
-                            { name: 'Preparing', value: data.preparingOrders || 0 },
-                            { name: 'Completed', value: data.completedOrders || 0 },
-                            { name: 'Cancelled', value: data.cancelledOrders || 0 },
-                          ].filter(d => d.value > 0)}
-                          cx="50%" cy="50%"
-                          innerRadius={50}
-                          outerRadius={70}
-                          dataKey="value"
-                          nameKey="name"
-                          label={({ name, percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
-                          labelLine={false}
+                <div className="flex items-center gap-3">
+                  {!showDailyChart && (
+                    <div className="flex rounded-[10px] bg-panel p-0.5">
+                      {(['sales', 'orders'] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setMeasure(m)}
+                          className={`h-8 rounded-[8px] px-3 text-xs font-semibold ${measure === m ? 'bg-card text-ink shadow-card' : 'text-muted'}`}
                         >
-                          {[
-                            { name: 'Pending', value: data.pendingOrders || 0 },
-                            { name: 'Preparing', value: data.preparingOrders || 0 },
-                            { name: 'Completed', value: data.completedOrders || 0 },
-                            { name: 'Cancelled', value: data.cancelledOrders || 0 },
-                          ].filter(d => d.value > 0).map((_, idx) => (
-                            <Cell key={idx} fill={STATUS_COLORS[idx % STATUS_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip contentStyle={tooltipStyle} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    {/* Legend */}
-                    <div className="flex flex-wrap justify-center gap-4 mt-2">
-                      {[
-                        { name: 'Pending', color: STATUS_COLORS[0], count: data.pendingOrders || 0 },
-                        { name: 'Preparing', color: STATUS_COLORS[1], count: data.preparingOrders || 0 },
-                        { name: 'Completed', color: STATUS_COLORS[2], count: data.completedOrders || 0 },
-                        { name: 'Cancelled', color: STATUS_COLORS[3], count: data.cancelledOrders || 0 },
-                      ].filter(d => d.count > 0).map((item) => (
-                        <div key={item.name} className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                          <span className="text-sm text-gray-600">{item.name}: {item.count}</span>
-                        </div>
+                          {m === 'sales' ? 'Sales' : 'Orders'}
+                        </button>
                       ))}
                     </div>
+                  )}
+                  {saveBtn('chart-sales-trend', 'sales-trend.png')}
+                </div>
+              </div>
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={chartData} margin={{ left: 0, right: 0, top: 4 }}>
+                    <CartesianGrid vertical={false} stroke={GRID} />
+                    <XAxis dataKey="label" stroke={AXIS} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                    <YAxis stroke={AXIS} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} width={56}
+                      tickFormatter={(v) => (chartKey === 'orders' ? String(v) : `₱${Number(v).toLocaleString('en-PH')}`)} />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      labelStyle={{ color: AXIS }}
+                      cursor={{ fill: 'rgba(180, 71, 42, 0.06)' }}
+                      formatter={(v) => (chartKey === 'orders' ? [String(v), 'Orders'] : [formatPeso(Number(v ?? 0)), 'Sales']) as [string, string]}
+                    />
+                    <Bar dataKey={chartKey} fill={ACCENT} radius={[6, 6, 0, 0]} maxBarSize={44} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-[280px] items-center justify-center text-sm text-faint">No sales in this period yet.</div>
+              )}
+            </section>
+
+            {/* Right column */}
+            <div className="space-y-4">
+              <section id="chart-order-status" className="c-card p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-base font-bold">Order status</h3>
+                  {saveBtn('chart-order-status', 'order-status.png')}
+                </div>
+                {statusTotal > 0 ? (
+                  <>
+                    <div className="mb-3 flex h-2.5 overflow-hidden rounded-full bg-panel">
+                      {statusRows.filter((r) => r.value > 0).map((r) => (
+                        <div key={r.name} className={r.color} style={{ width: `${(r.value / statusTotal) * 100}%` }} />
+                      ))}
+                    </div>
+                    <ul className="space-y-1.5 text-sm">
+                      {statusRows.map((r) => (
+                        <li key={r.name} className="flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full ${r.color}`} />
+                          <span className="flex-1 text-muted">{r.name}</span>
+                          <span className="font-semibold tabular-nums">{r.value}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </>
                 ) : (
-                  <div className="h-[300px] flex items-center justify-center text-gray-600 text-sm">No orders yet</div>
+                  <p className="py-4 text-sm text-faint">No orders yet.</p>
                 )}
-              </div>
+              </section>
 
-              {/* Peak Hours */}
-              <div id="chart-peak-hours" className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-bold mb-4 text-gray-900 flex items-center justify-between">
-                  <span>Peak Hours</span>
-                  <button onClick={() => downloadChart('chart-peak-hours', 'peak-hours.png')} className="text-gray-400 hover:text-gray-700 text-sm">📥 Download</button>
-                </h3>
-                {data?.salesByHour && data.salesByHour.some(h => h.orders > 0) ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={data.salesByHour.filter(h => h.orders > 0)}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="label" stroke="#6b7280" tick={{ fontSize: 10 }} />
-                      <YAxis stroke="#6b7280" tick={{ fontSize: 10 }} width={40} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v, key) => [key === 'orders' ? v : `₱${Number(v ?? 0).toFixed(0)}`, key === 'orders' ? 'Orders' : 'Sales'] as [string, string]} />
-                      <Bar dataKey="orders" fill="#3b82f6" radius={[2, 2, 0, 0]} maxBarSize={24} />
-                    </BarChart>
-                  </ResponsiveContainer>
+              <section className="c-card p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-base font-bold">Stock health</h3>
+                  <span className="text-xs text-faint">{inventory != null ? `${inventory.totalIngredients} ingredients` : ''}</span>
+                </div>
+                {inventory == null && !inventoryLoaded ? (
+                  <p className="text-sm text-faint">Loading…</p>
+                ) : inventory == null ? (
+                  <p className="text-sm text-faint">Stock summary is unavailable right now.</p>
                 ) : (
-                  <div className="h-[300px] flex items-center justify-center text-gray-600 text-sm">No data yet</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Healthy', value: inventory.healthy, tile: 'bg-tile-sage text-good' },
+                      { label: 'Low', value: inventory.low, tile: 'bg-tile-sand text-warn' },
+                      { label: 'Out', value: inventory.out, tile: inventory.out > 0 ? 'bg-danger-bg text-danger' : 'bg-panel text-muted' },
+                    ].map((t) => (
+                      <div key={t.label} className={`rounded-[14px] px-3 py-2.5 ${t.tile}`}>
+                        <p className="text-xl font-bold tabular-nums">{t.value}</p>
+                        <p className="text-xs font-semibold opacity-80">{t.label}</p>
+                      </div>
+                    ))}
+                    <div className="col-span-3 flex items-center justify-between rounded-[14px] bg-panel px-3 py-2.5 text-sm">
+                      <span className="text-muted">Stock value</span>
+                      <span className="font-bold tabular-nums">{formatPeso(inventory.totalStockValue)}</span>
+                    </div>
+                  </div>
                 )}
-              </div>
-
-              {/* Sales by Category */}
-              <div id="chart-sales-category" className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-bold mb-4 text-gray-900 flex items-center justify-between">
-                  <span>Sales by Category</span>
-                  <button onClick={() => downloadChart('chart-sales-category', 'sales-by-category.png')} className="text-gray-400 hover:text-gray-700 text-sm">📥 Download</button>
-                </h3>
-                {data?.salesByCategory && data.salesByCategory.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={data.salesByCategory}
-                        cx="50%" cy="50%"
-                        outerRadius={80}
-                        dataKey="sales"
-                        nameKey="name"
-                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {data.salesByCategory.map((_, idx) => (
-                          <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`₱${Number(v ?? 0).toFixed(2)}`, 'Sales'] as [string, string]} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[300px] flex items-center justify-center text-gray-600 text-sm">No data yet</div>
-                )}
-              </div>
+              </section>
             </div>
+          </div>
 
-            {/* Third Row - Top Items */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Top Items */}
-              <div id="chart-top-items" className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm lg:col-span-2">
-                <h3 className="text-lg font-bold mb-4 text-gray-900 flex items-center justify-between">
-                  <span>Top Selling Items</span>
-                  <button onClick={() => downloadChart('chart-top-items', 'top-selling-items.png')} className="text-gray-400 hover:text-gray-700 text-sm">📥 Download</button>
-                </h3>
-                {data?.topItems && data.topItems.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {data.topItems.slice(0, 6).map((item, idx) => {
-                      const maxCount = data.topItems[0]?.count ?? 1;
-                      const pct = (item.count / maxCount) * 100;
-                      return (
-                        <div key={item.name} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                          <span className="text-gray-400 w-6 h-6 flex items-center justify-center bg-white rounded-full text-xs font-bold">{idx + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between text-sm mb-1 gap-2">
-                              <span className="text-gray-900 font-medium truncate">{item.name}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <div className="flex-1 mr-3">
-                                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                                </div>
-                              </div>
-                              <div className="flex gap-3 shrink-0">
-                                <span className="text-gray-500 text-xs">{item.count}×</span>
-                                <span className="text-accent-text text-xs font-semibold">₱{item.revenue.toFixed(0)}</span>
-                              </div>
-                            </div>
+          <div className="grid gap-4 xl:grid-cols-3">
+            {/* Best sellers */}
+            <section id="chart-top-items" className="c-card p-5 xl:col-span-2">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold">Best sellers</h3>
+                  <p className="text-xs text-faint">By pieces sold</p>
+                </div>
+                {saveBtn('chart-top-items', 'top-selling-items.png')}
+              </div>
+              {data?.topItems && data.topItems.length > 0 ? (
+                <ol className="grid gap-x-8 gap-y-3 md:grid-cols-2">
+                  {data.topItems.slice(0, 8).map((item, idx) => {
+                    const pct = (item.count / (data.topItems[0]?.count || 1)) * 100;
+                    return (
+                      <li key={item.name} className="flex items-center gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-bold tabular-nums text-muted">{idx + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2 text-sm">
+                            <span className="truncate font-semibold">{item.name}</span>
+                            <span className="shrink-0 tabular-nums text-muted">{item.count}× · <span className="font-semibold text-ink">{formatPeso(item.revenue)}</span></span>
+                          </div>
+                          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-panel">
+                            <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500 text-sm">No orders completed yet</div>
-                )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <p className="py-6 text-center text-sm text-faint">No sales in this period yet.</p>
+              )}
+            </section>
+
+            {/* Categories */}
+            <section id="chart-sales-category" className="c-card p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-base font-bold">Sales by category</h3>
+                {saveBtn('chart-sales-category', 'sales-by-category.png')}
               </div>
-            </div>
-          </>
-        )}
-      </div>
+              {data?.salesByCategory && data.salesByCategory.length > 0 ? (
+                <ul className="space-y-3">
+                  {[...data.salesByCategory].sort((a, b) => b.sales - a.sales).map((c) => {
+                    const pct = categoryTotal > 0 ? (c.sales / categoryTotal) * 100 : 0;
+                    return (
+                      <li key={c.name}>
+                        <div className="flex items-baseline justify-between gap-2 text-sm">
+                          <span className="truncate font-semibold">{c.name}</span>
+                          <span className="shrink-0 tabular-nums text-muted">{pct.toFixed(0)}% · <span className="font-semibold text-ink">{formatPeso(c.sales)}</span></span>
+                        </div>
+                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-panel">
+                          <div className="h-full rounded-full bg-[#C9A35B]" style={{ width: `${pct}%` }} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="py-6 text-center text-sm text-faint">No sales in this period yet.</p>
+              )}
+            </section>
+          </div>
+        </>
+      )}
     </div>
   );
 }
