@@ -152,10 +152,11 @@ export default function CashDrawerPanel({ businessName }: { businessName: string
       <button
         type="button"
         onClick={() => start(drawer ? 'view' : 'open')}
-        className="mb-1.5 flex w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-2 py-1.5 text-[10px] font-semibold text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]"
+        className="flex h-10 w-full items-center gap-2.5 rounded-[12px] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-3 text-left text-sm transition hover:border-[var(--pos-ink-soft)]/40"
       >
-        <span className="uppercase tracking-[0.12em]">Cash drawer</span>
-        <span className={drawer ? 'text-[var(--pos-accent)]' : ''}>{drawer ? `Open · ${formatPeso(drawer.totals.expectedCash)}` : 'Closed — open'}</span>
+        <span className={`h-2 w-2 shrink-0 rounded-full ${drawer ? 'bg-[var(--c-good)]' : 'bg-[var(--pos-border)]'}`} aria-hidden />
+        <span className="min-w-0 flex-1 truncate font-semibold">{drawer ? 'Drawer open' : 'Drawer closed'}</span>
+        <span className="shrink-0 text-xs text-[var(--pos-ink-soft)] tabular-nums">{drawer ? formatPeso(drawer.totals.expectedCash) : 'Open'}</span>
       </button>
 
       {mode && (

@@ -288,7 +288,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {drawer && !collapsed && (
             <Link
               href="/admin/terminal"
-              className="flex items-center gap-3 rounded-2xl border border-hair bg-card px-3 py-2.5 transition-colors hover:border-hair-strong"
+              className="flex items-center gap-3 rounded-2xl border border-hair bg-card px-3 py-2.5 transition-colors hover:border-hair-strong [@media(max-height:820px)]:hidden"
             >
               <span className={`h-2 w-2 shrink-0 rounded-full ${drawer.open ? 'bg-good' : 'bg-hair-strong'}`} />
               <span className="min-w-0 flex-1">

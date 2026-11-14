@@ -199,57 +199,6 @@ export default function PosTerminalPage() {
   const [pickerSingle, setPickerSingle] = useState<Record<number, number>>({});
   const [pickerMulti, setPickerMulti] = useState<number[]>([]);
 
-  // ── Draggable column widths (persisted per device) ─────────────────────────
-  const [colW, setColW] = useState<{ calc: number; summary: number }>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('terminal-col-widths');
-        if (raw) {
-          const saved = JSON.parse(raw);
-          if (saved?.calc && saved?.summary) return saved;
-        }
-      } catch (e) {
-        console.error('Could not read the saved column widths, using defaults:', e);
-      }
-    }
-    return { calc: 220, summary: 260 };
-  });
-  const dragCol = useRef<{ target: 'calc' | 'summary'; startX: number; startW: number } | null>(null);
-
-  useEffect(() => {
-    function onMove(e: PointerEvent) {
-      if (!dragCol.current) return;
-      const dx = e.clientX - dragCol.current.startX;
-      const { target, startW } = dragCol.current;
-      setColW((prev) => {
-        const w = target === 'calc'
-          ? Math.min(460, Math.max(170, startW + dx))
-          : Math.min(520, Math.max(210, startW - dx));
-        return { ...prev, [target]: w };
-      });
-    }
-    function onUp() {
-      if (!dragCol.current) return;
-      dragCol.current = null;
-      try {
-        localStorage.setItem('terminal-col-widths', JSON.stringify(colW));
-      } catch (e) {
-        console.error('Could not save the column widths on this device:', e);
-      }
-    }
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
-  }, [colW]);
-
-  function startColDrag(target: 'calc' | 'summary', e: React.PointerEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCol.current = { target, startX: e.clientX, startW: colW[target] };
-  }
   const [customerName, setCustomerName] = useState('Walk-In');
   const [tables, setTables] = useState<Table[]>([]);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
@@ -391,10 +340,10 @@ export default function PosTerminalPage() {
     setCashReceived(0);
   };
 
-  const applyCashAmount = () => {
-    const cash = parseFloat(cashInput) || 0;
-    setCashReceived(cash);
-  };
+  // The amount typed is the amount tendered (spec 018: no separate Apply step).
+  useEffect(() => {
+    setCashReceived(Number.parseFloat(cashInput) || 0);
+  }, [cashInput]);
 
   const cartSubtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const loyaltyDiscount = cart.length > 0 && loyaltyVouchers.length > 0
@@ -430,12 +379,6 @@ export default function PosTerminalPage() {
   const cashValue = cashReceived > 0 ? cashReceived : Number.parseFloat(cashInput || '0') || 0;
   const changeValue = cashValue > 0 ? cashValue - total : 0;
   const hasCashInput = cashInput.trim() !== '' || cashReceived > 0;
-
-  const calculateChange = () => {
-    if (!hasCashInput) return null;
-    if (changeValue < 0) return `(${Math.abs(changeValue).toFixed(2)})`;
-    return changeValue.toFixed(2);
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -864,201 +807,439 @@ export default function PosTerminalPage() {
     }
   }
 
-  return (
-    <div className="flex h-screen w-full bg-[radial-gradient(circle_at_top,_#fffaf4_0%,_#f7f3ee_35%,_#f0ece7_100%)] text-stone-900 overflow-hidden">
+  const ROW = 'flex items-center justify-between gap-3';
+  const typeLabel = orderType === 'DINE_IN' ? 'Dine-in' : orderType === 'TAKEOUT' ? 'Takeout' : 'Delivery';
+  const tableName = tables.find((t) => t.id === selectedTable)?.name;
+  const segBtn = (active: boolean) =>
+    `h-9 rounded-[10px] px-3 text-[13px] font-semibold transition ${active ? 'bg-[var(--pos-surface)] text-[var(--pos-ink)] shadow-[0_1px_2px_rgba(45,30,20,0.12)]' : 'text-[var(--pos-ink-soft)] hover:text-[var(--pos-ink)]'}`;
+  const fieldCls =
+    'h-10 w-full rounded-[12px] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-3 text-sm text-[var(--pos-ink)] outline-none transition placeholder:text-[var(--pos-ink-soft)]/60 focus:border-[var(--pos-accent)] focus:ring-2 focus:ring-[var(--pos-accent)]/15';
+  const keypad = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0', 'backspace'];
 
-      {/* Loading State */}
+  return (
+    <div className="flex h-full min-h-screen w-full flex-col bg-[var(--pos-paper)] text-[var(--pos-ink)]">
+
       {loading && (
-        <div className="flex h-full w-full items-center justify-center bg-white">
+        <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
-            <div className="inline-block w-10 h-10 border-4 border-[var(--pos-accent)] border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-[var(--pos-ink-soft)]">Loading terminal...</p>
+            <div className="mb-3 inline-block h-9 w-9 animate-spin rounded-full border-[3px] border-[var(--pos-accent)] border-t-transparent" />
+            <p className="text-sm text-[var(--pos-ink-soft)]">Loading the register…</p>
           </div>
         </div>
       )}
 
-      {/* Error State with Retry */}
       {!loading && fetchError && (
-        <div className="flex h-full w-full items-center justify-center bg-white p-6">
-          <div className="text-center max-w-md">
-            <div className="text-5xl mb-4">⚠️</div>
-            <h2 className="text-xl font-semibold text-[var(--pos-ink)] mb-2">Failed to Load Terminal</h2>
-            <p className="text-[var(--pos-ink-soft)] mb-4">{fetchError}</p>
-            <p className="text-sm text-[var(--pos-ink-soft)]/70 mb-4">
-              This usually happens on first install when the database hasn&apos;t been seeded yet.
+        <div className="flex flex-1 items-center justify-center p-6">
+          <div className="max-w-md rounded-[20px] border border-[var(--pos-border)] bg-[var(--pos-surface)] p-6 text-center">
+            <h2 className="mb-2 text-xl font-bold tracking-[-0.02em]">The register could not load</h2>
+            <p className="mb-2 text-sm text-[var(--pos-ink-soft)]">{fetchError}</p>
+            <p className="mb-4 text-xs text-[var(--pos-ink-soft)]">
+              This usually happens on a first install before the menu has been set up.
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2.5 bg-[var(--pos-accent)] text-white font-semibold rounded-[var(--radius-md)] hover:bg-[var(--pos-accent-hover)] transition-colors"
+              className="h-10 rounded-[12px] bg-[var(--pos-accent)] px-5 text-sm font-semibold text-white hover:bg-[var(--pos-accent-hover)]"
             >
-              Retry (Reload)
+              Try again
             </button>
           </div>
         </div>
       )}
 
-      {/* Main Terminal UI - only show when loaded and no error */}
       {!loading && !fetchError && (
         <>
-
-      {/* ── COLUMN 1: Calculator (220px) ──────────────────────────────── */}
-      <div
-        className="flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-[var(--pos-border)] bg-[var(--pos-paper)] relative"
-        style={{ width: colW.calc, minWidth: 170, maxWidth: 460 }}
-      >
-        {/* Drag handle (left edge) */}
-        <div
-          onPointerDown={(e) => startColDrag('calc', e)}
-          className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--pos-accent)]/40"
-          title="Drag to resize"
-        />
-        {/* Cash Calculator */}
-        <div className="border-b border-[var(--pos-border)] bg-[var(--pos-surface)] p-2.5">
-          <div className="mb-2 rounded-[var(--radius-lg)] bg-[var(--pos-ink)] p-2.5 text-white shadow-[var(--shadow-modal)]">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Total</span>
-              <span className="text-sm font-semibold tracking-[-0.04em] text-white" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{formatPeso(total)}</span>
-            </div>
-            {bill.vatRemoved > 0 && (
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Less VAT</span>
-                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatPeso(bill.vatRemoved)}</span>
-              </div>
-            )}
-            {bill.discount > 0 && (
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Discount</span>
-                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatPeso(bill.discount)}</span>
-              </div>
-            )}
-            {bill.serviceCharge > 0 && (
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Service charge</span>
-                <span className="text-sm font-semibold tracking-[-0.04em] text-white" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{formatPeso(bill.serviceCharge)}</span>
-              </div>
-            )}
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Cash</span>
-              <span className={`text-sm font-semibold tracking-[-0.04em] ${cashValue >= total && cashValue > 0 ? 'text-[var(--pos-accent-soft)]' : 'text-white'}`} style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-                {hasCashInput ? formatPeso(cashValue) : '—'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center border-t border-white/10 pt-1.5">
-              <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Change</span>
-              <span className={`text-sm font-semibold tracking-[-0.04em] ${calculateChange() !== null && Number(calculateChange()) >= 0 ? 'text-[#d7f3d7]' : 'text-[#f7d2ce]'}`} style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-                {calculateChange() !== null ? `₱${calculateChange()}` : '—'}
-              </span>
-            </div>
-            {loyaltyDiscount > 0 && (
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-300">Loyalty</span>
-                <span className="text-sm font-semibold tracking-[-0.04em] text-[#d7f3d7]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>−{formatPeso(loyaltyDiscount)}</span>
-              </div>
-            )}
-          </div>
-
-          <CashDrawerPanel businessName={businessSettings?.businessName || 'My Restaurant'} />
-          <DiscountPicker value={discount} onChange={setDiscount} studentRate={studentRate} />
-          {billError && <p className="mb-1.5 text-[10px] text-[#b42318]" role="alert">{billError}</p>}
-
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Enter cash tendered</div>
-          <div className="grid grid-cols-4 gap-1 mb-1.5">{[100,200,500,1000].map(a=>(<button key={a} onClick={()=>setCashInput(String(a))} className="rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] py-1.5 text-[10px] font-semibold tracking-[-0.04em] text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>₱{a}</button>))}</div>
-          <div className="grid grid-cols-3 gap-1 mb-1.5">{['1','2','3','4','5','6','7','8','9'].map(k=>(<button key={k} onClick={()=>handleCashInput(k)} className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-sm font-semibold tracking-[-0.04em] text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{k}</button>))}</div>
-          <div className="grid grid-cols-3 gap-1 mb-1.5">
-            <button onClick={()=>handleCashInput('00')} className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-sm font-semibold tracking-[-0.04em] text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>00</button>
-            <button onClick={()=>handleCashInput('0')} className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-sm font-semibold tracking-[-0.04em] text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>0</button>
-            <button onClick={()=>handleCashInput('clear')} className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--pos-danger-soft)] bg-[var(--pos-danger-soft)] text-sm font-semibold tracking-[-0.04em] text-[var(--pos-danger)]" style={{ fontFamily: '"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>C</button>
-          </div>
-          <button onClick={applyCashAmount} disabled={!cashInput || Number.parseFloat(cashInput) < total} className="w-full rounded-[var(--radius-md)] bg-[var(--pos-accent)] py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[var(--pos-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--pos-muted)] disabled:text-[var(--pos-ink-soft)]">Apply</button>
+      {/* Header */}
+      <header className="flex flex-wrap items-end justify-between gap-3 px-5 pb-3 pt-5">
+        <div className="min-w-0">
+          <h1 className="text-[30px] font-bold leading-none tracking-[-0.035em]">New order</h1>
+          <p className="mt-1.5 truncate text-sm text-[var(--pos-ink-soft)]">
+            {typeLabel}{tableName ? ` · ${tableName}` : ''} · {customerName.trim() || 'Walk-in'} ·{' '}
+            <span className="font-semibold text-[var(--pos-ink)]">{itemCount} item{itemCount === 1 ? '' : 's'}</span>
+          </p>
         </div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="w-60">
+            <CashDrawerPanel businessName={businessSettings?.businessName || 'My Restaurant'} />
+          </div>
+          <div className="relative flex-1 sm:w-80 sm:flex-none">
+            <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--pos-ink-soft)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
+              <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search the menu"
+              aria-label="Search the menu"
+              className={`${fieldCls} pl-9`}
+            />
+          </div>
+        </div>
+      </header>
 
-        {/* Order Type / Table / Address */}
-        <div className="border-b border-[var(--pos-border)] p-2.5">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Order type</label>
-          <div className="grid grid-cols-3 gap-1 mb-1.5">
-            {['DINE_IN', 'TAKEOUT', 'DELIVERY'].map((type) => (
+      {/* Register: categories · products · ticket */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-5 pb-5 min-[1024px]:grid-cols-[minmax(0,1fr)_360px] min-[1440px]:grid-cols-[210px_minmax(0,1fr)_400px]">
+
+        {/* Categories */}
+        <aside className="hidden min-h-0 flex-col rounded-[20px] border border-[var(--pos-border)] bg-[var(--pos-surface)] p-2 min-[1440px]:flex">
+          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+            {[{ id: 'all' as const, name: 'All items', count: allProducts.length, glyph: 'all' }, ...categories.map((c) => ({ id: c.id, name: c.name, count: c.products.length, glyph: c.name }))].map((c) => {
+              const active = !search && activeCategory === c.id;
+              return (
+                <button
+                  key={String(c.id)}
+                  onClick={() => { setSearch(''); setActiveCategory(c.id); }}
+                  className={`flex h-12 w-full items-center gap-3 rounded-[14px] px-2.5 text-left text-sm transition ${active ? 'bg-[var(--pos-accent-soft)] font-semibold text-[var(--pos-accent-hover)]' : 'text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)] hover:text-[var(--pos-ink)]'}`}
+                >
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${active ? 'bg-[var(--pos-accent)] text-white' : 'bg-[var(--pos-muted)]'}`}>
+                    <CategoryGlyph name={c.glyph} active={false} className={`h-4 w-4 ${active ? '[&]:stroke-white' : ''}`} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  <span className="text-xs tabular-nums opacity-70">{c.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* Products */}
+        <section className="flex min-h-0 flex-col rounded-[20px] border border-[var(--pos-border)] bg-[var(--pos-surface)]">
+          <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-4">
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-bold tracking-[-0.01em]">
+                {search ? `Results for “${search}”` : activeCategory === 'all' ? 'Everything on the menu' : activeCat?.name}
+              </h2>
+              <p className="text-xs text-[var(--pos-ink-soft)]">
+                {displayedProducts.length} item{displayedProducts.length === 1 ? '' : 's'} · tap to add, the badge shows how many are on the ticket
+              </p>
+            </div>
+          </div>
+          {/* Categories as chips on narrow screens */}
+          <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 min-[1440px]:hidden">
+            {[{ id: 'all' as const, name: 'All' }, ...categories.map((c) => ({ id: c.id, name: c.name }))].map((c) => (
               <button
-                key={type}
-                onClick={() => {
-                  setOrderType(type);
-                  if (type !== 'DINE_IN') setSelectedTable(null);
-                }}
-                className={`min-h-[32px] rounded-[var(--radius-sm)] border px-1.5 text-[6px] font-semibold transition ${
-                  orderType === type
-                    ? 'border-[var(--pos-accent)] bg-[var(--pos-accent)] text-white'
-                    : 'border-[var(--pos-border)] bg-[var(--pos-surface)] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]'
-                }`}
+                key={String(c.id)}
+                onClick={() => { setSearch(''); setActiveCategory(c.id); }}
+                className={`h-9 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold ${activeCategory === c.id && !search ? 'border-[var(--pos-accent)] bg-[var(--pos-accent)] text-white' : 'border-[var(--pos-border)] text-[var(--pos-ink-soft)]'}`}
               >
-                {type === 'DINE_IN' ? 'Dine-in' : type === 'TAKEOUT' ? 'Takeout' : 'Delivery'}
+                {c.name}
               </button>
             ))}
           </div>
-
-          {orderType === 'DINE_IN' && (
-            <div className="mt-2">
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Table #</label>
-              <select
-                value={selectedTable ?? ''}
-                onChange={e => setSelectedTable(e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-2.5 py-2 text-xs text-[var(--pos-ink)] shadow-sm outline-none transition focus:border-[var(--pos-accent)] focus:ring-2 focus:ring-[var(--pos-accent)]/20"
-              >
-                <option value="">Select table</option>
-                {tables.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+              {displayedProducts.map((product) => {
+                const outOfStock = product.inventory && product.inventory.quantity === 0;
+                const inCart = cart.filter((i) => i.productId === product.id).reduce((n, i) => n + i.quantity, 0);
+                const blocked = outOfStock && !overrideStock;
+                const catName = categories.find((c) => c.products.some((p) => p.id === product.id))?.name ?? 'all';
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => !blocked && handleProductClick(product)}
+                    disabled={blocked}
+                    className={`group relative flex flex-col overflow-hidden rounded-[16px] border text-left transition ${
+                      blocked
+                        ? 'cursor-not-allowed border-[var(--pos-border)] opacity-50'
+                        : inCart
+                          ? 'border-[var(--pos-accent)] ring-1 ring-[var(--pos-accent)]'
+                          : 'border-[var(--pos-border)] hover:border-[var(--pos-ink-soft)]/40 active:scale-[0.98]'
+                    }`}
+                  >
+                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--pos-muted)]">
+                      {isImageUrl(product.imageUrl)
+                        ? <img src={product.imageUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                        : <div className="flex h-full w-full items-center justify-center"><CategoryGlyph name={catName} active={false} className="h-8 w-8 opacity-60" /></div>}
+                      {outOfStock && (
+                        <span className="absolute left-2 top-2 rounded-full bg-[var(--pos-surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--pos-danger)]">
+                          {overrideStock ? 'Sold out · selling anyway' : 'Sold out'}
+                        </span>
+                      )}
+                      {inCart > 0 && (
+                        <span className="absolute right-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--pos-accent)] px-2 text-xs font-bold text-white tabular-nums">
+                          {inCart}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col justify-between gap-2 p-3">
+                      <p className="line-clamp-2 text-sm font-semibold leading-snug">{product.name}</p>
+                      <div className={ROW}>
+                        <span className="text-[15px] font-bold tabular-nums tracking-[-0.01em]">{formatPeso(product.price)}</span>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--pos-border)] text-lg leading-none text-[var(--pos-ink-soft)] transition group-hover:border-[var(--pos-accent)] group-hover:bg-[var(--pos-accent)] group-hover:text-white">+</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          )}
+            {displayedProducts.length === 0 && (
+              <div className="flex h-56 flex-col items-center justify-center text-center text-[var(--pos-ink-soft)]">
+                <p className="text-sm font-semibold text-[var(--pos-ink)]">Nothing matches</p>
+                <p className="text-xs">Try another word or pick a category.</p>
+              </div>
+            )}
+          </div>
+        </section>
 
-          {orderType === 'DELIVERY' && (
-            <div className="mt-2">
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Address</label>
+        {/* Ticket */}
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-[var(--pos-border)] bg-[var(--pos-surface)]">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-3 border-b border-[var(--pos-border)] p-4">
+            <div className={ROW}>
+              <h2 className="text-base font-bold tracking-[-0.01em]">Ticket</h2>
+              {cart.length > 0 && (
+                <button onClick={clearCart} className="text-xs font-semibold text-[var(--pos-ink-soft)] hover:text-[var(--pos-danger)]">
+                  Clear ticket
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-1 rounded-[12px] bg-[var(--pos-muted)] p-1">
+              {(['DINE_IN', 'TAKEOUT', 'DELIVERY'] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => { setOrderType(type); if (type !== 'DINE_IN') setSelectedTable(null); }}
+                  className={segBtn(orderType === type)}
+                >
+                  {type === 'DINE_IN' ? 'Dine-in' : type === 'TAKEOUT' ? 'Takeout' : 'Delivery'}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
-                value={deliveryAddress}
-                onChange={e => setDeliveryAddress(e.target.value)}
-                placeholder="House number, street, landmark"
-                className="w-full rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-2.5 py-2 text-xs text-[var(--pos-ink)] placeholder:text-[var(--pos-ink-soft)]/60 shadow-sm outline-none transition focus:border-[var(--pos-accent)] focus:ring-2 focus:ring-[var(--pos-accent)]/20"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Customer name"
+                aria-label="Customer name"
+                className={fieldCls}
               />
+              {orderType === 'DINE_IN' ? (
+                <select
+                  value={selectedTable ?? ''}
+                  onChange={(e) => setSelectedTable(e.target.value ? Number(e.target.value) : null)}
+                  aria-label="Table"
+                  className={fieldCls}
+                >
+                  <option value="">No table</option>
+                  {tables.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              ) : orderType === 'DELIVERY' ? (
+                <input
+                  type="text"
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  placeholder="Delivery address"
+                  aria-label="Delivery address"
+                  className={fieldCls}
+                />
+              ) : (
+                <div className="flex h-10 items-center rounded-[12px] bg-[var(--pos-muted)] px-3 text-xs text-[var(--pos-ink-soft)]">Takeout counter</div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Customer Input */}
-        <div className="p-2 border-b border-gray-100">
-          <label className="text-gray-500 text-[10px] font-semibold block mb-1">Customer</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={customerName}
-              onChange={e => setCustomerName(e.target.value)}
-              placeholder="Walk-in"
-              className="flex-1 rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-2.5 py-2 text-xs text-[var(--pos-ink)] shadow-sm outline-none transition placeholder:text-[var(--pos-ink-soft)]/60 focus:border-[var(--pos-accent)] focus:ring-2 focus:ring-[var(--pos-accent)]/20"
-            />
             {businessSettings?.loyaltyEnabled && (
               <button
                 type="button"
                 onClick={openLoyaltyPicker}
-                className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-xs font-semibold text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]"
-                title="Select loyalty member"
+                className="flex w-full items-center gap-3 rounded-[14px] border border-[var(--pos-border)] px-3 py-2 text-left transition hover:border-[var(--pos-ink-soft)]/40"
               >
-                💳
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--pos-accent-soft)] text-[var(--pos-accent)]">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" /></svg>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{selectedLoyaltyCard ? selectedLoyaltyCard.customerName : 'Add a loyalty member'}</span>
+                  <span className="block truncate text-xs text-[var(--pos-ink-soft)]">
+                    {selectedLoyaltyCard
+                      ? loyaltyVoucherCodes.length > 0 ? `${loyaltyVoucherCodes.length} reward${loyaltyVoucherCodes.length === 1 ? '' : 's'} applied` : 'Earns stamps on this sale'
+                      : 'Walk-in · they would earn stamps on this sale'}
+                  </span>
+                </span>
+                <span className="text-[var(--pos-ink-soft)]">›</span>
               </button>
             )}
           </div>
-          {selectedLoyaltyCard && (
-            <div className="mt-1.5 flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--pos-accent-soft)] px-2 py-1">
-              <span className="text-[9px] font-semibold text-[var(--pos-accent)]">
-                {selectedLoyaltyCard.customerName}
-              </span>
-              {loyaltyVoucherCodes.length > 0 && (
-                <span className="text-[8px] font-bold text-green-700">
-                  🎁 {loyaltyVoucherCodes.length} auto-applied
-                </span>
-              )}
+
+          {/* Lines */}
+          <div className="px-4 py-2">
+            {cart.length === 0 ? (
+              <div className="flex min-h-[96px] flex-col items-center justify-center text-center">
+                <p className="text-sm font-semibold">Tap a dish to start</p>
+                <p className="mt-0.5 text-xs text-[var(--pos-ink-soft)]">Items you add appear here.</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-[var(--pos-border)]">
+                {cart.map((item) => (
+                  <li key={item.key ?? item.productId} className="py-2.5">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-snug">{item.name}</p>
+                        {item.selectionsLabel && <p className="text-xs text-[var(--pos-accent)]">{item.selectionsLabel}</p>}
+                        <p className="text-xs text-[var(--pos-ink-soft)] tabular-nums">{formatPeso(item.price)} each</p>
+                      </div>
+                      <div className="flex items-center rounded-full border border-[var(--pos-border)]">
+                        <button onClick={() => updateCartItemQuantity(item.key ?? item.productId, -1)} className="h-8 w-8 rounded-full text-base text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]" aria-label={`One less ${item.name}`}>−</button>
+                        <span className="w-6 text-center text-sm font-semibold tabular-nums">{item.quantity}</span>
+                        <button onClick={() => updateCartItemQuantity(item.key ?? item.productId, 1)} className="h-8 w-8 rounded-full text-base text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]" aria-label={`One more ${item.name}`}>+</button>
+                      </div>
+                      <div className="w-20 text-right">
+                        <p className="text-sm font-bold tabular-nums">{formatPeso(item.price * item.quantity)}</p>
+                        <button onClick={() => removeFromCart(item.key ?? item.productId)} className="text-[11px] text-[var(--pos-ink-soft)] hover:text-[var(--pos-danger)]">Remove</button>
+                      </div>
+                    </div>
+
+                    {businessSettings?.loyaltyEnabled && (
+                      <div className="mt-2 rounded-[12px] bg-[var(--pos-paper)] px-2.5 py-2">
+                        <div className={ROW}>
+                          <span className="text-[11px] font-semibold text-[var(--pos-ink-soft)]">Stamps to</span>
+                          <button type="button" onClick={() => openItemLoyaltyPicker(item.productId)} className="text-[11px] font-semibold text-[var(--pos-accent)] hover:underline">
+                            + Member
+                          </button>
+                        </div>
+                        {(item.loyaltyAssignments ?? []).length === 0 ? (
+                          <p className="text-[11px] text-[var(--pos-ink-soft)]">No member on this item.</p>
+                        ) : (
+                          <div className="mt-1 space-y-1">
+                            {(item.loyaltyAssignments ?? []).map((assignment, idx) => (
+                              <div key={`${item.productId}-${idx}`} className="flex items-center gap-1.5">
+                                <select
+                                  value={assignment.customerName}
+                                  onChange={(e) => updateLoyaltyAssignment(item.productId, idx, 'customerName', e.target.value)}
+                                  className="h-8 min-w-0 flex-1 rounded-[10px] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-2 text-xs outline-none focus:border-[var(--pos-accent)]"
+                                  aria-label="Loyalty member"
+                                >
+                                  <option value="">Select member</option>
+                                  {allLoyaltyResults.map((card) => (
+                                    <option key={`${card.id}-${card.customerName}`} value={card.customerName}>{card.customerName}</option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={item.quantity}
+                                  value={assignment.quantity}
+                                  onChange={(e) => updateLoyaltyAssignment(item.productId, idx, 'quantity', Number(e.target.value) || 1)}
+                                  className="h-8 w-12 rounded-[10px] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-center text-xs outline-none focus:border-[var(--pos-accent)]"
+                                  aria-label="Quantity for this member"
+                                />
+                                <button type="button" onClick={() => removeLoyaltyAssignment(item.productId, idx)} className="h-8 w-8 rounded-[10px] text-xs text-[var(--pos-ink-soft)] hover:bg-[var(--pos-danger-soft)] hover:text-[var(--pos-danger)]" aria-label="Remove member">
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Discount, totals, payment */}
+          <div className="space-y-3 border-t border-[var(--pos-border)] p-4">
+            <DiscountPicker value={discount} onChange={setDiscount} studentRate={studentRate} />
+            {billError && <p className="text-xs text-[var(--pos-danger)]" role="alert">{billError}</p>}
+
+            <dl className="space-y-1 text-sm">
+              <div className={ROW}><dt className="text-[var(--pos-ink-soft)]">Subtotal</dt><dd className="tabular-nums">{formatPeso(bill.gross)}</dd></div>
+              {loyaltyDiscount > 0 && <div className={ROW}><dt className="text-[var(--pos-ink-soft)]">Loyalty reward</dt><dd className="tabular-nums text-[var(--pos-accent)]">−{formatPeso(bill.loyaltyDiscount)}</dd></div>}
+              {bill.vatRemoved > 0 && <div className={ROW}><dt className="text-[var(--pos-ink-soft)]">Less VAT (Senior/PWD)</dt><dd className="tabular-nums text-[var(--pos-accent)]">−{formatPeso(bill.vatRemoved)}</dd></div>}
+              {bill.discount > 0 && <div className={ROW}><dt className="text-[var(--pos-ink-soft)]">Discount</dt><dd className="tabular-nums text-[var(--pos-accent)]">−{formatPeso(bill.discount)}</dd></div>}
+              {bill.serviceCharge > 0 && <div className={ROW}><dt className="text-[var(--pos-ink-soft)]">Service charge</dt><dd className="tabular-nums">{formatPeso(bill.serviceCharge)}</dd></div>}
+              <div className={`${ROW} border-t border-dashed border-[var(--pos-border)] pt-2`}>
+                <dt className="text-base font-bold">Total</dt>
+                <dd className="text-2xl font-bold tabular-nums tracking-[-0.03em]">{formatPeso(total)}</dd>
+              </div>
+            </dl>
+
+            <div className="grid grid-cols-3 gap-1 rounded-[12px] bg-[var(--pos-muted)] p-1">
+              {['CASH', 'GCASH', 'PAYMAYA'].map((pm) => (
+                <button key={pm} onClick={() => setPaymentMethod(pm)} className={segBtn(paymentMethod === pm)}>
+                  {pm === 'CASH' ? 'Cash' : pm === 'GCASH' ? 'GCash' : 'Maya'}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
+
+            {paymentMethod === 'CASH' && (
+              <div className="space-y-2">
+                <div className="flex gap-1.5">
+                  <button onClick={() => setCashInput(total.toFixed(2))} disabled={total <= 0} className="h-9 flex-1 rounded-[10px] border border-[var(--pos-border)] text-xs font-semibold hover:bg-[var(--pos-muted)] disabled:opacity-40">Exact</button>
+                  {[100, 200, 500, 1000].map((a) => (
+                    <button key={a} onClick={() => setCashInput(String(a))} className="h-9 flex-1 rounded-[10px] border border-[var(--pos-border)] text-xs font-semibold tabular-nums hover:bg-[var(--pos-muted)]">₱{a}</button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <label className="relative block">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[var(--pos-ink-soft)]">₱</span>
+                    <input
+                      inputMode="decimal"
+                      value={cashInput}
+                      onChange={(e) => setCashInput(e.target.value.replace(/[^0-9.]/g, ''))}
+                      placeholder="Cash received"
+                      aria-label="Cash received"
+                      className={`${fieldCls} pl-7 text-base font-semibold tabular-nums`}
+                    />
+                  </label>
+                  <div className={`flex h-10 min-w-[120px] flex-col justify-center rounded-[12px] px-3 ${changeValue < 0 && hasCashInput ? 'bg-[var(--pos-danger-soft)] text-[var(--pos-danger)]' : 'bg-[var(--tile-sage)] text-[var(--c-good)]'}`}>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] opacity-80">{changeValue < 0 && hasCashInput ? 'Short' : 'Change'}</span>
+                    <span className="text-sm font-bold leading-tight tabular-nums">{hasCashInput ? formatPeso(Math.abs(changeValue)) : '—'}</span>
+                  </div>
+                </div>
+                <details className="group">
+                  <summary className="cursor-pointer list-none text-xs font-semibold text-[var(--pos-ink-soft)] hover:text-[var(--pos-ink)]">
+                    <span className="group-open:hidden">Show keypad</span><span className="hidden group-open:inline">Hide keypad</span>
+                  </summary>
+                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                    {keypad.map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => handleCashInput(k)}
+                        className="h-11 rounded-[12px] border border-[var(--pos-border)] text-base font-semibold tabular-nums hover:bg-[var(--pos-muted)]"
+                        aria-label={k === 'backspace' ? 'Delete last digit' : k}
+                      >
+                        {k === 'backspace' ? '⌫' : k}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--pos-ink-soft)]">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={autoPrint} onChange={() => setAutoPrint(!autoPrint)} className="h-4 w-4 accent-[var(--pos-accent)]" />
+                Print receipt automatically
+              </label>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={overrideStock} onChange={() => setOverrideStock(!overrideStock)} className="h-4 w-4 accent-[var(--pos-accent)]" />
+                Sell sold-out items
+              </label>
+            </div>
+
+          </div>
+          </div>
+
+          {/* Pinned: problems and the Charge button stay in view */}
+          <div className="space-y-2 border-t border-[var(--pos-border)] bg-[var(--pos-surface)] p-4">
+            {error && <div className="rounded-[12px] bg-[var(--pos-danger-soft)] px-3 py-2 text-sm text-[var(--pos-danger)]" role="alert">{error}</div>}
+            {warnings.length > 0 && (
+              <div className="rounded-[12px] bg-[var(--tile-sand)] px-3 py-2 text-sm text-[var(--c-amber)]" role="status">
+                {warnings.map((w) => <p key={w}>{w}</p>)}
+                <button type="button" onClick={() => setWarnings([])} className="mt-1 text-xs font-semibold underline">Dismiss</button>
+              </div>
+            )}
+
+            <button
+              onClick={placeOrder}
+              disabled={placing || cart.length === 0}
+              className="flex h-14 w-full items-center justify-between rounded-[16px] bg-[var(--pos-accent)] px-5 text-base font-bold text-white transition hover:bg-[var(--pos-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--pos-muted)] disabled:text-[var(--pos-ink-soft)]"
+            >
+              <span>{placing ? 'Placing order…' : orderFeedback === 'success' ? 'Order placed' : `Charge ${formatPeso(total)}`}</span>
+              <span aria-hidden>→</span>
+            </button>
+          </div>
+        </section>
+      </div>
 
         {businessSettings?.loyaltyEnabled && showLoyaltyModal && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/35 px-4 backdrop-blur-[2px]">
@@ -1125,310 +1306,6 @@ export default function PosTerminalPage() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* ── COLUMN 2: Order Summary (260px) ──────────────────────────────── */}
-      <div
-        className="flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-[var(--pos-border)] bg-[var(--pos-surface)] relative"
-        style={{ width: colW.summary, minWidth: 210, maxWidth: 520 }}
-      >
-        {/* Drag handle (left edge) — drag right edge effect: narrows when pulled left */}
-        <div
-          onPointerDown={(e) => startColDrag('summary', e)}
-          className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-[var(--pos-accent)]/40"
-          title="Drag to resize"
-        />
-        {/* ── COLUMN 2: Order Summary ── */}
-        {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto p-2">
-          {cart.length === 0 ? (
-            <div className="py-6 text-center text-xs text-[var(--pos-ink-soft)]">No items in cart</div>
-          ) : (
-            <div className="space-y-1">
-              {cart.map(item => (
-                <div key={item.key ?? item.productId} className="rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-paper)] p-1.5">
-                  <div className="flex items-center gap-1">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => updateCartItemQuantity(item.key ?? item.productId, -1)}
-                        className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-[10px] font-bold text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]"
-                      >
-                        -
-                      </button>
-                      <button
-                        onClick={() => updateCartItemQuantity(item.key ?? item.productId, 1)}
-                        className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-surface)] text-[10px] font-bold text-[var(--pos-ink)] hover:bg-[var(--pos-muted)]"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words text-[10px] font-medium text-[var(--pos-ink)]">{item.name}</p>
-                      {item.selectionsLabel && (
-                        <p className="break-words text-[9px] text-[var(--pos-accent)]">{item.selectionsLabel}</p>
-                      )}
-                      <div className="mt-0.5 flex items-center justify-between text-[9px] text-[var(--pos-ink-soft)]">
-                        <span>Qty {item.quantity}</span>
-                        <span className="font-semibold text-[var(--pos-ink)]">{formatPeso(item.price * item.quantity)}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeFromCart(item.key ?? item.productId)}
-                      className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-sm)] text-[10px] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-danger-soft)] hover:text-[var(--pos-danger)]"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  {businessSettings?.loyaltyEnabled && (
-                    <div className="mt-1.5 rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-white/60 p-1.5">
-                      <div className="mb-1 flex items-center justify-between gap-1">
-                        <span className="text-[8px] font-semibold uppercase tracking-[0.12em] text-[var(--pos-ink-soft)]">Loyalty count</span>
-                        <button
-                          type="button"
-                          onClick={() => openItemLoyaltyPicker(item.productId)}
-                          className="rounded-full border border-[var(--pos-border)] bg-[var(--pos-surface)] px-0.5 py-0 text-[5px] font-semibold uppercase tracking-[0.02em] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]"
-                        >
-                          + add member
-                        </button>
-                      </div>
-
-                      {(item.loyaltyAssignments ?? []).length === 0 ? (
-                        <div className="text-[8px] text-[var(--pos-ink-soft)]">No loyalty member assigned yet.</div>
-                      ) : (
-                        <div className="space-y-1">
-                          {(item.loyaltyAssignments ?? []).map((assignment, idx) => (
-                            <div key={`${item.productId}-${idx}`} className="flex items-center gap-1">
-                              <select
-                                value={assignment.customerName}
-                                onChange={(e) => updateLoyaltyAssignment(item.productId, idx, 'customerName', e.target.value)}
-                                className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-1 py-0.5 text-[8px] text-[var(--pos-ink)] outline-none focus:border-[var(--pos-accent)]"
-                              >
-                                <option value="">Select member</option>
-                                {allLoyaltyResults.map((card) => (
-                                  <option key={`${card.id}-${card.customerName}`} value={card.customerName}>{card.customerName}</option>
-                                ))}
-                              </select>
-                              <input
-                                type="number"
-                                min={1}
-                                max={item.quantity}
-                                value={assignment.quantity}
-                                onChange={(e) => updateLoyaltyAssignment(item.productId, idx, 'quantity', Number(e.target.value) || 1)}
-                                className="w-8 rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-0.5 py-0.5 text-center text-[8px] text-[var(--pos-ink)] outline-none focus:border-[var(--pos-accent)]"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeLoyaltyAssignment(item.productId, idx)}
-                                className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-sm)] text-[10px] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-danger-soft)] hover:text-[var(--pos-danger)]"
-                                aria-label="Remove loyalty assignment"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Order Details */}
-        <div className="space-y-3 border-t border-[var(--pos-border)] bg-[var(--pos-surface)] p-3">
-          {error && <div className="rounded-[var(--radius-md)] border border-[var(--pos-danger)] bg-[var(--pos-danger-soft)] p-2 text-xs text-[var(--pos-danger)]">{error}</div>}
-
-          {warnings.length > 0 && (
-            <div className="rounded-[var(--radius-md)] border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
-              {warnings.map((warning) => (
-                <p key={warning} className="flex items-start gap-1.5">
-                  <span aria-hidden>⚠️</span>
-                  <span>{warning}</span>
-                </p>
-              ))}
-              <button
-                type="button"
-                onClick={() => setWarnings([])}
-                className="mt-1 font-semibold underline"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-[var(--pos-ink-soft)]">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
-            <span className="text-2xl font-semibold text-[var(--pos-ink)]" style={{ fontFamily: 'Georgia, serif' }}>{formatPeso(total)}</span>
-          </div>
-
-          {/* Payment Method */}
-          <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Payment</label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {['CASH', 'GCASH', 'PAYMAYA'].map(pm => (
-                <button
-                  key={pm}
-                  onClick={() => setPaymentMethod(pm)}
-                  className={`min-h-[44px] rounded-[var(--radius-md)] border text-[10px] font-semibold transition ${
-                    paymentMethod === pm
-                      ? 'border-[var(--pos-accent)] bg-[var(--pos-accent)] text-white'
-                      : 'border-[var(--pos-border)] bg-[var(--pos-surface)] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]'
-                  }`}
-                >
-                  {pm === 'CASH' ? 'Cash' : pm === 'GCASH' ? 'G-Cash' : 'PayMaya'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Auto Print Toggle */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Auto-print</span>
-            <button
-              onClick={() => setAutoPrint(!autoPrint)}
-              className={`relative h-6 w-11 rounded-full transition-colors ${autoPrint ? 'bg-[var(--pos-accent)]' : 'bg-[var(--pos-muted)]'}`}
-            >
-              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${autoPrint ? 'translate-x-5' : 'left-1'}`} />
-            </button>
-          </div>
-
-          {/* Sell-out override Toggle */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Sell sold-out items</span>
-            <button
-              onClick={() => setOverrideStock(!overrideStock)}
-              className={`relative h-6 w-11 rounded-full transition-colors ${overrideStock ? 'bg-[var(--pos-accent)]' : 'bg-[var(--pos-muted)]'}`}
-            >
-              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${overrideStock ? 'translate-x-5' : 'left-1'}`} />
-            </button>
-          </div>
-
-          {orderFeedback === 'success' && (
-            <div className="rounded-[var(--radius-md)] border border-[var(--pos-accent)] bg-[var(--pos-accent-soft)] px-2.5 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-accent)]">
-              Order placed
-            </div>
-          )}
-
-          <button
-            onClick={placeOrder}
-            disabled={placing || cart.length === 0}
-            className="w-full rounded-[var(--radius-md)] bg-[var(--pos-accent)] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--pos-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--pos-muted)] disabled:text-[var(--pos-ink-soft)]"
-          >
-            {placing ? 'Placing order…' : orderFeedback === 'success' ? '✅ Place Order' : '✅ Place Order'}
-          </button>
-
-          {cart.length > 0 && (
-            <button onClick={clearCart} className="w-full rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-surface)] py-2.5 text-sm font-medium text-[var(--pos-ink-soft)] transition hover:border-[var(--pos-danger)] hover:text-[var(--pos-danger)]">
-              🗑 Clear Cart
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── COLUMN 3: Products ──────────────────────────────── */}
-      <div className="flex h-full flex-1 flex-col overflow-y-auto overflow-x-visible bg-[radial-gradient(circle_at_top,_#fffefc_0%,_#f5f1ea_45%,_#efeae2_100%)] min-w-0">
-
-        {/* Search + Category Tabs */}
-        <div className="sticky top-0 z-20 border-b border-[var(--pos-border)] bg-white/90 px-4 pt-3 pb-2 shadow-[0_8px_22px_rgba(30,24,20,0.04)] backdrop-blur-sm">
-          <input
-            type="search"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search products..."
-            className="mb-3 w-full rounded-[var(--radius-lg)] border border-[var(--pos-border)] bg-[var(--pos-paper)] px-3 py-2.5 text-sm text-[var(--pos-ink)] placeholder:text-[var(--pos-ink-soft)]/70 shadow-sm outline-none transition focus:border-[var(--pos-accent)] focus:ring-2 focus:ring-[var(--pos-accent)]/15"
-          />
-          {!search && (
-            <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
-              {/* All Products Tab */}
-              <button
-                onClick={() => setActiveCategory('all')}
-                className={`flex-shrink-0 flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-1 text-[10px] font-medium transition-all ${
-                  activeCategory === 'all'
-                    ? 'bg-[var(--pos-accent-soft)] text-[var(--pos-accent)] shadow-sm ring-1 ring-[var(--pos-accent)]/15'
-                    : 'bg-[var(--pos-muted)] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-border)]'
-                }`}
-              >
-                <CategoryGlyph name="all" active={activeCategory === 'all'} className="h-3 w-3" />
-                <span>All</span>
-                <span className="text-[9px] opacity-75">({allProducts.length})</span>
-              </button>
-              {/* Category Tabs */}
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`flex-shrink-0 flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-1 text-[10px] font-medium transition-all ${
-                    activeCategory === cat.id
-                      ? 'bg-[var(--pos-accent-soft)] text-[var(--pos-accent)] shadow-sm ring-1 ring-[var(--pos-accent)]/15'
-                      : 'bg-[var(--pos-muted)] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-border)]'
-                  }`}
-                >
-                  <CategoryGlyph name={cat.name} active={activeCategory === cat.id} className="h-3 w-3" />
-                  <span>{cat.name}</span>
-                  <span className="text-[9px] opacity-75">({cat.products.length})</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Products Grid */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
-          {search && (
-            <p className="mb-3 text-xs font-medium text-[var(--pos-ink-soft)]">{displayedProducts.length} result{displayedProducts.length !== 1 ? 's' : ''} for &quot;{search}&quot;</p>
-          )}
-          <div className="grid w-full grid-cols-4 gap-3">
-            {displayedProducts.map(product => {
-              const outOfStock = product.inventory && product.inventory.quantity === 0;
-              const cartItem = cart.find(i => i.productId === product.id);
-              const catIcon = categories.find(c => c.products.some(p => p.id === product.id))?.icon;
-              const blocked = outOfStock && !overrideStock;
-              return (
-                <button
-                  key={product.id}
-                  onClick={() => !blocked && handleProductClick(product)}
-                  disabled={blocked}
-                  className={`relative flex w-full min-w-0 min-h-[320px] flex-col items-center justify-between rounded-[var(--radius-lg)] border bg-white p-4 text-center shadow-sm transition-all overflow-hidden ${
-                    blocked
-                      ? 'cursor-not-allowed border-gray-100 opacity-40'
-                      : cartItem
-                        ? 'border-[var(--pos-accent)] bg-[var(--pos-accent-soft)] shadow-md shadow-[rgba(74,93,58,0.08)]'
-                        : 'border-[var(--pos-border)] hover:border-[var(--pos-accent)] hover:shadow-md active:scale-[0.97]'
-                  }`}
-                >
-                  {cartItem && (
-                    <span className="absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--pos-accent)] text-[10px] font-bold text-white">
-                      {cartItem.quantity}
-                    </span>
-                  )}
-                  <div className="mb-3 flex h-40 w-40 items-center justify-center overflow-hidden rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-muted)] text-[var(--pos-ink-soft)]">
-                    {isImageUrl(product.imageUrl)
-                      ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
-                      : <CategoryGlyph name={categories.find(c => c.products.some(p => p.id === product.id))?.name ?? 'all'} active={false} className="h-8 w-8" />}
-                  </div>
-                  <p className="line-clamp-2 break-words text-sm font-semibold leading-tight text-[var(--pos-ink)]">{product.name}</p>
-                  <p className="mt-2 text-base font-bold text-[var(--pos-ink)]">₱{product.price.toFixed(2)}</p>
-                  {outOfStock && (
-                    <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/60">
-                      <span className={`text-xs font-bold ${overrideStock ? 'text-[var(--pos-accent)]' : 'text-gray-400'}`}>{overrideStock ? 'Sell anyway' : 'Sold Out'}</span>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {displayedProducts.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-              <span className="text-5xl mb-3">🔍</span>
-              <p className="text-sm font-medium">No products found</p>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* BIR-Compliant Receipt Modal */}
       {receipt && (

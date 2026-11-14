@@ -51,14 +51,14 @@ export function discountProblem(d: TerminalDiscount): string | null {
 const emptyHolder = (): DiscountHolderDraft => ({ type: 'SENIOR', name: '', idNumber: '' });
 
 const chip = (active: boolean) =>
-  `min-h-[32px] rounded-[var(--radius-sm)] border px-1.5 text-[10px] font-semibold transition ${
+  `h-9 whitespace-nowrap rounded-[10px] px-1.5 text-[13px] font-semibold transition ${
     active
-      ? 'border-[var(--pos-accent)] bg-[var(--pos-accent)] text-white'
-      : 'border-[var(--pos-border)] bg-[var(--pos-surface)] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]'
+      ? 'bg-[var(--pos-surface)] text-[var(--pos-ink)] shadow-[0_1px_2px_rgba(45,30,20,0.12)]'
+      : 'text-[var(--pos-ink-soft)] hover:text-[var(--pos-ink)]'
   }`;
 
 const input =
-  'w-full rounded-[var(--radius-sm)] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-1.5 py-1 text-[11px] text-[var(--pos-ink)] focus:border-[var(--pos-accent)] focus:outline-none';
+  'h-9 w-full rounded-[10px] border border-[var(--pos-border)] bg-[var(--pos-surface)] px-2.5 text-sm text-[var(--pos-ink)] focus:border-[var(--pos-accent)] focus:outline-none';
 
 export default function DiscountPicker({
   value,
@@ -75,9 +75,9 @@ export default function DiscountPicker({
   };
 
   return (
-    <div className="mb-1.5">
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--pos-ink-soft)]">Discount</div>
-      <div className="grid grid-cols-3 gap-1">
+    <div>
+      <div className="mb-1.5 text-xs font-semibold text-[var(--pos-ink-soft)]">Discount</div>
+      <div className="grid grid-cols-3 gap-1 rounded-[12px] bg-[var(--pos-muted)] p-1">
         <button type="button" className={chip(value.kind === 'NONE')} onClick={() => onChange({ kind: 'NONE' })}>
           None
         </button>
@@ -86,16 +86,16 @@ export default function DiscountPicker({
           className={chip(value.kind === 'STATUTORY')}
           onClick={() => value.kind !== 'STATUTORY' && onChange({ kind: 'STATUTORY', diners: 1, holders: [emptyHolder()] })}
         >
-          Senior / PWD
+          Senior/PWD
         </button>
         <button type="button" className={chip(value.kind === 'STUDENT')} onClick={() => onChange({ kind: 'STUDENT' })}>
-          Student {studentRate}%
+          Student
         </button>
       </div>
 
       {value.kind === 'STATUTORY' && (
-        <div className="mt-1.5 space-y-1.5 rounded-[var(--radius-md)] border border-[var(--pos-border)] bg-[var(--pos-paper)] p-1.5">
-          <label className="flex items-center justify-between gap-2 text-[10px] text-[var(--pos-ink-soft)]">
+        <div className="mt-2 space-y-2 rounded-[14px] bg-[var(--pos-paper)] p-2.5">
+          <label className="flex items-center justify-between gap-2 text-xs font-semibold text-[var(--pos-ink-soft)]">
             Diners at this bill
             <input
               type="number"
@@ -103,7 +103,7 @@ export default function DiscountPicker({
               step={1}
               value={value.diners}
               onChange={(e) => onChange({ ...value, diners: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
-              className={`${input} w-14 text-right`}
+              className={`${input} w-16 text-right`}
             />
           </label>
           {value.holders.map((h, i) => (
@@ -136,7 +136,7 @@ export default function DiscountPicker({
                   <button
                     type="button"
                     onClick={() => onChange({ ...value, holders: value.holders.filter((_, j) => j !== i) })}
-                    className="rounded-[var(--radius-sm)] border border-[var(--pos-border)] px-1.5 text-[10px] text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]"
+                    className="h-9 rounded-[10px] border border-[var(--pos-border)] px-2.5 text-xs text-[var(--pos-ink-soft)] hover:bg-[var(--pos-surface)]"
                     aria-label="Remove ID holder"
                   >
                     Remove
@@ -150,11 +150,11 @@ export default function DiscountPicker({
             onClick={() =>
               onChange({ ...value, holders: [...value.holders, emptyHolder()], diners: Math.max(value.diners, value.holders.length + 1) })
             }
-            className="w-full rounded-[var(--radius-sm)] border border-dashed border-[var(--pos-border)] py-1 text-[10px] font-semibold text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)]"
+            className="h-9 w-full rounded-[10px] border border-dashed border-[var(--pos-border)] text-xs font-semibold text-[var(--pos-ink-soft)] hover:bg-[var(--pos-surface)]"
           >
             Add another ID holder
           </button>
-          <p className="text-[9px] leading-snug text-[var(--pos-ink-soft)]">
+          <p className="text-[11px] leading-snug text-[var(--pos-ink-soft)]">
             20% off after VAT is removed, on the holders&apos; share of the bill. Check the ID before applying.
           </p>
         </div>
