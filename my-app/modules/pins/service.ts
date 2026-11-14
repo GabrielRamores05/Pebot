@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { canApprove, pinProblem } from '@/lib/approvals';
 import * as repo from '@/modules/pins/repository';
+import { rateLimit, resetRateLimit } from '@/lib/rate-limit';
 
 // Staff PINs (spec 020): quick sign-in on a shared register and manager approvals.
 
@@ -41,10 +42,19 @@ export async function findUserByPin(pin: string) {
   return user;
 }
 
-/** The manager who approves with this PIN, or a 403 error. */
-export async function requireApprover(pin: unknown) {
+/**
+ * The manager who approves with this PIN, or a 403 error. `askedBy` is the
+ * signed-in user asking: 5 wrong PINs per 15 minutes each, so a cashier cannot
+ * guess a manager's PIN.
+ */
+export async function requireApprover(pin: unknown, askedBy?: number) {
   if (typeof pin !== 'string' || !/^\d{4,6}$/.test(pin)) throw fail('Enter a manager PIN.', 403);
+  const key = `approver:${askedBy ?? 'anyone'}`;
+  if (!rateLimit(key, 5, 15 * 60 * 1000).allowed) {
+    throw fail('Too many wrong manager PINs. Wait 15 minutes or ask the manager to sign in.', 429);
+  }
   const u = await matching(pin);
   if (!u || !canApprove(u)) throw fail('That PIN is not a manager PIN.', 403);
+  resetRateLimit(key);
   return { id: u.id, name: u.name };
 }

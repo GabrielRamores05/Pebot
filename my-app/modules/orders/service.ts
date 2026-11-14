@@ -531,7 +531,7 @@ const VoidInputSchema = z.object({
  */
 export async function voidOrder(idOrNumber: string, input: unknown, staff: { userId: number; name: string }) {
   const data = parseInput(VoidInputSchema, input);
-  const approver = await requireApprover(data.pin);
+  const approver = await requireApprover(data.pin, staff.userId);
 
   const existing = await repo.findOrderForMessage(idOrNumber);
   if (!existing) throw setErrorStatus(new Error('Order not found'), 404);

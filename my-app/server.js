@@ -102,6 +102,12 @@ app.prepare().then(() => {
       delete req.headers['x-pebot-local'];
       if (local) req.headers['x-pebot-local'] = '1';
 
+      // Nothing sits in front of this server, so the socket address is the client.
+      // Never trust a forwarded header a client sent: rate limits key on it.
+      const remote = String(req.socket.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+      req.headers['x-forwarded-for'] = remote;
+      req.headers['x-real-ip'] = remote;
+
       const decision = classifyRequest({
         method: req.method,
         pathname: parsedUrl.pathname || '/',
