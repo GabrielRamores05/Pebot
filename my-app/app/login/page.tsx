@@ -94,24 +94,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#fffaf4_0%,#f7f0e4_30%,#efe7de_100%)] px-5 py-8 text-stone-900 sm:px-8">
+    <div className="relative min-h-screen overflow-hidden bg-page px-5 py-8 text-stone-900 sm:px-8">
       <div className="absolute inset-0 opacity-60">
-        <div className="absolute left-[-8%] top-[-12%] h-72 w-72 rounded-full bg-[#eac8a5]/30 blur-3xl" />
-        <div className="absolute bottom-[-12%] right-[-8%] h-80 w-80 rounded-full bg-[#d8b086]/20 blur-3xl" />
+        
+        
       </div>
 
       <div className={`relative z-10 mx-auto grid max-w-5xl items-center gap-6 transition-all duration-700 lg:grid-cols-[1.1fr_0.9fr] ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-        <section className="hidden rounded-4xl border border-[#e9daba] bg-[#1f1a17] p-8 text-white shadow-[0_28px_70px_rgba(31,26,23,0.2)] lg:block">
+        <section className="hidden rounded-4xl bg-ink p-8 text-white shadow-[0_28px_70px_rgba(31,26,23,0.2)] lg:block">
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-2xl shadow-inner">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-xl font-black">
               {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt="Logo" className="h-full w-full rounded-2xl object-cover" />
               ) : (
-                '🍽️'
+                branding.shopName.slice(0, 1)
               )}
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d5c39d]">Pebot</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#F0B8A4]">Pebot</p>
               <h2 className="text-xl font-bold">{branding.shopName}</h2>
             </div>
           </div>
@@ -121,42 +121,42 @@ export default function LoginPage() {
           </h1>
 
           <p className="mt-5 max-w-md text-base leading-7 text-stone-300">
-            Bring service, loyalty, kitchen flow, and sales into one premium command center designed for busy restaurant teams.
+            The register, the kitchen, your stock and your money in one place, built for busy Philippine restaurants.
           </p>
 
           <div className="mt-8 space-y-3">
             {[
-              'Live order tracking',
-              'Table-ready ordering',
-              'Loyalty & promotions',
-              'Inventory-level awareness',
+              'Live orders from table to kitchen',
+              'Senior, PWD and service charge done right',
+              'Payroll, payslips and daily backups',
+              'Stock that counts itself from recipes',
             ].map((item) => (
               <div key={item} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-stone-200">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#efd6b4] text-sm text-stone-900">✓</span>
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent text-sm text-white">✓</span>
                 {item}
               </div>
             ))}
           </div>
         </section>
 
-        <section className="rounded-4xl border border-[#e8d5b2] bg-[#fffdfb]/85 p-5 shadow-[0_28px_70px_rgba(77,52,30,0.08)] backdrop-blur-xl sm:p-7 lg:p-8">
+        <section className="rounded-4xl border border-hair bg-card p-5 shadow-[0_28px_70px_rgba(77,52,30,0.08)] backdrop-blur-xl sm:p-7 lg:p-8">
           <div className="mb-6 flex justify-center lg:hidden">
-            <div className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-linear-to-br from-[#2d221d] via-[#5f3e2b] to-[#b67c4d] text-3xl text-white shadow-md">
+            <div className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-ink text-2xl font-black text-white shadow-md">
               {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt="Logo" className="h-full w-full rounded-[22px] object-cover" />
               ) : (
-                '🍽️'
+                branding.shopName.slice(0, 1)
               )}
             </div>
           </div>
 
           <div className="mb-6 text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b6c47]">Staff access</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-text">Staff access</p>
             <h2 className="mt-2 text-3xl font-black tracking-[-0.06em] text-stone-900">Welcome back</h2>
             <p className="mt-2 text-sm text-stone-500">Sign in to manage orders, service, and loyalty.</p>
           </div>
 
-          <div className="mb-5 grid grid-cols-2 gap-1 rounded-2xl bg-[#f3ece2] p-1" role="tablist" aria-label="Sign-in method">
+          <div className="mb-5 grid grid-cols-2 gap-1 rounded-2xl bg-panel p-1" role="tablist" aria-label="Sign-in method">
             {(['email', 'pin'] as const).map((m) => (
               <button
                 key={m}
@@ -209,7 +209,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@restaurant.com"
                 required
-                className="w-full rounded-2xl border border-[#ebddc4] bg-[#faf5ee] px-4 py-3.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-[#d0ab79] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#f2dfc0]/60"
+                className="w-full rounded-2xl border border-[#ebddc4] bg-[#faf5ee] px-4 py-3.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-accent-soft"
               />
             </div>
 
@@ -221,7 +221,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
                 required
-                className="w-full rounded-2xl border border-[#ebddc4] bg-[#faf5ee] px-4 py-3.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-[#d0ab79] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#f2dfc0]/60"
+                className="w-full rounded-2xl border border-[#ebddc4] bg-[#faf5ee] px-4 py-3.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-accent-soft"
               />
             </div>
 

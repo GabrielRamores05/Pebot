@@ -356,7 +356,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-page min-h-screen p-4 md:p-6">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl">
 
          {/* Header */}
          <div className="mb-4">

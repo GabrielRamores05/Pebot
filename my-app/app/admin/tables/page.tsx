@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
+import { StatTile } from '@/components/pebot-ui';
 
 type TableStatus = 'AVAILABLE' | 'OCCUPIED' | 'NEEDS_CLEANING';
 
@@ -47,10 +48,10 @@ interface Table {
   sessions?: TableVisit[];
 }
 
-const STATUS_CONFIG: Record<TableStatus, { label: string; color: string; dot: string }> = {
-  AVAILABLE:      { label: 'Available',      color: 'bg-green-500/20  border-green-500  text-green-400', dot: 'bg-green-400' },
-  OCCUPIED:       { label: 'Occupied',       color: 'bg-yellow-500/20 border-yellow-500 text-yellow-400', dot: 'bg-yellow-400' },
-  NEEDS_CLEANING: { label: 'Needs Cleaning', color: 'bg-red-500/20    border-red-500    text-red-400', dot: 'bg-red-400' },
+const STATUS_CONFIG: Record<TableStatus, { label: string; color: string; dot: string; stripe: string; tone: 'sage' | 'sand' | 'peach' }> = {
+  AVAILABLE:      { label: 'Available',      color: 'bg-green-500/20  border-green-500  text-green-400', dot: 'bg-good', stripe: 'border-l-good', tone: 'sage' },
+  OCCUPIED:       { label: 'Occupied',       color: 'bg-yellow-500/20 border-yellow-500 text-yellow-400', dot: 'bg-warn', stripe: 'border-l-warn', tone: 'sand' },
+  NEEDS_CLEANING: { label: 'Needs cleaning', color: 'bg-red-500/20    border-red-500    text-red-400', dot: 'bg-danger', stripe: 'border-l-danger', tone: 'peach' },
 };
 
 const NEXT_STATUS: Record<TableStatus, TableStatus> = {
@@ -438,8 +439,8 @@ export default function TablesPage() {
       <div className="mb-6">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
           <div>
-            <h1 className="c-title">Table Management</h1>
-            <p className="mt-1.5 text-sm text-muted">Manage all tables, track occupancy time, and monitor alerts.</p>
+            <h1 className="c-title">Tables</h1>
+            <p className="mt-1.5 text-sm text-muted">Tap a table to change its status. Long stays are flagged so no one waits too long for the bill.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -477,10 +478,8 @@ export default function TablesPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         {Object.entries(STATUS_CONFIG).map(([status, cfg]) => (
-          <div key={status} className="bg-white rounded-xl p-4 shadow-sm">
-            <p className="text-2xl font-semibold text-gray-900">{byStatus(status as TableStatus).length}</p>
-            <p className="text-xs font-medium text-gray-500 mt-0.5">{cfg.label}</p>
-          </div>
+          <StatTile key={status} tone={cfg.tone} label={cfg.label} value={byStatus(status as TableStatus).length}
+            note={status === 'OCCUPIED' ? `${tables.reduce((n, t) => n + (t.currentOccupants ?? 0), 0)} guests seated` : `of ${tables.length} tables`} />
         ))}
       </div>
 
@@ -570,11 +569,11 @@ export default function TablesPage() {
             const occupancyText = table.status === 'OCCUPIED' ? formatOccupancyTime(table.occupiedSince) : null;
             
             return (
-              <div key={table.id} className={`bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${alertBorder}`}
+              <div key={table.id} className={`c-card border-l-4 ${cfg.stripe} p-3 transition hover:-translate-y-0.5 cursor-pointer ${alertBorder ? `ring-2 ${alertBorder.replace('border-', 'ring-')}` : ''}`}
                    onClick={() => cycleStatus(table)}>
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <p className="text-gray-900 font-semibold text-sm">{table.name}</p>
+                    <p className="text-base font-bold text-ink">{table.name}</p>
                     <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
                       {(table.currentOccupants ?? 0)}/{table.capacity}
                       {typeof table.currentOccupants === 'number' && table.currentOccupants > 0 && (
@@ -613,20 +612,20 @@ export default function TablesPage() {
                         e.stopPropagation();
                         showQr(table);
                       }}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-colors shadow-sm"
-                      title="Show QR code"
+                      className="h-9 rounded-xl border border-hair bg-card px-2.5 text-xs font-semibold text-muted transition-colors hover:text-ink"
+                      title="Show the QR code guests scan to order"
                     >
-                      📱
+                      QR
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         openEdit(table);
                       }}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-colors shadow-sm"
+                      className="h-9 rounded-xl border border-hair bg-card px-2.5 text-xs font-semibold text-muted transition-colors hover:text-ink"
                       title="Edit table"
                     >
-                      ⚙️
+                      Edit
                     </button>
                   </div>
                 </div>
