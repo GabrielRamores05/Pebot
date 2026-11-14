@@ -11,6 +11,7 @@ function alertPrint(error?: string) {
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { formatPeso } from '@/lib/format';
+import VoidOrderDialog from '@/components/VoidOrderDialog';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSocket } from '@/hooks/useSocket';
@@ -153,6 +154,10 @@ export default function AdminPage() {
   const [showInvoice, setShowInvoice] = useState(false);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
   const [selected, setSelected] = useState<Order | null>(null);
+  // Spec 020: void/refund and moving an order to another table.
+  const [voidTarget, setVoidTarget] = useState<Order | null>(null);
+  const [tableList, setTableList] = useState<{ id: number; name: string }[]>([]);
+  const [moveMsg, setMoveMsg] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const selectedRef = useRef<Order | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -629,6 +634,19 @@ export default function AdminPage() {
       </div>
       )}
 
+      {voidTarget && (
+        <VoidOrderDialog
+          order={voidTarget}
+          onClose={() => setVoidTarget(null)}
+          onVoided={(updated) => {
+            const u = updated as unknown as Order;
+            setOrders((prev) => prev.map((o) => (o.id === u.id ? { ...o, ...u } : o)));
+            setSelected((prev) => (prev && prev.id === u.id ? { ...prev, ...u } : prev));
+            setVoidTarget(null);
+          }}
+        />
+      )}
+
       {/* Touch drag ghost - Premium Style */}
       {touchDragging && (
         <div
@@ -677,6 +695,38 @@ export default function AdminPage() {
                   </button>
                 ))}
               </div>
+
+              {/* Move to another table (merging = moving each order to the same table) */}
+              <div className="flex items-center gap-2">
+                <select
+                  value=""
+                  onFocus={() => { if (tableList.length === 0) fetch('/api/tables').then((r) => r.json()).then((t) => setTableList(Array.isArray(t) ? t : [])).catch(() => {}); }}
+                  onChange={async (e) => {
+                    const tableId = Number(e.target.value);
+                    if (!tableId) return;
+                    const res = await fetch(`/api/orders/${selected.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId }) });
+                    if (res.ok) {
+                      const updated = await res.json();
+                      setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+                      setSelected(updated);
+                      setMoveMsg(`Moved to ${updated.table?.name ?? 'the new table'}.`);
+                    } else {
+                      setMoveMsg('Could not move the order.');
+                    }
+                  }}
+                  className="h-10 flex-1 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent"
+                  aria-label="Move to table"
+                >
+                  <option value="">{selected.table ? `At ${selected.table.name} · move to…` : 'Seat at a table…'}</option>
+                  {tableList.filter((t) => t.name !== selected.table?.name).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                {selected.status !== 'CANCELLED' && (
+                  <button onClick={() => setVoidTarget(selected)} className="c-btn h-10 border-hair text-danger hover:bg-danger-bg">
+                    Void / refund
+                  </button>
+                )}
+              </div>
+              {moveMsg && <p className="text-xs text-muted">{moveMsg}</p>}
 
               {/* Invoice Button */}
               <button

@@ -364,6 +364,12 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
                 </div>
               </FormSection>
 
+              <FormSection title="PIN" hint="4 to 6 digits for quick sign-in on the register. Managers and the owner also use it to approve voids and refunds.">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label={editingId ? 'New PIN (leave blank to keep)' : 'PIN (optional)'} type="password" value={form.pin ?? ''} onChange={v => setForm({ ...form, pin: v.replace(/\D/g, '').slice(0, 6) })} />
+                </div>
+              </FormSection>
+
               <FormSection title="Employment and pay">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
@@ -724,7 +730,7 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl bg-tile-sand px-4 py-3 text-sm text-ink">
-        Tip: staff are clocked in automatically when they log in, and clocked out when they log out. Use the buttons below only to fix mistakes.
+        Staff clock in and out themselves from the menu sidebar. Use the buttons below to fix mistakes or to clock someone in for their shift.
       </div>
       <h2 className="text-base font-bold">Time clock</h2>
       <div className="flex gap-2 items-end flex-wrap">
@@ -1227,6 +1233,7 @@ type StaffForm = {
   phone: string; address: string; dateOfBirth: string; hireDate: string;
   position: string; department: string; emergencyContactName: string; emergencyContactPhone: string;
   hourlyRate: string; monthlySalary: string; paymentType: string;
+  pin?: string;
 };
 function blankForm(): StaffForm {
   return { name: '', email: '', role: 'STAFF', password: '', phone: '', address: '', dateOfBirth: '', hireDate: '', position: '', department: '', emergencyContactName: '', emergencyContactPhone: '', hourlyRate: '', monthlySalary: '', paymentType: '' };

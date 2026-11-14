@@ -419,6 +419,23 @@ async function assignInvoiceNumberTx(tx: Tx, orderId: number) {
   });
 }
 
+/** The fields a void needs (spec 020). */
+export async function findOrderForVoid(orderId: number) {
+  return prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, orderNumber: true, paidAt: true, paymentMethod: true, cashSessionId: true, totalAmount: true },
+  });
+}
+
+export async function findOpenCashSessionId(locationId: number): Promise<number | null> {
+  const s = await prisma.cashSession.findFirst({ where: { locationId, closedAt: null }, select: { id: true } });
+  return s?.id ?? null;
+}
+
+export async function createCashMovement(data: { sessionId: number; kind: 'IN' | 'OUT'; amount: number; reason: string; userId: number; userName: string }) {
+  return prisma.cashMovement.create({ data });
+}
+
 /** Business settings the bill depends on (spec 017). */
 export async function findCheckoutSettings() {
   return prisma.businessSettings.findFirst({
@@ -665,7 +682,7 @@ export { LoyaltyVoucherError, InsufficientStockError };
 
 export interface UpdateOrderParams {
   orderId: number;
-  updateData: { status?: string; tableId?: number | null };
+  updateData: { status?: string; tableId?: number | null; voidReason?: string; voidedAt?: Date; voidedById?: number; refundAmount?: number };
   addItems?: { productId: number; quantity: number }[];
   isPaymentConfirmation: boolean;
   isCancel: boolean;

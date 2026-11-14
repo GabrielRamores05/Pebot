@@ -21,6 +21,9 @@ export interface DayOrder {
   serviceCharge: number;
   /** Payment was confirmed. Unpaid orders are not sales yet. */
   paid: boolean;
+  /** Spec 020: set when a manager voided or refunded the order. */
+  voidReason?: string | null;
+  refundAmount?: number | null;
 }
 
 export interface DiscountHolderRecord {
@@ -34,6 +37,9 @@ export interface DaySummary {
   cancelled: { count: number; amount: number };
   /** Orders placed but never paid (for example a QR order nobody paid for). */
   unpaid: { count: number; amount: number };
+  /** Voided or refunded orders with the reason (spec 020). */
+  voids: { orderNumber: string; reason: string; refund: number }[];
+  refundTotal: number;
   gross: number;
   loyaltyDiscount: number;
   discounts: {
@@ -107,6 +113,7 @@ export function summarizeDay(orders: DayOrder[]): DaySummary {
   const orderTypes = new Map<string, { count: number; amount: number }>();
   const cancelled = { count: 0, amount: 0 };
   const unpaid = { count: 0, amount: 0 };
+  const voids: DaySummary['voids'] = [];
   const statutory: DaySummary['statutory'] = [];
   let orderCount = 0;
   let gross = 0;
@@ -123,6 +130,7 @@ export function summarizeDay(orders: DayOrder[]): DaySummary {
     if (o.status === 'CANCELLED') {
       cancelled.count += 1;
       cancelled.amount += o.totalAmount;
+      if (o.voidReason) voids.push({ orderNumber: o.orderNumber, reason: o.voidReason, refund: round2(o.refundAmount ?? 0) });
       continue;
     }
     if (!o.paid) {
@@ -166,6 +174,8 @@ export function summarizeDay(orders: DayOrder[]): DaySummary {
     orderCount,
     cancelled: { count: cancelled.count, amount: round2(cancelled.amount) },
     unpaid: { count: unpaid.count, amount: round2(unpaid.amount) },
+    voids,
+    refundTotal: round2(voids.reduce((n, v) => n + v.refund, 0)),
     gross: round2(gross),
     loyaltyDiscount: round2(loyaltyDiscount),
     discounts: Object.fromEntries(Object.entries(discounts).map(([k, v]) => [k, round2(v)])) as DaySummary['discounts'],

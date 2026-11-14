@@ -69,6 +69,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [guestLeftNotif, setGuestLeftNotif] = useState<Array<{ guestNames: string; tableName: string; id: number }>>([]);
   // Cash drawer status for the sidebar card (spec 017/018). Null = unknown or no access.
   const [drawer, setDrawer] = useState<{ open: boolean; expected?: number; since?: string } | null>(null);
+  // Clocking in is its own action, not a side effect of signing in (spec 020).
+  const [shift, setShift] = useState<{ clockedIn: boolean; since: string | null } | null>(null);
+  const [shiftBusy, setShiftBusy] = useState(false);
 
   const handleNewOrder = useCallback((data: any) => {
     playNewOrderSound();
@@ -183,6 +186,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const t = window.setInterval(load, 60_000);
     return () => { cancelled = true; window.clearInterval(t); };
   }, [user, pathname]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch('/api/attendance/me').then((r) => (r.ok ? r.json() : null)).then((d) => d && setShift(d)).catch(() => {});
+  }, [user]);
+
+  const toggleShift = async () => {
+    setShiftBusy(true);
+    try {
+      const r = await fetch('/api/attendance/me', { method: 'POST' });
+      if (r.ok) setShift(await r.json());
+    } finally {
+      setShiftBusy(false);
+    }
+  };
 
   // Enforce per-route permissions for non-admin staff. ADMIN has full access.
   useEffect(() => {
@@ -309,8 +327,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </span>
               <span className={`min-w-0 flex-1 ${collapsed ? 'md:hidden' : ''}`}>
                 <span className="block truncate text-[13px] font-semibold">{user.name}</span>
-                <span className="block truncate text-xs capitalize text-faint">{user.role.toLowerCase()}</span>
+                <span className="block truncate text-xs capitalize text-faint">
+                  {shift?.clockedIn && shift.since
+                    ? `On shift since ${new Date(shift.since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+                    : user.role.toLowerCase()}
+                </span>
               </span>
+              {shift && (
+                <button
+                  onClick={toggleShift}
+                  disabled={shiftBusy}
+                  className={`h-8 shrink-0 rounded-lg px-2 text-[11px] font-semibold transition disabled:opacity-50 ${collapsed ? 'md:hidden' : ''} ${shift.clockedIn ? 'bg-good-bg text-good hover:brightness-95' : 'border border-hair text-muted hover:text-ink'}`}
+                  title={shift.clockedIn ? 'Clock out' : 'Clock in'}
+                >
+                  {shift.clockedIn ? 'Clock out' : 'Clock in'}
+                </button>
+              )}
               <button
                 onClick={logOut}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-faint transition-colors hover:bg-danger-bg hover:text-danger"

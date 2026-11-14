@@ -63,18 +63,8 @@ export async function POST(req: NextRequest) {
 
     const token = await signToken(payload);
 
-    // Auto clock-in: record an attendance entry when a staff member logs in
-    // (if they don't already have an open shift today).
-    try {
-      const open = await prisma.attendance.findFirst({
-        where: { userId: user.id, clockOut: null },
-      });
-      if (!open) {
-        await prisma.attendance.create({ data: { userId: user.id, clockIn: new Date() } });
-      }
-    } catch (attErr) {
-      console.error('[LOGIN] auto clock-in failed:', attErr);
-    }
+    // Signing in no longer clocks a person in: an owner checking reports from home
+    // is not on shift. Staff clock in from the sidebar (spec 020).
 
     const res = NextResponse.json({ user: payload, token });
     res.cookies.set('cafeos-token', token, {

@@ -112,6 +112,18 @@ describe('summarizeDay (spec 017, US5)', () => {
     expect(s.unpaid).toEqual({ count: 1, amount: 112 });
   });
 
+  it('lists voids and refunds with their reasons (spec 020)', () => {
+    const voided = order({ lines: [line(250)], ...vat }, { status: 'CANCELLED', voidReason: 'Wrong order', refundAmount: 250 });
+    const unpaidVoid = order({ lines: [line(120)], ...vat }, { status: 'CANCELLED', voidReason: 'Customer left', refundAmount: 0, paid: false });
+    const s = summarizeDay([withService, voided, unpaidVoid]);
+    expect(s.voids).toEqual([
+      { orderNumber: voided.orderNumber, reason: 'Wrong order', refund: 250 },
+      { orderNumber: unpaidVoid.orderNumber, reason: 'Customer left', refund: 0 },
+    ]);
+    expect(s.refundTotal).toBe(250);
+    expect(s.net).toBe(550);
+  });
+
   it('is all zeros for a day with no orders', () => {
     const s = summarizeDay([]);
     expect(s).toMatchObject({ orderCount: 0, gross: 0, net: 0, payments: [], statutory: [] });

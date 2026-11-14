@@ -16,6 +16,9 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [branding, setBranding] = useState<BrandingState>({ shopName: 'Pebot', logoUrl: null });
   const [mounted, setMounted] = useState(false);
+  // Spec 020: quick PIN sign-in for a shared register.
+  const [mode, setMode] = useState<'email' | 'pin'>('email');
+  const [pin, setPin] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -52,6 +55,42 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const goNext = () => {
+    const next = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null;
+    router.push(next && next.startsWith('/') ? next : '/admin');
+  };
+
+  const submitPin = async () => {
+    if (pin.length < 4 || loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/pin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Sign-in failed');
+        setPin('');
+        return;
+      }
+      goNext();
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pressKey = (k: string) => {
+    setError('');
+    if (k === 'back') setPin((p) => p.slice(0, -1));
+    else if (k === 'ok') void submitPin();
+    else setPin((p) => (p.length < 6 ? p + k : p));
   };
 
   return (
@@ -117,6 +156,50 @@ export default function LoginPage() {
             <p className="mt-2 text-sm text-stone-500">Sign in to manage orders, service, and loyalty.</p>
           </div>
 
+          <div className="mb-5 grid grid-cols-2 gap-1 rounded-2xl bg-[#f3ece2] p-1" role="tablist" aria-label="Sign-in method">
+            {(['email', 'pin'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => { setMode(m); setError(''); setPin(''); }}
+                className={`h-10 rounded-xl text-sm font-semibold transition ${mode === m ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-800'}`}
+              >
+                {m === 'email' ? 'Email and password' : 'Staff PIN'}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'pin' && (
+            <div className="space-y-4">
+              <div className="flex justify-center gap-3 py-2" aria-label={`${pin.length} digits entered`}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <span key={i} className={`h-3.5 w-3.5 rounded-full transition ${i < pin.length ? 'bg-[#1d1917]' : i < 4 ? 'border-2 border-[#d9c7aa]' : 'border-2 border-dashed border-[#e6d8c2]'}`} />
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'].map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => pressKey(k)}
+                    disabled={loading || (k === 'ok' && pin.length < 4)}
+                    className={`h-14 rounded-2xl text-xl font-semibold tabular-nums transition disabled:opacity-40 ${
+                      k === 'ok' ? 'bg-[#1d1917] text-base text-white hover:bg-[#2d2724]' : 'border border-[#ebddc4] bg-[#faf5ee] text-stone-900 hover:bg-white'
+                    }`}
+                    aria-label={k === 'back' ? 'Delete last digit' : k === 'ok' ? 'Sign in' : k}
+                  >
+                    {k === 'back' ? '⌫' : k === 'ok' ? (loading ? '…' : 'Sign in') : k}
+                  </button>
+                ))}
+              </div>
+              {error && <p className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">{error}</p>}
+              <p className="text-center text-xs text-stone-500">Your PIN is set by the owner in Staff &amp; HR.</p>
+            </div>
+          )}
+
+          {mode === 'email' && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Email</label>
@@ -154,6 +237,7 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
+          )}
 
           <div className="mt-6 flex items-center justify-center gap-3 text-sm text-stone-500">
             <Link href="/" className="inline-flex items-center gap-2 font-medium text-stone-600 transition hover:text-stone-900">

@@ -49,6 +49,23 @@ export async function clockIn(input: unknown, approvedById: number) {
   return record;
 }
 
+/** Whether the signed-in person is on shift (spec 020). */
+export async function myShift(userId: number) {
+  const active = await repo.findActiveAttendance(userId);
+  return { clockedIn: Boolean(active), since: active?.clockIn ?? null, attendanceId: active?.id ?? null };
+}
+
+/** Clock the signed-in person in, or out when they already are (spec 020). */
+export async function toggleMyShift(userId: number) {
+  const active = await repo.findActiveAttendance(userId);
+  if (active) {
+    await clockOut({ attendanceId: active.id }, userId);
+    return { clockedIn: false, since: null, attendanceId: null };
+  }
+  const record = await clockIn({ userId }, userId);
+  return { clockedIn: true, since: record.clockIn, attendanceId: record.id };
+}
+
 export async function clockOut(input: unknown, approvedById: number) {
   const data = parseInput(ClockOutInputSchema, input);
 

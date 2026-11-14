@@ -25,6 +25,8 @@ interface Report {
     orderCount: number;
     cancelled: { count: number; amount: number };
     unpaid: { count: number; amount: number };
+    voids: { orderNumber: string; reason: string; refund: number }[];
+    refundTotal: number;
     gross: number;
     loyaltyDiscount: number;
     discounts: { senior: number; pwd: number; seniorAndPwd: number; student: number; legacyStudentPwd: number; other: number };
@@ -252,6 +254,24 @@ export default function EndOfDayPage() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </Section>
+
+          <Section title={`Voids and refunds (${s.voids.length})`}>
+            {s.voids.length === 0 ? (
+              <p className="text-faint">None.</p>
+            ) : (
+              <>
+                <ul className="divide-y divide-hair">
+                  {s.voids.map((v) => (
+                    <li key={v.orderNumber} className="flex items-center justify-between gap-4 py-2">
+                      <span className="min-w-0"><span className="font-semibold tabular-nums">{v.orderNumber}</span> <span className="text-muted">· {v.reason}</span></span>
+                      <span className="shrink-0 tabular-nums">{v.refund > 0 ? `Refunded ${formatPeso(v.refund)}` : 'Not paid'}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 flex justify-between border-t border-hair pt-2 font-semibold"><span>Total refunded</span><span className="tabular-nums">{formatPeso(s.refundTotal)}</span></div>
+              </>
             )}
           </Section>
 

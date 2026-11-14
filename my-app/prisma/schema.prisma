@@ -33,6 +33,7 @@ model User {
   hourlyRate         Float?
   monthlySalary      Float?
   paymentType        String?           // HOURLY, SALARIED
+  pinHash            String?           // bcrypt of the staff PIN for quick sign-in and approvals (spec 020)
 
   // HR back-relations
   schedules          Schedule[]
@@ -292,6 +293,11 @@ model Order {
   discountHolders      String? // JSON [{type: SENIOR|PWD, name, idNumber}]
   paidAt               DateTime? // when payment was confirmed (spec 017); null = not paid yet
   invoiceNumber        String?   // sequential sales invoice number, given when paid (spec 019); unique by construction
+  // Void / refund (spec 020)
+  voidReason           String?
+  voidedAt             DateTime?
+  voidedById           Int?      // the manager who approved
+  refundAmount         Float     @default(0)
   cashSessionId        Int?
   cashSession          CashSession?        @relation(fields: [cashSessionId], references: [id])
   paymentMethod        String              @default("CASH") // CASH | GCASH | PAYMAYA

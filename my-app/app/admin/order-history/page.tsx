@@ -1,6 +1,7 @@
 'use client';
 
 import { printInvoice, printKitchenTicket } from '@/lib/print-documents';
+import VoidOrderDialog from '@/components/VoidOrderDialog';
 import type { InvoiceOrder } from '@/lib/invoice';
 
 /** Print failures are shown in the console and as a toast-free status (spec 019). */
@@ -72,6 +73,7 @@ export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showInvoice, setShowInvoice] = useState(false);
+  const [voiding, setVoiding] = useState(false);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -467,10 +469,20 @@ export default function OrderHistoryPage() {
                 >
                   Kitchen ticket
                 </button>
+                {selectedOrder.status !== 'CANCELLED' && (
+                  <button onClick={() => setVoiding(true)} className="c-btn flex-1 border-hair text-danger hover:bg-danger-bg">Void / refund</button>
+                )}
               </div>
             </div>
           </div>
         </div>
+      )}
+      {voiding && selectedOrder && (
+        <VoidOrderDialog
+          order={selectedOrder as unknown as { id: number; orderNumber: string; totalAmount: number; paymentMethod?: string; status?: string }}
+          onClose={() => setVoiding(false)}
+          onVoided={() => { setVoiding(false); setShowInvoice(false); fetchOrders(); }}
+        />
       )}
     </div>
   );

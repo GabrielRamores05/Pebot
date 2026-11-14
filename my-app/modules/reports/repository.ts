@@ -22,6 +22,8 @@ export async function findOrdersForDay(locationId: number, from: Date, to: Date)
       vatExemptSales: true,
       serviceCharge: true,
       paidAt: true,
+      voidReason: true,
+      refundAmount: true,
     },
   });
 }

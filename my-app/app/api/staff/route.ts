@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { pinProblem } from '@/lib/approvals';
+import { setPin } from '@/modules/pins/service';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
 import { badRequest, serverError } from '@/lib/api-response';
@@ -53,8 +55,13 @@ export async function POST(req: NextRequest) {
       name, email, password, role = 'STAFF', permissions,
       phone, address, dateOfBirth, hireDate, position, department,
       emergencyContactName, emergencyContactPhone,
-      hourlyRate, monthlySalary, paymentType,
+      hourlyRate, monthlySalary, paymentType, pin,
     } = body;
+
+    if (pin != null && pin !== '') {
+      const problem = pinProblem(String(pin));
+      if (problem) return badRequest(problem);
+    }
 
     if (!name || !email || !password) {
       return badRequest('Name, email, and password are required');
@@ -84,6 +91,10 @@ export async function POST(req: NextRequest) {
       },
       select: STAFF_SELECT,
     });
+
+    if (pin != null && pin !== '') {
+      try { await setPin(newStaff.id, String(pin)); } catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: (e as { status?: number }).status ?? 400 }); }
+    }
 
     return NextResponse.json({
       ...newStaff,
