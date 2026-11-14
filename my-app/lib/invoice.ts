@@ -46,6 +46,8 @@ export interface InvoiceBusiness {
   branchCode?: string | null;
   footerMessage?: string | null;
   vatRegistered?: boolean | null;
+  /** BIR Permit to Use. Without it the document is a sales slip, not an official invoice. */
+  birPermitNumber?: string | null;
 }
 
 export interface InvoiceOptions {
@@ -187,7 +189,8 @@ export function renderInvoiceHtml(order: InvoiceOrder, business: InvoiceBusiness
     <div class="big">${e(business.businessName)}</div>
     ${business.businessAddress ? `<div class="muted">${e(business.businessAddress)}</div>` : ''}
     ${business.tin ? `<div class="muted">TIN ${e(business.tin)}${business.branchCode ? ` · Branch ${e(business.branchCode)}` : ''}</div>` : ''}
-    <div class="title" style="margin-top:6px">SALES INVOICE</div>
+    <div class="title" style="margin-top:6px">${business.birPermitNumber ? 'SALES INVOICE' : 'SALES SLIP'}</div>
+    ${business.birPermitNumber ? `<div class="muted">BIR PTU No. ${e(business.birPermitNumber)}</div>` : ''}
     ${opts.copyLabel ? `<div><span class="tag">${e(opts.copyLabel)}</span></div>` : ''}
   </div>
   <hr>
@@ -209,6 +212,7 @@ export function renderInvoiceHtml(order: InvoiceOrder, business: InvoiceBusiness
   ${holdersBlock}
   <hr>
   <div class="center">${e(business.footerMessage || 'Thank you!')}</div>
+  ${business.birPermitNumber ? '' : '<div class="center" style="margin-top:6px;font-weight:700">THIS IS NOT AN OFFICIAL RECEIPT</div><div class="center muted">This document is not valid for claim of input tax.</div>'}
   <div class="center muted" style="margin-top:4px">Powered by Pebot</div>
 </div></body></html>`;
 }

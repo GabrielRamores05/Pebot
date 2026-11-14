@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
+import UpdateBanner from '@/components/UpdateBanner';
 import {
   IconMonitor, IconProducts, IconAnalytics, IconInventory, IconSettings,
   IconTerminal, IconConsultant, IconAudit, IconStar, IconLogout,
@@ -392,6 +393,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main content: a raised sheet on the canvas */}
       <main className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-14 md:pt-0">
+        <UpdateBanner isAdmin={user?.role === 'ADMIN'} />
         {children}
       </main>
     </div>

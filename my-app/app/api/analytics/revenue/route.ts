@@ -4,6 +4,7 @@ import { unauthorized, serverError } from '@/lib/api-response';
 import { requirePermission } from '@/lib/auth';
 import { loyaltyCoveredValue } from '@/lib/loyalty-utils';
 import { findLoyaltySettingsWithCategory } from '@/modules/loyalty/repository';
+import { isPaid } from '@/modules/reports/service';
 
 interface RevenueMetrics {
   totalRevenue: number;
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
     const { startDate, endDate } = getDateRange(filter, isPrevious);
 
     // Fetch all orders in date range
-    const orders = await prisma.order.findMany({
+    const placed = await prisma.order.findMany({
       where: {
         createdAt: {
           gte: startDate,
@@ -105,6 +106,10 @@ export async function GET(req: NextRequest) {
         payment: true,
       },
     });
+
+    // Revenue is money actually taken: no voided or cancelled orders, no unpaid ones
+    // (the same rule as End of Day and the profit report).
+    const orders = placed.filter((o) => o.status !== 'CANCELLED' && isPaid(o.status, o.paidAt));
 
     // Calculate metrics
     const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);

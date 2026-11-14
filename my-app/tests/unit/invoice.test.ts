@@ -127,3 +127,18 @@ describe('renderKitchenTicketHtml', () => {
     expect(html).not.toContain('₱');
   });
 });
+
+describe('BIR wording (QA)', () => {
+  it('prints a sales slip marked "not an official receipt" without a BIR permit', () => {
+    const html = renderInvoiceHtml(seniorOrder, business, { paper: '80' });
+    expect(html).toContain('SALES SLIP');
+    expect(html).toContain('THIS IS NOT AN OFFICIAL RECEIPT');
+    expect(html).not.toContain('SALES INVOICE');
+  });
+  it('prints a sales invoice with the permit number once the owner enters it', () => {
+    const html = renderInvoiceHtml(seniorOrder, { ...business, birPermitNumber: 'PTU-123' }, { paper: '80' });
+    expect(html).toContain('SALES INVOICE');
+    expect(html).toContain('BIR PTU No. PTU-123');
+    expect(html).not.toContain('NOT AN OFFICIAL RECEIPT');
+  });
+});

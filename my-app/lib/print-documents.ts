@@ -31,6 +31,7 @@ export async function printInvoice(
     branchCode: settings?.branchCode,
     footerMessage: settings?.footerMessage,
     vatRegistered: settings?.vatRegistered ?? true,
+    birPermitNumber: settings?.birPermitNumber ?? null,
   };
   const paper = paperOf(settings, opts.paper);
   const html = renderInvoiceHtml(order, business, { paper, cash: opts.cash, copyLabel: opts.copyLabel });

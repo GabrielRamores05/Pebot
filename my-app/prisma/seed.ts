@@ -168,11 +168,13 @@ async function main() {
 
   // ── HR: default leave types ────────────────────────────────────────────────
   const leaveTypes = [
+    // Philippine minimums by law; sick and vacation leave are company policy.
+    { name: 'Service Incentive Leave', daysPerYear: 5 }, // Labor Code Art. 95
+    { name: 'Maternity Leave', daysPerYear: 105 }, // RA 11210
+    { name: 'Paternity Leave', daysPerYear: 7 }, // RA 8187
+    { name: 'Solo Parent Leave', daysPerYear: 7 }, // RA 11861
     { name: 'Sick Leave', daysPerYear: 15 },
     { name: 'Vacation Leave', daysPerYear: 15 },
-    { name: 'Personal Leave', daysPerYear: 5 },
-    { name: 'Maternity Leave', daysPerYear: 60 },
-    { name: 'Paternity Leave', daysPerYear: 7 },
   ];
   for (const lt of leaveTypes) {
     await prisma.leaveType.upsert({

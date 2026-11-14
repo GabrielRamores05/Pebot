@@ -447,6 +447,7 @@ model BusinessSettings {
   paperWidth          String   @default("80") // 58 | 80 | A4
   autoPrintInvoice    Boolean  @default(false)
   autoPrintKitchen    Boolean  @default(false)
+  birPermitNumber     String?  // BIR Permit to Use; empty = documents print as "not an official receipt"
   // Payment method settings
   gcashAccountName    String? // GCash account name
   gcashQrImage        String? // Base64 or file URL of uploaded GCash QR image

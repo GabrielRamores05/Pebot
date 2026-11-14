@@ -21,6 +21,7 @@ interface Settings {
   paperWidth?: string;
   autoPrintInvoice?: boolean;
   autoPrintKitchen?: boolean;
+  birPermitNumber?: string | null;
 }
 
 const SAMPLE: InvoiceOrder = {
@@ -79,6 +80,7 @@ export default function PrintingPanel() {
           paperWidth: s.paperWidth || '80',
           autoPrintInvoice: Boolean(s.autoPrintInvoice),
           autoPrintKitchen: Boolean(s.autoPrintKitchen),
+          birPermitNumber: s.birPermitNumber?.trim() || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -129,6 +131,19 @@ export default function PrintingPanel() {
             {printerSelect(s.kitchenPrinter, (v) => set({ kitchenPrinter: v }), 'Same as invoices')}
           </label>
         </div>
+
+        <label className="block text-xs font-semibold text-muted">
+          BIR Permit to Use (PTU) number
+          <input
+            value={s.birPermitNumber ?? ''}
+            onChange={(e) => set({ birPermitNumber: e.target.value })}
+            placeholder="Leave blank until BIR issues one"
+            className="mt-1 block h-10 w-full max-w-sm rounded-xl border border-hair bg-card px-3 text-sm text-ink outline-none focus:border-accent"
+          />
+          <span className="mt-1 block font-normal text-faint">
+            Pebot is not BIR-accredited. Without a PTU number, printouts say SALES SLIP and &quot;This is not an official receipt&quot;. Keep issuing your BIR-registered receipts.
+          </span>
+        </label>
 
         <div>
           <p className="text-xs font-semibold text-muted">Paper</p>

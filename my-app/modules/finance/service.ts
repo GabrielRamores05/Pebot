@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { emitEvent } from '@/lib/socket';
 import { computePhilippinePayroll } from '@/lib/philippine-payroll';
-import { defaultHolidays, nightHours, periodPay, serviceChargeShares, thirteenthMonthPay, type DayType } from '@/lib/labor-pay';
+import { PayrollRatesSchema, resolvePayrollRates, type PayrollRates } from '@/lib/payroll-rates';
+import { findSettingByKey, upsertSetting } from '@/modules/system/repository';
+import { defaultHolidays, nightHours, periodFraction, periodPay, serviceChargeShares, thirteenthMonthPay, type DayType } from '@/lib/labor-pay';
 import * as financeRepo from '@/modules/finance/repository';
 import * as hrRepo from '@/modules/hr/repository';
 import * as ordersRepo from '@/modules/orders/repository';
@@ -212,12 +214,14 @@ export async function createPayroll(input: unknown, approvedById: number) {
   const overtimeHours = pay.overtimeHours;
   const serviceChargeShare = data.serviceChargeShare ?? 0;
   const grossPay = pay.grossPay + serviceChargeShare;
-  // Contributions use a monthly basis: the salary, or for hourly staff this period's pay.
-  const base = salaried ? user.monthlySalary! : grossPay;
+  // Contributions use a monthly basis: the salary, or for hourly staff this period's
+  // pay scaled up to a month. The run then pays its share of the month.
+  const fraction = periodFraction(data.periodStart, data.periodEnd);
+  const base = salaried ? user.monthlySalary! : grossPay / fraction;
 
   const otherDeductions = data.deductions ?? 0;
   const result = {
-    ...computePhilippinePayroll({ grossPay, base, otherDeductions, overtimeHours }),
+    ...computePhilippinePayroll({ grossPay, base, otherDeductions, overtimeHours, periodFraction: fraction, rates: await getPayrollRates() }),
     basicPay: pay.basicPay,
     holidayPremium: pay.holidayPremium,
     overtimePay: pay.overtimePay,
@@ -261,6 +265,7 @@ export async function runPayrollForAll(input: unknown, approvedById: number) {
   const created = [];
   const skipped: { name: string; reason: string }[] = [];
   for (const s of staff) {
+    if (!s.paymentType) { skipped.push({ name: s.name, reason: 'Pay not set up' }); continue; }
     if (s.paymentType === 'HOURLY' && !s.hourlyRate) { skipped.push({ name: s.name, reason: 'No hourly rate' }); continue; }
     if (s.paymentType === 'SALARIED' && !s.monthlySalary) { skipped.push({ name: s.name, reason: 'No monthly salary' }); continue; }
     created.push(await createPayroll({ userId: s.id, periodStart: data.periodStart, periodEnd: data.periodEnd, serviceChargeShare: shares[s.id] ?? 0 }, approvedById));
@@ -334,4 +339,22 @@ export async function createPayment(input: unknown) {
 
 export async function listPayments() {
   return ordersRepo.findPaymentTransactions();
+}
+
+// ── Government payroll rates (QA) ─────────────────────────────────────────
+const PAYROLL_RATES_KEY = 'payrollRates';
+
+export async function getPayrollRates(): Promise<PayrollRates> {
+  try {
+    const row = await findSettingByKey(PAYROLL_RATES_KEY);
+    return resolvePayrollRates(row ? JSON.parse(row.value) : null);
+  } catch {
+    return resolvePayrollRates(null);
+  }
+}
+
+export async function savePayrollRates(input: unknown): Promise<PayrollRates> {
+  const rates = parseInput(PayrollRatesSchema, input);
+  await upsertSetting(PAYROLL_RATES_KEY, JSON.stringify(rates));
+  return rates;
 }

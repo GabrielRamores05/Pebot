@@ -37,16 +37,18 @@ export default function ProfitPanel({ filter }: { filter: string }) {
   if (error) return <Panel title="Profit"><p className="text-sm text-danger">{error}</p></Panel>;
   if (!r) return <Panel title="Profit"><p className="text-sm text-faint">Working it out…</p></Panel>;
 
+  // -0 would print as "₱-0.00".
+  const z = (n: number) => (n === 0 ? 0 : n);
   const lines: { label: string; value: number; kind: 'in' | 'out' | 'total'; note?: string }[] = [
     { label: 'Sales', value: r.grossSales, kind: 'in', note: `${r.orderCount} paid orders` },
     ...(r.refunds ? [{ label: 'Refunds', value: -r.refunds, kind: 'out' as const }] : []),
     ...(r.serviceCharge ? [{ label: 'Service charge (goes to staff)', value: -r.serviceCharge, kind: 'out' as const }] : []),
     { label: 'Net sales', value: r.netSales, kind: 'total' },
-    { label: 'Cost of ingredients used', value: -r.costOfGoods, kind: 'out', note: 'From recipes, at ingredient cost' },
+    { label: 'Cost of ingredients used', value: z(-r.costOfGoods), kind: 'out', note: 'From recipes, at ingredient cost' },
     { label: 'Gross profit', value: r.grossProfit, kind: 'total', note: r.grossMargin != null ? `${r.grossMargin}% of net sales` : undefined },
     ...(r.waste ? [{ label: 'Waste', value: -r.waste, kind: 'out' as const }] : []),
-    { label: 'Labor', value: -r.labor, kind: 'out', note: 'Payroll ending in the period + employer contributions' },
-    { label: 'Expenses', value: -r.expenses, kind: 'out' },
+    { label: 'Labor', value: z(-r.labor), kind: 'out', note: 'Payroll ending in the period + employer contributions' },
+    { label: 'Expenses', value: z(-r.expenses), kind: 'out' },
     { label: 'Net profit', value: r.netProfit, kind: 'total', note: r.netMargin != null ? `${r.netMargin}% of net sales` : undefined },
   ];
 
