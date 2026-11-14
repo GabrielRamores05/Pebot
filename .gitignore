@@ -6,3 +6,6 @@ node_modules/
 # Pebot seller secrets — never commit
 *.pem
 PebotSeller/
+
+# Built installers (tools/release/build-pebot.cmd)
+/Pebot 1.0/
