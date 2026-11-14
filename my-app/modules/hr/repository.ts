@@ -363,3 +363,87 @@ export async function createStaffDocument(
 export async function deleteStaffDocument(id: number, _locationId: number = 1) {
   return prisma.staffDocument.delete({ where: { id } });
 }
+
+// ----- Spec 021: holidays, schedules, service charge, payroll reports -----
+
+export async function listHolidaysBetween(from: string, to: string, locationId: number = 1) {
+  return prisma.holiday.findMany({ where: { locationId, date: { gte: from, lte: to } }, orderBy: { date: 'asc' } });
+}
+
+export async function countHolidaysForYear(year: number, locationId: number = 1) {
+  return prisma.holiday.count({ where: { locationId, date: { gte: `${year}-01-01`, lte: `${year}-12-31` } } });
+}
+
+export async function createHolidays(rows: { date: string; name: string; type: string }[], locationId: number = 1) {
+  for (const r of rows) {
+    await prisma.holiday.upsert({
+      where: { locationId_date: { locationId, date: r.date } },
+      update: {},
+      create: { ...r, locationId },
+    });
+  }
+}
+
+export async function upsertHoliday(row: { date: string; name: string; type: string }, locationId: number = 1) {
+  return prisma.holiday.upsert({
+    where: { locationId_date: { locationId, date: row.date } },
+    update: { name: row.name, type: row.type },
+    create: { ...row, locationId },
+  });
+}
+
+export async function deleteHoliday(id: number, locationId: number = 1) {
+  return prisma.holiday.deleteMany({ where: { id, locationId } });
+}
+
+export async function listScheduleDates(userId: number, from: string, to: string) {
+  const rows = await prisma.schedule.findMany({
+    where: { userId, status: { not: 'CANCELLED' }, date: { gte: new Date(from + 'T00:00:00'), lte: new Date(to + 'T23:59:59') } },
+    select: { date: true },
+  });
+  return rows.map((r) => r.date);
+}
+
+/** Service charges collected on paid, not-cancelled orders in the period. */
+export async function sumServiceCharge(from: string, to: string, locationId: number = 1) {
+  const r = await prisma.order.aggregate({
+    where: { locationId, status: { not: 'CANCELLED' }, paidAt: { gte: new Date(from + 'T00:00:00'), lte: new Date(to + 'T23:59:59') } },
+    _sum: { serviceCharge: true },
+  });
+  return r._sum.serviceCharge ?? 0;
+}
+
+export async function listPayableStaff() {
+  return prisma.user.findMany({
+    where: { active: true, paymentType: { not: null } },
+    select: { id: true, name: true, paymentType: true, hourlyRate: true, monthlySalary: true },
+    orderBy: { name: 'asc' },
+  });
+}
+
+export async function listUserIdsWithAttendance(from: string, to: string) {
+  const rows = await prisma.attendance.findMany({
+    where: { clockOut: { not: null }, clockIn: { gte: new Date(from + 'T00:00:00'), lte: new Date(to + 'T23:59:59') } } as any,
+    select: { userId: true },
+    distinct: ['userId'],
+  });
+  return rows.map((r) => r.userId);
+}
+
+export async function listPayrollsEndingIn(from: string, to: string) {
+  return prisma.payroll.findMany({
+    where: { periodEnd: { gte: new Date(from + 'T00:00:00'), lte: new Date(to + 'T23:59:59') } },
+    select: { userId: true, grossPay: true, breakdown: true, user: { select: { id: true, name: true, position: true } } },
+  });
+}
+
+export async function listApprovedLeaveBetween(from: string, to: string) {
+  return prisma.leaveRequest.findMany({
+    where: { status: 'APPROVED', startDate: { lte: new Date(to + 'T23:59:59') }, endDate: { gte: new Date(from + 'T00:00:00') } },
+    select: { userId: true, leaveTypeId: true, startDate: true, endDate: true },
+  });
+}
+
+export async function listActiveStaffBasic() {
+  return prisma.user.findMany({ where: { active: true }, select: { id: true, name: true, position: true }, orderBy: { name: 'asc' } });
+}

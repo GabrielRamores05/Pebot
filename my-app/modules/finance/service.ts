@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { emitEvent } from '@/lib/socket';
 import { computePhilippinePayroll } from '@/lib/philippine-payroll';
+import { defaultHolidays, nightHours, periodPay, serviceChargeShares, thirteenthMonthPay, type DayType } from '@/lib/labor-pay';
 import * as financeRepo from '@/modules/finance/repository';
 import * as hrRepo from '@/modules/hr/repository';
 import * as ordersRepo from '@/modules/orders/repository';
@@ -146,6 +147,17 @@ export async function listPayrolls(input: unknown) {
   return hrRepo.listPayrolls(filters);
 }
 
+const localIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Holidays for the years a period touches, filling the year's defaults the first time (spec 021). */
+async function holidayMap(periodStart: string, periodEnd: string) {
+  for (let y = Number(periodStart.slice(0, 4)); y <= Number(periodEnd.slice(0, 4)); y++) {
+    if ((await hrRepo.countHolidaysForYear(y)) === 0) await hrRepo.createHolidays(defaultHolidays(y));
+  }
+  const rows = await hrRepo.listHolidaysBetween(periodStart, periodEnd);
+  return new Map(rows.map((h) => [h.date, h.type as DayType]));
+}
+
 export async function createPayroll(input: unknown, approvedById: number) {
   const data = parseInput(
     z.object({
@@ -154,6 +166,7 @@ export async function createPayroll(input: unknown, approvedById: number) {
       periodEnd: z.string(),
       deductions: z.number().nonnegative().optional(),
       overtimeRate: z.number().optional(),
+      serviceChargeShare: z.number().nonnegative().optional(),
     }),
     input,
   );
@@ -169,28 +182,50 @@ export async function createPayroll(input: unknown, approvedById: number) {
     data.periodEnd,
   );
 
-  let regularHours = 0;
-  let overtimeHours = 0;
-  for (const a of attendance) {
-    const h = a.totalHours ?? 0;
-    regularHours += Math.min(h, 8);
-    overtimeHours += Math.max(0, h - 8);
+  // Spec 021: holiday, rest-day, overtime and night rates; salary prorated to the period.
+  let holidays = new Map<string, DayType>();
+  let scheduled: Date[] = [];
+  try {
+    holidays = await holidayMap(data.periodStart, data.periodEnd);
+    scheduled = (await hrRepo.listScheduleDates(data.userId, data.periodStart, data.periodEnd)) ?? [];
+  } catch (e) {
+    // Pay is still computed; it just cannot apply holiday or rest-day rates.
+    console.error('Payroll: could not read holidays or schedules, paying ordinary rates:', e);
   }
-
-  let grossPay = 0;
-  let base = 0;
-  if (user.paymentType === 'SALARIED' && user.monthlySalary) {
-    grossPay = user.monthlySalary;
-    base = user.monthlySalary;
-  } else if (user.hourlyRate) {
-    const rate = user.hourlyRate;
-    const otRate = data.overtimeRate ?? rate * 1.25;
-    grossPay = regularHours * rate + overtimeHours * otRate;
-    base = grossPay;
-  }
+  const salaried = user.paymentType === 'SALARIED' && Boolean(user.monthlySalary);
+  const pay = periodPay({
+    shifts: attendance.map((a) => {
+      const inAt = a.clockIn ? new Date(a.clockIn) : null;
+      const outAt = a.clockOut ? new Date(a.clockOut) : null;
+      return {
+        date: inAt ? localIso(inAt) : null,
+        hours: a.totalHours ?? 0,
+        nightHours: inAt && outAt ? nightHours(inAt, outAt) : 0,
+      };
+    }),
+    holidays,
+    scheduledDates: scheduled.length ? new Set(scheduled.map((d) => localIso(new Date(d)))) : null,
+    hourlyRate: user.hourlyRate ?? 0,
+    salary: salaried ? { monthly: user.monthlySalary!, periodStart: data.periodStart, periodEnd: data.periodEnd } : null,
+  });
+  const regularHours = pay.regularHours;
+  const overtimeHours = pay.overtimeHours;
+  const serviceChargeShare = data.serviceChargeShare ?? 0;
+  const grossPay = pay.grossPay + serviceChargeShare;
+  // Contributions use a monthly basis: the salary, or for hourly staff this period's pay.
+  const base = salaried ? user.monthlySalary! : grossPay;
 
   const otherDeductions = data.deductions ?? 0;
-  const result = computePhilippinePayroll({ grossPay, base, otherDeductions, overtimeHours });
+  const result = {
+    ...computePhilippinePayroll({ grossPay, base, otherDeductions, overtimeHours }),
+    basicPay: pay.basicPay,
+    holidayPremium: pay.holidayPremium,
+    overtimePay: pay.overtimePay,
+    nightDiff: pay.nightDiff,
+    nightHours: pay.nightHours,
+    serviceChargeShare,
+    daysWorked: pay.days,
+  };
 
   const payroll = await hrRepo.createPayroll({
     userId: data.userId,
@@ -207,6 +242,54 @@ export async function createPayroll(input: unknown, approvedById: number) {
   });
 
   return payroll;
+}
+
+/** Run payroll for every active staff member with pay set up (spec 021). */
+export async function runPayrollForAll(input: unknown, approvedById: number) {
+  const data = parseInput(
+    z.object({ periodStart: z.string(), periodEnd: z.string(), includeServiceCharge: z.boolean().optional() }),
+    input,
+  );
+  const staff = await hrRepo.listPayableStaff();
+  let shares: Record<number, number> = {};
+  let serviceChargeTotal = 0;
+  if (data.includeServiceCharge) {
+    serviceChargeTotal = await hrRepo.sumServiceCharge(data.periodStart, data.periodEnd);
+    const worked = new Set(await hrRepo.listUserIdsWithAttendance(data.periodStart, data.periodEnd));
+    shares = serviceChargeShares(serviceChargeTotal, staff.filter((s) => worked.has(s.id)).map((s) => s.id));
+  }
+  const created = [];
+  const skipped: { name: string; reason: string }[] = [];
+  for (const s of staff) {
+    if (s.paymentType === 'HOURLY' && !s.hourlyRate) { skipped.push({ name: s.name, reason: 'No hourly rate' }); continue; }
+    if (s.paymentType === 'SALARIED' && !s.monthlySalary) { skipped.push({ name: s.name, reason: 'No monthly salary' }); continue; }
+    created.push(await createPayroll({ userId: s.id, periodStart: data.periodStart, periodEnd: data.periodEnd, serviceChargeShare: shares[s.id] ?? 0 }, approvedById));
+  }
+  return { created: created.length, skipped, serviceChargeTotal, records: created };
+}
+
+/** 13th-month pay for a year: basic pay earned (from payroll runs) ÷ 12 (spec 021). */
+export async function thirteenthMonthReport(input: unknown) {
+  const { year } = parseInput(z.object({ year: z.number().int().min(2000).max(2100) }), input);
+  const rows = await hrRepo.listPayrollsEndingIn(`${year}-01-01`, `${year}-12-31`);
+  const byUser = new Map<number, { name: string; position: string | null; basic: number; runs: number }>();
+  for (const r of rows) {
+    let basic = r.grossPay;
+    try {
+      const b = r.breakdown ? JSON.parse(r.breakdown) : null;
+      if (b && typeof b.basicPay === 'number') basic = b.basicPay;
+    } catch { /* older run without a breakdown: gross pay is the best record */ }
+    const cur = byUser.get(r.userId) ?? { name: r.user?.name ?? 'Staff', position: r.user?.position ?? null, basic: 0, runs: 0 };
+    cur.basic += basic;
+    cur.runs += 1;
+    byUser.set(r.userId, cur);
+  }
+  const staff = [...byUser.entries()].map(([userId, v]) => ({
+    userId, name: v.name, position: v.position, runs: v.runs,
+    basicEarned: Math.round(v.basic * 100) / 100,
+    thirteenthMonth: thirteenthMonthPay(v.basic),
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  return { year, staff, total: Math.round(staff.reduce((n, s) => n + s.thirteenthMonth, 0) * 100) / 100 };
 }
 
 export async function updatePayrollStatus(input: unknown) {

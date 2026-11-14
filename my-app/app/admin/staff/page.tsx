@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
 import { StatTile } from '@/components/pebot-ui';
+import { renderPayslipHtml } from '@/lib/payslip';
+import { printHtml } from '@/lib/print-client';
 
 // Pebot — Staff & HR (Philippine-friendly)
 // Tabs: Team · Schedule · Time Clock · Time Off · Payroll · Reviews · Documents · Training
@@ -438,6 +440,20 @@ function TeamTab({ onChanged }: { onChanged: () => void }) {
 
 // ─── SCHEDULE ────────────────────────────────────────────────────────────────
 function ScheduleTab() {
+  const [holidays, setHolidays] = useState<{ id: number; date: string; name: string; type: string }[]>([]);
+  const [holidayForm, setHolidayForm] = useState({ date: '', name: '', type: 'SPECIAL_HOLIDAY' });
+  const [holidayMsg, setHolidayMsg] = useState<string | null>(null);
+  const loadHolidays = () => fetchJson<typeof holidays>(`/api/holidays?year=${new Date().getFullYear()}`).then(setHolidays).catch(() => setHolidays([]));
+  useEffect(() => { loadHolidays(); }, []);
+  async function addHoliday() {
+    try {
+      await fetchJson('/api/holidays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(holidayForm) });
+      setHolidayForm({ date: '', name: '', type: 'SPECIAL_HOLIDAY' }); setHolidayMsg(null); loadHolidays();
+    } catch (e) { setHolidayMsg(userMessage(e, 'Could not save the holiday.')); }
+  }
+  async function deleteHoliday(id: number) {
+    try { await fetchJson(`/api/holidays?id=${id}`, { method: 'DELETE' }); loadHolidays(); } catch (e) { setHolidayMsg(userMessage(e, 'Could not remove the holiday.')); }
+  }
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [shifts, setShifts] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -592,6 +608,29 @@ function ScheduleTab() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="c-card p-5">
+        <p className="text-sm font-semibold text-ink">Holidays {new Date().getFullYear()}</p>
+        <p className="mb-3 text-xs text-faint">Payroll pays 200% on regular holidays and 130% on special days worked. Add holidays proclaimed for this year (for example Eid al-Fitr, Chinese New Year).</p>
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {holidays.map((h) => (
+            <span key={h.id} className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${h.type === 'REGULAR_HOLIDAY' ? 'bg-accent-soft text-accent-text' : 'bg-tile-sand text-warn'}`}>
+              <b className="tabular-nums">{new Date(h.date + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}</b> {h.name}
+              <button onClick={() => deleteHoliday(h.id)} className="opacity-60 hover:opacity-100" aria-label={`Remove ${h.name}`}>×</button>
+            </span>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <input type="date" value={holidayForm.date} onChange={e => setHolidayForm({ ...holidayForm, date: e.target.value })} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" aria-label="Holiday date" />
+          <input value={holidayForm.name} onChange={e => setHolidayForm({ ...holidayForm, name: e.target.value })} placeholder="Name" className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" aria-label="Holiday name" />
+          <select value={holidayForm.type} onChange={e => setHolidayForm({ ...holidayForm, type: e.target.value })} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" aria-label="Holiday type">
+            <option value="REGULAR_HOLIDAY">Regular holiday (200%)</option>
+            <option value="SPECIAL_HOLIDAY">Special day (130%)</option>
+          </select>
+          <button onClick={addHoliday} disabled={!holidayForm.date || holidayForm.name.trim().length < 2} className="c-btn c-btn--ghost disabled:opacity-50">Add holiday</button>
+        </div>
+        {holidayMsg && <p className="mt-2 text-sm text-danger">{holidayMsg}</p>}
       </div>
     </div>
   );
@@ -782,6 +821,8 @@ function TimeClockTab({ onChanged }: { onChanged: () => void }) {
 
 // ─── TIME OFF ────────────────────────────────────────────────────────────────
 function TimeOffTab({ onChanged }: { onChanged: () => void }) {
+  const [balances, setBalances] = useState<{ userId: number; name: string; balances: { leaveTypeId: number; leaveType: string; allowance: number; used: number; left: number }[] }[]>([]);
+  useEffect(() => { fetchJson<typeof balances>(`/api/leave-balances?year=${new Date().getFullYear()}`).then(setBalances).catch(() => setBalances([])); }, []);
   const [types, setTypes] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -860,6 +901,28 @@ function TimeOffTab({ onChanged }: { onChanged: () => void }) {
           </tbody>
         </table>
       </div>
+
+      <div className="c-card overflow-x-auto p-5">
+        <p className="text-sm font-semibold text-ink">Leave balances {new Date().getFullYear()}</p>
+        <p className="mb-3 text-xs text-faint">Allowance per leave type, approved days used and days left. Staff with a year of service are owed at least 5 days of Service Incentive Leave.</p>
+        {balances.length === 0 || balances[0].balances.length === 0 ? (
+          <p className="text-sm text-faint">Add leave types (for example Service Incentive Leave, 5 days) to see balances.</p>
+        ) : (
+          <table className="c-table min-w-[560px]">
+            <thead><tr><th>Staff</th>{balances[0].balances.map((b) => <th key={b.leaveTypeId} className="c-num">{b.leaveType}</th>)}</tr></thead>
+            <tbody>
+              {balances.map((p) => (
+                <tr key={p.userId}>
+                  <td className="font-semibold">{p.name}</td>
+                  {p.balances.map((b) => (
+                    <td key={b.leaveTypeId} className="c-num"><span className={b.left === 0 && b.allowance > 0 ? 'font-bold text-danger' : 'font-bold'}>{b.left}</span><span className="text-faint"> / {b.allowance} left</span></td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
@@ -871,6 +934,35 @@ function PayrollTab() {
   const [form, setForm] = useState({ userId: '', periodStart: '', periodEnd: '', deductions: '0' });
   const [openId, setOpenId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  // Spec 021: run for everyone, 13th month, payslips
+  const [batch, setBatch] = useState({ periodStart: '', periodEnd: '', includeServiceCharge: true });
+  const [batchMsg, setBatchMsg] = useState<string | null>(null);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [thirteenth, setThirteenth] = useState<{ total: number; staff: { userId: number; name: string; position: string | null; basicEarned: number; thirteenthMonth: number; runs: number }[] } | null>(null);
+  const [business, setBusiness] = useState<{ businessName: string; businessAddress?: string; tin?: string }>({ businessName: 'My Restaurant' });
+
+  useEffect(() => {
+    fetchJson<{ businessName: string; businessAddress?: string; tin?: string }>('/api/settings/business').then(setBusiness).catch(() => {});
+  }, []);
+  useEffect(() => {
+    fetchJson<NonNullable<typeof thirteenth>>(`/api/payroll/thirteenth-month?year=${year}`).then(setThirteenth).catch(() => setThirteenth(null));
+  }, [year]);
+
+  async function runAll() {
+    if (!batch.periodStart || !batch.periodEnd) { setBatchMsg('Pick the start and end of the pay period.'); return; }
+    setBatchMsg('Working…');
+    try {
+      const r = await fetchJson<{ created: number; skipped: { name: string; reason: string }[]; serviceChargeTotal: number }>('/api/payroll/batch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(batch),
+      });
+      setBatchMsg(`Created ${r.created} payslip${r.created === 1 ? '' : 's'}${r.serviceChargeTotal > 0 ? ` · ₱${r.serviceChargeTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })} service charge shared` : ''}${r.skipped.length ? ` · skipped: ${r.skipped.map((x) => `${x.name} (${x.reason.toLowerCase()})`).join(', ')}` : ''}.`);
+      await load();
+    } catch (e) {
+      setBatchMsg(userMessage(e, 'Could not run payroll. Try again.'));
+    }
+  }
+
+  const printSlip = (r: any) => printHtml(renderPayslipHtml(r, business), { printer: null });
 
   const load = async () => {
     try {
@@ -909,8 +1001,25 @@ function PayrollTab() {
       </div>
       <h2 className="text-base font-bold">Payroll</h2>
       {error && <div className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">{error}</div>}
+      <div className="c-card space-y-3 p-5">
+        <div>
+          <p className="text-sm font-semibold text-ink">Run payroll for everyone</p>
+          <p className="text-xs text-faint">One payslip per active staff member with pay set up. Holiday, rest-day, overtime and night rates come from their time clock.</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-xs font-semibold text-muted">From<input type="date" value={batch.periodStart} onChange={e => setBatch({ ...batch, periodStart: e.target.value })} className="mt-1 block h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" /></label>
+          <label className="text-xs font-semibold text-muted">To<input type="date" value={batch.periodEnd} onChange={e => setBatch({ ...batch, periodEnd: e.target.value })} className="mt-1 block h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" /></label>
+          <label className="flex h-10 items-center gap-2 text-sm">
+            <input type="checkbox" checked={batch.includeServiceCharge} onChange={e => setBatch({ ...batch, includeServiceCharge: e.target.checked })} className="h-4 w-4 accent-[var(--c-accent)]" />
+            Share service charges equally among staff who worked (RA 11360)
+          </label>
+          <button onClick={runAll} className="c-btn c-btn--primary">Run payroll</button>
+        </div>
+        {batchMsg && <p className="text-sm text-muted">{batchMsg}</p>}
+      </div>
+
       <div className="c-card p-5 space-y-3">
-        <p className="text-sm font-semibold text-ink">Run payroll for a period</p>
+        <p className="text-sm font-semibold text-ink">Run payroll for one person</p>
         <div className="flex flex-wrap gap-2 items-end">
           <select value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent"><option value="">Staff</option>{staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
           <input type="date" value={form.periodStart} onChange={e => setForm({ ...form, periodStart: e.target.value })} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" />
@@ -934,7 +1043,7 @@ function PayrollTab() {
                     <td className="p-3 text-right">{r.regularHours + r.overtimeHours}h</td>
                     <td className="p-3 text-right">₱{r.grossPay.toFixed(2)}</td>
                     <td className="p-3 text-right font-semibold">₱{r.netPay.toFixed(2)}</td>
-                    <td className="p-3"><Badge color={r.status === 'PAID' ? 'green' : r.status === 'PROCESSED' ? 'blue' : 'amber'}>{r.status}</Badge>{r.status !== 'PAID' && <button onClick={(e) => { e.stopPropagation(); markPaid(r.id); }} className="ml-2 text-xs text-green-600 hover:underline">Mark paid</button>}</td>
+                    <td className="p-3"><Badge color={r.status === 'PAID' ? 'green' : r.status === 'PROCESSED' ? 'blue' : 'amber'}>{r.status}</Badge>{r.status !== 'PAID' && <button onClick={(e) => { e.stopPropagation(); markPaid(r.id); }} className="ml-2 text-xs font-semibold text-good hover:underline">Mark paid</button>}<button onClick={(e) => { e.stopPropagation(); printSlip(r); }} className="ml-2 text-xs font-semibold text-accent-text hover:underline">Payslip</button></td>
                   </tr>
                   {openId === r.id && b && (
                     <tr className="bg-page">
@@ -947,6 +1056,11 @@ function PayrollTab() {
                           <Line label="Withholding tax" value={b.withholdingTax} />
                           <Line label="Taxable income" value={b.taxableIncome} />
                           <Line label="Employer cost" value={b.employerCost} sub="SSS/Phil/Pag shares" />
+                          {typeof b.basicPay === 'number' && <Line label="Basic pay" value={b.basicPay} />}
+                          {b.holidayPremium > 0 && <Line label="Holiday / rest-day premium" value={b.holidayPremium} />}
+                          {b.overtimePay > 0 && <Line label="Overtime" value={b.overtimePay} />}
+                          {b.nightDiff > 0 && <Line label="Night differential" value={b.nightDiff} sub={`${b.nightHours} night hours`} />}
+                          {b.serviceChargeShare > 0 && <Line label="Service charge share" value={b.serviceChargeShare} />}
                           <Line label="Net pay" value={b.netPay} bold />
                         </div>
                       </td>
@@ -958,6 +1072,31 @@ function PayrollTab() {
             {records.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-faint">No payroll runs</td></tr>}
           </tbody>
         </table>
+      </div>
+
+      <div className="c-card p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-ink">13th-month pay</p>
+            <p className="text-xs text-faint">Basic pay earned in the year ÷ 12. Pay it on or before December 24.</p>
+          </div>
+          <select value={year} onChange={e => setYear(Number(e.target.value))} className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent">
+            {[0, 1, 2].map((d) => new Date().getFullYear() - d).map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        {!thirteenth || thirteenth.staff.length === 0 ? (
+          <p className="text-sm text-faint">No payroll runs in {year} yet.</p>
+        ) : (
+          <table className="c-table">
+            <thead><tr><th>Staff</th><th className="c-num">Payroll runs</th><th className="c-num">Basic pay earned</th><th className="c-num">13th month</th></tr></thead>
+            <tbody>
+              {thirteenth.staff.map((p) => (
+                <tr key={p.userId}><td><span className="font-semibold">{p.name}</span>{p.position ? <span className="text-faint"> · {p.position}</span> : null}</td><td className="c-num">{p.runs}</td><td className="c-num">₱{p.basicEarned.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td><td className="c-num font-bold">₱{p.thirteenthMonth.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td></tr>
+              ))}
+              <tr><td className="font-bold">Total</td><td /><td /><td className="c-num font-bold">₱{thirteenth.total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td></tr>
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

@@ -910,3 +910,16 @@ model CashMovement {
   userName  String
   createdAt DateTime    @default(now())
 }
+
+// Holidays used by payroll (spec 021). Defaults are filled per year; the owner
+// adds proclaimed ones (Eid, Chinese New Year, extra special days).
+model Holiday {
+  id         Int      @id @default(autoincrement())
+  locationId Int      @default(1)
+  date       String   // YYYY-MM-DD
+  name       String
+  type       String   // REGULAR_HOLIDAY | SPECIAL_HOLIDAY
+  createdAt  DateTime @default(now())
+
+  @@unique([locationId, date])
+}

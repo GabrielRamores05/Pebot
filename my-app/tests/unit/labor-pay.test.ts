@@ -97,3 +97,56 @@ describe('default Philippine holidays', () => {
     expect(h.find((x) => x.date === '2026-12-08')).toMatchObject({ type: 'SPECIAL_HOLIDAY' });
   });
 });
+
+import { periodPay } from '@/lib/labor-pay';
+
+describe('periodPay (spec 021)', () => {
+  const holidays = new Map([['2026-11-30', 'REGULAR_HOLIDAY' as const]]);
+
+  it('adds up hourly pay over a period with holiday, overtime and night work', () => {
+    const p = periodPay({
+      shifts: [
+        { date: '2026-11-28', hours: 8, nightHours: 0 },
+        { date: '2026-11-29', hours: 10, nightHours: 2 },
+        { date: '2026-11-30', hours: 8, nightHours: 0 },
+      ],
+      holidays,
+      scheduledDates: null,
+      hourlyRate: 80,
+    });
+    expect(p).toMatchObject({
+      regularHours: 24, overtimeHours: 2, nightHours: 2, days: 3,
+      basicPay: 1920, holidayPremium: 640, overtimePay: 200, nightDiff: 16, grossPay: 2776,
+    });
+  });
+
+  it('treats an unscheduled day as a rest day when the person has a schedule', () => {
+    const p = periodPay({
+      shifts: [{ date: '2026-11-29', hours: 8, nightHours: 0 }],
+      holidays: new Map(),
+      scheduledDates: new Set(['2026-11-28']),
+      hourlyRate: 100,
+    });
+    expect(p.holidayPremium).toBe(240); // rest day 130%
+    expect(p.grossPay).toBe(1040);
+  });
+
+  it('pays salaried staff their prorated salary plus premiums only', () => {
+    const p = periodPay({
+      shifts: [{ date: '2026-11-30', hours: 8, nightHours: 0 }],
+      holidays,
+      scheduledDates: null,
+      hourlyRate: 0,
+      salary: { monthly: 31300, periodStart: '2026-11-16', periodEnd: '2026-11-30' },
+    });
+    // hourly equivalent = 31300 × 12 / 313 / 8 = 150; holiday premium = 8 × 150 × 1.0
+    expect(p.basicPay).toBe(15650);
+    expect(p.holidayPremium).toBe(1200);
+    expect(p.grossPay).toBe(16850);
+  });
+
+  it('works for records without clock times (hours only)', () => {
+    const p = periodPay({ shifts: [{ date: null, hours: 8, nightHours: 0 }, { date: null, hours: 10, nightHours: 0 }], holidays, scheduledDates: null, hourlyRate: 100 });
+    expect(p).toMatchObject({ regularHours: 16, overtimeHours: 2, grossPay: 1850 });
+  });
+});

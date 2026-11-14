@@ -144,3 +144,51 @@ export function defaultHolidays(year: number): HolidayDef[] {
     { date: `${year}-12-31`, name: 'Last Day of the Year', type: S },
   ].sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/** Working days per year used to turn a monthly salary into an hourly rate (6-day week, common in restaurants). */
+export const SALARY_DAYS_PER_YEAR = 313;
+
+/**
+ * Pay for one person over a pay period.
+ * - Hourly staff: every shift is paid by `shiftPay`.
+ * - Salaried staff: the prorated salary covers ordinary work; holiday, rest-day,
+ *   overtime and night premiums are added at the salary's hourly equivalent.
+ * A day without a schedule counts as a rest day only when the person has a schedule
+ * in the period (`scheduledDates` non-null).
+ */
+export function periodPay(opts: {
+  shifts: { date: string | null; hours: number; nightHours: number }[];
+  holidays: Map<string, DayType>;
+  scheduledDates: Set<string> | null;
+  hourlyRate: number;
+  salary?: { monthly: number; periodStart: string; periodEnd: string } | null;
+}) {
+  const salaried = Boolean(opts.salary && opts.salary.monthly > 0);
+  const rate = salaried ? (opts.salary!.monthly * 12) / SALARY_DAYS_PER_YEAR / 8 : opts.hourlyRate;
+  let regularHours = 0, overtimeHours = 0, night = 0, basic = 0, premium = 0, overtimePay = 0, nightDiff = 0;
+  for (const s of opts.shifts) {
+    const dayType = (s.date && opts.holidays.get(s.date)) || 'REGULAR';
+    const restDay = Boolean(s.date && opts.scheduledDates && opts.scheduledDates.size > 0 && !opts.scheduledDates.has(s.date));
+    const p = shiftPay({ hours: s.hours, nightHours: s.nightHours, dayType, restDay }, rate);
+    regularHours += p.regularHours;
+    overtimeHours += p.overtimeHours;
+    night += p.nightHours;
+    basic += p.basic;
+    premium += p.premium;
+    overtimePay += p.overtimePay;
+    nightDiff += p.nightDiff;
+  }
+  const basicPay = salaried ? proratedSalary(opts.salary!.monthly, opts.salary!.periodStart, opts.salary!.periodEnd) : round2(basic);
+  const holidayPremium = round2(premium);
+  return {
+    regularHours: round2(regularHours),
+    overtimeHours: round2(overtimeHours),
+    nightHours: round2(night),
+    days: opts.shifts.length,
+    basicPay,
+    holidayPremium,
+    overtimePay: round2(overtimePay),
+    nightDiff: round2(nightDiff),
+    grossPay: round2(basicPay + holidayPremium + overtimePay + nightDiff),
+  };
+}
