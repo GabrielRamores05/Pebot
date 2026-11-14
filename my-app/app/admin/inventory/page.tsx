@@ -2,6 +2,8 @@
 import Link from 'next/link';
 
 import { useState, useEffect, useCallback, Fragment, useRef, useMemo } from 'react';
+import { countAdjustments, wasteAdjustments, wasteNote, countNote, WASTE_REASONS } from '@/lib/stock-count';
+import { downloadCsv } from '@/lib/csv';
 import { useSocket } from '@/hooks/useSocket';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
 import { formatPeso } from '@/lib/format';
@@ -146,6 +148,7 @@ export default function InventoryPage() {
   const [historyIngredient, setHistoryIngredient] = useState<IngredientItem | null>(null);
   const [supplierInsights, setSupplierInsights] = useState<SupplierInsight[]>([]);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState<'count' | 'waste' | 'adjust'>('count');
 
   // Production Capacity state (derived, read-only view of sellable quantities)
   const [capacity, setCapacity] = useState<any[]>([]);
@@ -766,24 +769,20 @@ const [shopName, setShopName] = useState('Pebot');
     : [];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 min-h-screen">
+    <div className="flex-1 overflow-y-auto bg-page min-h-screen">
       {/* Apple-inspired Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 shadow-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="px-6 pb-2 pt-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center text-xl shadow-sm">
-              📦
-            </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 -tracking-[0.3px]">Inventory</h1>
-              <p className="text-xs text-gray-500">Manage your stock levels</p>
+              <h1 className="c-title">Inventory</h1>
+              <p className="mt-1.5 text-sm text-muted">Manage your stock levels</p>
             </div>
           </div>
           <button
             onClick={fetchInventory}
             className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm border border-gray-200 transition-all hover:shadow-md"
           >
-            <span>🔄</span>
             Refresh
           </button>
         </div>
@@ -806,7 +805,7 @@ const [shopName, setShopName] = useState('Pebot');
                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            📦 Products
+            Products
           </button>
           <button
             onClick={() => setActiveTab('ingredients')}
@@ -816,7 +815,7 @@ const [shopName, setShopName] = useState('Pebot');
                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            🥄 Ingredients
+            Ingredients
           </button>
           <button
             onClick={() => setActiveTab('suppliers')}
@@ -828,7 +827,7 @@ const [shopName, setShopName] = useState('Pebot');
               }
             `}
           >
-            🏢 Suppliers
+            Suppliers
           </button>
           <button
             onClick={() => setActiveTab('capacity')}
@@ -838,7 +837,7 @@ const [shopName, setShopName] = useState('Pebot');
                 : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            📊 Production Capacity
+            Production Capacity
           </button>
         </div>
 
@@ -887,23 +886,43 @@ const [shopName, setShopName] = useState('Pebot');
                   + Add Purchase
                 </button>
                 <button
-                  onClick={() => setBulkOpen(true)}
+                  onClick={() => { setBulkMode('count'); setBulkOpen(true); }}
                   className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 >
-                  ⚖ Bulk Adjust
+                  Stock count
+                </button>
+                <button
+                  onClick={() => { setBulkMode('waste'); setBulkOpen(true); }}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                >
+                  Log waste
+                </button>
+                <button
+                  onClick={() => downloadCsv('ingredients', ingredients, [
+                    { label: 'Ingredient', value: (i) => i.name },
+                    { label: 'In stock', value: (i) => i.currentStock },
+                    { label: 'Unit', value: (i) => i.baseUnit },
+                    { label: 'Minimum', value: (i) => i.minStock },
+                    { label: 'Cost per unit (PHP)', value: (i) => i.costPerUnit },
+                    { label: 'Stock value (PHP)', value: (i) => i.inventoryValue },
+                    { label: 'Status', value: (i) => i.statusText },
+                    { label: 'Supplier', value: (i) => i.supplier?.name ?? '' },
+                  ])}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                >
+                  Export CSV
                 </button>
                 <button
                   onClick={() => { setPlannerOpen(true); setCalcResult(null); setCalcProducts({}); }}
                   className="bg-amber-50 hover:bg-amber-100 text-accent-text px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                 >
-                  🧾 Plan Purchases
+                  Plan Purchases
                 </button>
               </div>
               <button
                 onClick={fetchIngredients}
                 className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm border border-gray-200 transition-all hover:shadow-md"
               >
-                <span>🔄</span>
                 Refresh
               </button>
             </div>
@@ -915,8 +934,7 @@ const [shopName, setShopName] = useState('Pebot');
             ) : ingredients.length === 0 ? (
               <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-gray-200/50 p-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">🥄</span>
-                </div>
+                  </div>
                 <p className="text-gray-500 font-medium">No ingredients found</p>
                 <button
                   onClick={openAddIngredient}
@@ -1305,8 +1323,7 @@ const [shopName, setShopName] = useState('Pebot');
              {suppliers.length === 0 ? (
                <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-gray-200/50 p-12 text-center">
                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                   <span className="text-3xl">🏢</span>
-                 </div>
+                   </div>
                  <p className="text-gray-500 font-medium">No suppliers found</p>
                  <button
                    onClick={() => { setEditingSupplier(null); setShowSupplierModal(true); }}
@@ -1475,7 +1492,6 @@ const [shopName, setShopName] = useState('Pebot');
         {lowStock.length > 0 && (
           <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-red-200/50 p-5 shadow-lg">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">⚠️</span>
               <p className="text-red-600 font-semibold">Low Stock Alert ({lowStock.length} items)</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -2127,8 +2143,7 @@ const [shopName, setShopName] = useState('Pebot');
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white text-lg">🧾</span>
-                        </div>
+                          </div>
                         <div>
                           <h4 className="text-slate-800 font-bold text-base">Purchase Invoice</h4>
                           <p className="text-slate-400 text-xs">#{Math.random().toString(36).substring(2, 8).toUpperCase()}</p>
@@ -2225,7 +2240,7 @@ const [shopName, setShopName] = useState('Pebot');
                   )}
 
                   <div className="bg-slate-50 px-4 py-3 border-t border-slate-200 text-center">
-                    <p className="text-slate-600 text-xs font-medium">Thank you for your business! 🙏</p>
+                    <p className="text-slate-600 text-xs font-medium">Thank you for your business!</p>
                     <p className="text-slate-400 text-xs mt-0.5">{shopName} • Purchase Request</p>
                   </div>
                 </div>
@@ -2268,6 +2283,7 @@ const [shopName, setShopName] = useState('Pebot');
       {/* Spec 014 US4: bulk stock adjust */}
       {bulkOpen && (
         <BulkAdjustModal
+          initialMode={bulkMode}
           ingredients={ingredients}
           onClose={() => setBulkOpen(false)}
           onApplied={() => {
@@ -2471,39 +2487,48 @@ function PurchaseHistoryModal({
 // ---------------------------------------------------------------------------
 function BulkAdjustModal({
   ingredients,
+  initialMode = 'count',
   onClose,
   onApplied,
 }: {
   ingredients: IngredientItem[];
+  initialMode?: 'count' | 'waste' | 'adjust';
   onClose: () => void;
   onApplied: () => void;
 }) {
-  const [deltas, setDeltas] = useState<Record<number, string>>({});
+  const [mode, setMode] = useState<'count' | 'waste' | 'adjust'>(initialMode);
+  const [values, setValues] = useState<Record<number, string>>({});
   const [notes, setNotes] = useState('');
+  const [reason, setReason] = useState<string>(WASTE_REASONS[0]);
+  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const switchMode = (m: 'count' | 'waste' | 'adjust') => { setMode(m); setValues({}); setError(null); };
+  const shown = ingredients.filter((i) => i.name.toLowerCase().includes(search.trim().toLowerCase()));
+
+  // Live preview of the peso difference for counts and waste.
+  const preview = mode === 'count' ? countAdjustments(ingredients, values) : mode === 'waste' ? wasteAdjustments(ingredients, values) : null;
+
   async function apply() {
     setError(null);
-    const rows: { ingredientId: number; adjustment: number }[] = [];
-    for (const ing of ingredients) {
-      const text = (deltas[ing.id] ?? '').trim();
-      if (!text) continue;
-      const delta = parseFloat(text);
-      if (!Number.isFinite(delta)) {
-        setError(`Enter a valid number for ${ing.name}.`);
-        return;
+    let rows: { ingredientId: number; adjustment: number }[] = [];
+    let note: string | null = notes;
+    if (mode === 'adjust') {
+      for (const ing of ingredients) {
+        const text = (values[ing.id] ?? '').trim();
+        if (!text) continue;
+        const delta = parseFloat(text);
+        if (!Number.isFinite(delta)) { setError(`Enter a valid number for ${ing.name}.`); return; }
+        if (delta === 0) continue;
+        if (ing.currentStock + delta < 0) { setError(`${ing.name} would drop below zero (only ${ing.currentStock} ${ing.baseUnit} left). Nothing was changed.`); return; }
+        rows.push({ ingredientId: ing.id, adjustment: delta });
       }
-      if (delta === 0) continue;
-      if (ing.currentStock + delta < 0) {
-        setError(`${ing.name} would drop below zero (only ${ing.currentStock} ${ing.baseUnit} left). Nothing was changed.`);
-        return;
-      }
-      rows.push({ ingredientId: ing.id, adjustment: delta });
-    }
-    if (rows.length === 0) {
-      setError('Enter at least one adjustment.');
-      return;
+      if (rows.length === 0) { setError('Enter at least one adjustment.'); return; }
+    } else {
+      if (!preview || !preview.ok) { setError(preview && !preview.ok ? preview.error : 'Nothing to save.'); return; }
+      rows = preview.rows;
+      note = mode === 'waste' ? wasteNote(reason, notes) : countNote(notes);
     }
 
     setSaving(true);
@@ -2511,88 +2536,97 @@ function BulkAdjustModal({
       await fetchJson('/api/ingredients/bulk-adjust', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows, notes }),
+        body: JSON.stringify({ rows, notes: note }),
       });
       onApplied();
     } catch (e) {
-      setError(userMessage(e, 'Failed to save bulk adjustment. Nothing was changed.'));
+      setError(userMessage(e, 'Could not save. Nothing was changed.'));
     } finally {
       setSaving(false);
     }
   }
 
+  const TITLES = {
+    count: ['Stock count', 'Type what is on the shelf. Pebot corrects the stock and shows the peso difference. Leave blank what you did not count.'],
+    waste: ['Log waste', 'Record ingredients thrown away. Waste shows on the profit report.'],
+    adjust: ['Adjust stock', 'Enter + to receive, − to correct down. Stock only: never touches cost or supplier.'],
+  } as const;
+  const placeholder = mode === 'count' ? 'Counted' : mode === 'waste' ? 'Wasted' : '±';
+  const peso = (n: number) => `${n < 0 ? '−' : ''}₱${Math.abs(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden"
+        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-start justify-between gap-3 border-b border-hair px-6 py-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Bulk Adjust Stock</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Enter + to receive, − to correct down (stock can&apos;t go below zero). Stock only — never touches cost or supplier.
-            </p>
+            <h3 className="text-lg font-semibold text-ink">{TITLES[mode][0]}</h3>
+            <p className="mt-0.5 text-xs text-faint">{TITLES[mode][1]}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 flex items-center justify-center transition-all"
-          >
-            ✕
-          </button>
+          <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-panel text-muted hover:text-ink">✕</button>
         </div>
 
-        <div className="p-5 space-y-3 overflow-y-auto flex-1 min-h-0">
-          <input
-            type="text"
-            placeholder="Reason (optional, shared by the whole batch)"
-            value={notes}
+        <div className="flex flex-wrap items-center gap-2 border-b border-hair px-5 py-3">
+          {(['count', 'waste', 'adjust'] as const).map((m) => (
+            <button key={m} onClick={() => switchMode(m)}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${mode === m ? 'bg-ink text-white' : 'bg-panel text-muted hover:text-ink'}`}>
+              {TITLES[m][0]}
+            </button>
+          ))}
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find ingredient"
+            className="ml-auto h-9 w-44 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent" />
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-5">
+          {mode === 'waste' && (
+            <div className="flex flex-wrap gap-1.5 pb-1">
+              {WASTE_REASONS.map((r) => (
+                <button key={r} onClick={() => setReason(r)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${reason === r ? 'border-accent bg-accent-soft text-accent-text' : 'border-hair text-muted'}`}>{r}</button>
+              ))}
+            </div>
+          )}
+          <input type="text" placeholder={mode === 'adjust' ? 'Reason (optional, shared by the whole batch)' : 'Note (optional)'} value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
-          />
-          {ingredients.length === 0 ? (
-            <p className="py-10 text-center text-gray-400 text-sm">No ingredients to adjust.</p>
+            className="w-full rounded-xl border border-hair bg-card px-4 py-2.5 text-sm outline-none focus:border-accent" />
+          {shown.length === 0 ? (
+            <p className="py-10 text-center text-sm text-faint">No ingredients match.</p>
           ) : (
-            ingredients.map((ing) => {
+            shown.map((ing) => {
               const isOut = ing.currentStock <= 0;
               return (
-                <div key={ing.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-gray-900 font-medium text-sm truncate">{ing.name}</p>
-                    <p className={`text-xs ${isOut ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
-                      {ing.currentStock.toLocaleString()} {ing.baseUnit} in stock{isOut ? ' — out of stock' : ''}
+                <div key={ing.id} className="flex items-center gap-3 rounded-xl bg-panel px-4 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">{ing.name}</p>
+                    <p className={`text-xs ${isOut ? 'font-medium text-danger' : 'text-faint'}`}>
+                      {mode === 'count' ? 'Pebot expects ' : ''}{ing.currentStock.toLocaleString()} {ing.baseUnit}{mode === 'count' ? '' : ' in stock'}{isOut ? ' · out of stock' : ''}
                     </p>
                   </div>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Δ"
-                    value={deltas[ing.id] ?? ''}
-                    onChange={(e) => setDeltas((prev) => ({ ...prev, [ing.id]: e.target.value }))}
-                    className="w-28 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-center text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
-                  />
+                  <input type="number" step="0.01" min={mode === 'adjust' ? undefined : 0} placeholder={placeholder}
+                    aria-label={`${placeholder} ${ing.name}`}
+                    value={values[ing.id] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, [ing.id]: e.target.value }))}
+                    className="w-28 rounded-xl border border-hair bg-card px-3 py-2 text-center text-sm text-ink outline-none focus:border-accent" />
+                  <span className="w-8 text-xs text-faint">{ing.baseUnit}</span>
                 </div>
               );
             })
           )}
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-          )}
+          {error && <div className="rounded-xl border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{error}</div>}
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 flex gap-3 justify-end">
-          <button
-            onClick={onClose}
-            className="flex-1 bg-white text-gray-700 font-semibold py-2.5 rounded-xl border border-gray-200 hover:bg-gray-100 transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={apply}
-            disabled={saving || ingredients.length === 0}
-            className="flex-1 bg-black hover:bg-gray-800 text-white font-semibold py-2.5 rounded-xl transition disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Apply All'}
+        <div className="flex flex-wrap items-center gap-3 border-t border-hair bg-panel px-6 py-4">
+          {preview && preview.ok && (
+            <p className="mr-auto text-sm text-muted">
+              {preview.rows.length} ingredient{preview.rows.length === 1 ? '' : 's'} · <b className={preview.value < 0 ? 'text-danger' : 'text-good'}>{peso(preview.value)}</b>
+              {mode === 'count' ? (preview.value < 0 ? ' missing' : ' extra') : ' wasted'}
+            </p>
+          )}
+          <button onClick={onClose} className="c-btn c-btn--ghost ml-auto">Cancel</button>
+          <button onClick={apply} disabled={saving || ingredients.length === 0} className="c-btn c-btn--primary disabled:opacity-50">
+            {saving ? 'Saving…' : mode === 'count' ? 'Save count' : mode === 'waste' ? 'Log waste' : 'Apply all'}
           </button>
         </div>
       </div>

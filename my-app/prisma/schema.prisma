@@ -33,6 +33,7 @@ model User {
   hourlyRate         Float?
   monthlySalary      Float?
   paymentType        String?           // HOURLY, SALARIED
+  pinHash            String?           // bcrypt of the staff PIN for quick sign-in and approvals (spec 020)
 
   // HR back-relations
   schedules          Schedule[]
@@ -290,6 +291,13 @@ model Order {
   vatExemptSales       Float               @default(0) // or all sales when not VAT-registered
   serviceCharge        Float               @default(0)
   discountHolders      String? // JSON [{type: SENIOR|PWD, name, idNumber}]
+  paidAt               DateTime? // when payment was confirmed (spec 017); null = not paid yet
+  invoiceNumber        String?   // sequential sales invoice number, given when paid (spec 019); unique by construction
+  // Void / refund (spec 020)
+  voidReason           String?
+  voidedAt             DateTime?
+  voidedById           Int?      // the manager who approved
+  refundAmount         Float     @default(0)
   cashSessionId        Int?
   cashSession          CashSession?        @relation(fields: [cashSessionId], references: [id])
   paymentMethod        String              @default("CASH") // CASH | GCASH | PAYMAYA
@@ -305,6 +313,8 @@ model Order {
    loyaltyTransactions  LoyaltyTransaction[]
    createdAt            DateTime            @default(now())
    updatedAt            DateTime            @updatedAt
+
+  @@index([invoiceNumber])
 }
 
 // ──────── OrderItem ────────
@@ -431,6 +441,12 @@ model BusinessSettings {
   vatRegistered       Boolean  @default(true) // false: prices carry no VAT; Senior/PWD removes no VAT
   serviceChargeRate   Float    @default(0) // %, 0 = off
   serviceChargeOrderTypes String @default("DINE_IN") // comma-separated order types
+  // Printing (spec 019)
+  receiptPrinter      String?  // Windows printer name for invoices; null = ask each time
+  kitchenPrinter      String?  // Windows printer name for kitchen tickets; null = same as receipts
+  paperWidth          String   @default("80") // 58 | 80 | A4
+  autoPrintInvoice    Boolean  @default(false)
+  autoPrintKitchen    Boolean  @default(false)
   // Payment method settings
   gcashAccountName    String? // GCash account name
   gcashQrImage        String? // Base64 or file URL of uploaded GCash QR image
@@ -893,4 +909,17 @@ model CashMovement {
   userId    Int?
   userName  String
   createdAt DateTime    @default(now())
+}
+
+// Holidays used by payroll (spec 021). Defaults are filled per year; the owner
+// adds proclaimed ones (Eid, Chinese New Year, extra special days).
+model Holiday {
+  id         Int      @id @default(autoincrement())
+  locationId Int      @default(1)
+  date       String   // YYYY-MM-DD
+  name       String
+  type       String   // REGULAR_HOLIDAY | SPECIAL_HOLIDAY
+  createdAt  DateTime @default(now())
+
+  @@unique([locationId, date])
 }

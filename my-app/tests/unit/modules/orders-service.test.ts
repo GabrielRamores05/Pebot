@@ -5,6 +5,10 @@ const mocks = vi.hoisted(() => ({
   findProductsByIds: vi.fn(),
   createOrder: vi.fn(),
   findCheckoutSettings: vi.fn(),
+  findOrderForVoid: vi.fn(),
+  findOpenCashSessionId: vi.fn(),
+  createCashMovement: vi.fn(),
+  requireApprover: vi.fn(),
   findOrderByNumberOrId: vi.fn(),
   findOrderForMessage: vi.fn(),
   findOrderForFollowUp: vi.fn(),
@@ -43,6 +47,9 @@ vi.mock('../../../modules/orders/repository', () => ({
   findProductsByIds: mocks.findProductsByIds,
   createOrder: mocks.createOrder,
   findCheckoutSettings: mocks.findCheckoutSettings,
+  findOrderForVoid: mocks.findOrderForVoid,
+  findOpenCashSessionId: mocks.findOpenCashSessionId,
+  createCashMovement: mocks.createCashMovement,
   findOrderByNumberOrId: mocks.findOrderByNumberOrId,
   findOrderForMessage: mocks.findOrderForMessage,
   findOrderForFollowUp: mocks.findOrderForFollowUp,
@@ -70,6 +77,7 @@ vi.mock('@/lib/waitTime', () => ({
   calculateStationWaitTime: mocks.calculateStationWaitTime,
 }));
 vi.mock('@/lib/recoverable', () => ({ runRecoverableStep: mocks.runRecoverableStep }));
+vi.mock('@/modules/pins/service', () => ({ requireApprover: mocks.requireApprover }));
 vi.mock('@/lib/loyalty-award', () => ({
   awardLoyaltyForPaidOrder: mocks.awardLoyaltyForPaidOrder,
   awardLoyaltyToSpecificCards: mocks.awardLoyaltyToSpecificCards,
@@ -106,7 +114,7 @@ vi.mock('@/lib/api-response', () => ({
   serverError: mocks.serverError,
 }));
 
-import { listOrders, createOrder, getOrder, updateOrder, followUp, listMessages, createMessage, getWaitTime } from '../../../modules/orders/service';
+import { listOrders, createOrder, getOrder, updateOrder, voidOrder, followUp, listMessages, createMessage, getWaitTime } from '../../../modules/orders/service';
 import { LoyaltyVoucherError, InsufficientStockError } from '../../../modules/orders/repository';
 
 describe('orders service', () => {
@@ -366,6 +374,7 @@ describe('orders service', () => {
       expect(params.discountRate).toBe(20);
       expect(JSON.parse(params.discountHolders)).toEqual([{ type: 'SENIOR', name: 'Lola Remedios', idNumber: 'OSCA-123' }]);
       expect(params.countInDrawer).toBe(true);
+      expect(params.paid).toBe(true);
     });
 
     it('records a table with both a senior and a PWD as SENIOR_PWD', async () => {
@@ -421,6 +430,65 @@ describe('orders service', () => {
         { staff: true, source: 'tablet' },
       );
       expect(mocks.createOrder.mock.calls[0][0].countInDrawer).toBe(false);
+    });
+  });
+
+  describe('voidOrder (spec 020)', () => {
+    const staff = { userId: 9, name: 'Maria' };
+    const paidCash = { id: 5, orderNumber: 'ORD-1-A005', paidAt: new Date(), paymentMethod: 'CASH', cashSessionId: 1, totalAmount: 250 };
+
+    beforeEach(() => {
+      mocks.requireApprover.mockResolvedValue({ id: 1, name: 'Liza (manager)' });
+      mocks.findOrderForMessage.mockResolvedValue({ id: 5, orderNumber: 'ORD-1-A005', status: 'COMPLETED' });
+      mocks.findOrderForVoid.mockResolvedValue(paidCash);
+      mocks.updateOrderInTransaction.mockResolvedValue({ id: 5, orderNumber: 'ORD-1-A005', status: 'CANCELLED', items: [] });
+      mocks.findOpenCashSessionId.mockResolvedValue(3);
+    });
+
+    it('refuses without a manager PIN', async () => {
+      mocks.requireApprover.mockRejectedValue(Object.assign(new Error('That PIN is not a manager PIN.'), { status: 403 }));
+      await expect(voidOrder('5', { reason: 'Wrong order', pin: '9999' }, staff)).rejects.toMatchObject({ status: 403 });
+      expect(mocks.updateOrderInTransaction).not.toHaveBeenCalled();
+    });
+
+    it('needs a reason', async () => {
+      await expect(voidOrder('5', { reason: '', pin: '4821' }, staff)).rejects.toThrow();
+      expect(mocks.updateOrderInTransaction).not.toHaveBeenCalled();
+    });
+
+    it('cancels like a cancellation, records the refund, approver and audit entry', async () => {
+      const r = await voidOrder('5', { reason: 'Wrong order', pin: '4821' }, staff);
+      expect(mocks.updateOrderInTransaction).toHaveBeenCalledWith(expect.objectContaining({
+        orderId: 5,
+        isCancel: true,
+        updateData: expect.objectContaining({ status: 'CANCELLED', voidReason: 'Wrong order', voidedById: 1, refundAmount: 250 }),
+      }));
+      expect(mocks.refundLoyaltyForCancelledOrder).toHaveBeenCalledWith(5);
+      expect(mocks.logAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'ORDER_VOID', details: expect.objectContaining({ approvedBy: 'Liza (manager)', refundAmount: 250 }) }));
+      expect(r.approvedBy).toBe('Liza (manager)');
+    });
+
+    it('pays a cash refund out of the open drawer when the sale was counted in an earlier one', async () => {
+      await voidOrder('5', { reason: 'Wrong order', pin: '4821' }, staff);
+      expect(mocks.createCashMovement).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 3, kind: 'OUT', amount: 250, userName: 'Maria' }));
+    });
+
+    it('does not pay out when the sale is still in the open drawer', async () => {
+      mocks.findOrderForVoid.mockResolvedValue({ ...paidCash, cashSessionId: 3 });
+      await voidOrder('5', { reason: 'Wrong order', pin: '4821' }, staff);
+      expect(mocks.createCashMovement).not.toHaveBeenCalled();
+    });
+
+    it('records no refund for an unpaid order', async () => {
+      mocks.findOrderForVoid.mockResolvedValue({ ...paidCash, paidAt: null });
+      await voidOrder('5', { reason: 'Customer left', pin: '4821' }, staff);
+      expect(mocks.updateOrderInTransaction).toHaveBeenCalledWith(expect.objectContaining({ updateData: expect.objectContaining({ refundAmount: 0 }) }));
+      expect(mocks.createCashMovement).not.toHaveBeenCalled();
+    });
+
+    it('refuses to void twice', async () => {
+      mocks.findOrderForMessage.mockResolvedValue({ id: 5, orderNumber: 'ORD-1-A005', status: 'CANCELLED' });
+      await expect(voidOrder('5', { reason: 'Again', pin: '4821' }, staff)).rejects.toMatchObject({ status: 409 });
     });
   });
 

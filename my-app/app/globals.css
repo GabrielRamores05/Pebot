@@ -56,8 +56,8 @@
   --font-sans: "Manrope", "SF Pro Display", "SF Pro Text", "SF Pro Rounded", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", "SF Mono", "Menlo", "Monaco", Consolas, "Liberation Mono", monospace;
 
-  --background: #f7f2ea;
-  --foreground: #1f1a17;
+  --background: #F4F1EC;
+  --foreground: #1D1915;
   --panel: rgba(255, 255, 255, 0.8);
   --panel-strong: #fffdfb;
   --line: rgba(112, 80, 49, 0.14);
@@ -68,15 +68,15 @@
   --cream: #fff9f3;
 
   /* POS design tokens from cafeos-pos-10-10-spec */
-  --pos-ink: #1C1917;
-  --pos-ink-soft: #57534E;
-  --pos-paper: #FAF7F2;
-  --pos-surface: #FFFFFF;
-  --pos-muted: #EDE8DE;
-  --pos-border: #DDD6C8;
-  --pos-accent: #4A5D3A;
-  --pos-accent-hover: #3D4D2F;
-  --pos-accent-soft: #E7EDE1;
+  --pos-ink: #1D1915;
+  --pos-ink-soft: #5E574F;
+  --pos-paper: #F4F1EC;
+  --pos-surface: #FFFDFA;
+  --pos-muted: #EFEAE3;
+  --pos-border: #E3DCD1;
+  --pos-accent: #B4472A;
+  --pos-accent-hover: #963A22;
+  --pos-accent-soft: #F6E3DA;
   --pos-danger: #B3261E;
   --pos-danger-soft: #F6E4E2;
   --space-1: 4px;
@@ -86,46 +86,52 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-8: 48px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --shadow-modal: 0 8px 30px rgba(28,25,23,0.12);
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --shadow-modal: 0 24px 60px -20px rgba(45, 30, 20, 0.35);
 
   /* -------------------------------------------------------------------------
-     Pebot admin design system (adapted from the "Coffer" template)
-     Neutral graphite/navy accents, hairline borders, soft shadows.
+     Pebot design system (spec 018). Warm canvas, near-white panels, one
+     terracotta ("achuete") accent, pastel tiles for headline numbers.
      ------------------------------------------------------------------------- */
-  --a-950: #05070b;
-  --a-800: #2a303c;
-  --a-700: #111622;
-  --a-600: #3a4150;
-  --a-400: #9097a5;
-  --a-100: #e6e8ed;
+  --a-950: #171310;
+  --a-800: #7A301D;
+  --a-700: #B4472A;
+  --a-600: #963A22;
+  --a-400: #D07E5F;
+  --a-100: #F6E3DA;
 
-  --c-page: #f4f5f7;
-  --c-panel: #eceef2;
-  --c-card: #fdfdfe;
-  --c-hair: #e3e6eb;
-  --c-hair-strong: #cfd4dc;
-  --c-ink: #111622;
-  --c-muted: #4a5263;
-  --c-faint: #5c6576;
+  --c-page: #F4F1EC;
+  --c-panel: #ECE7DF;
+  --c-card: #FFFDFA;
+  --c-hair: #E7E1D8;
+  --c-hair-strong: #D6CEC2;
+  --c-ink: #1D1915;
+  --c-muted: #5E574F;
+  --c-faint: #6E665D;
 
   --c-accent: var(--a-700);
-  --c-accent-text: var(--a-700);
+  --c-accent-text: #9A3B22;
   --c-accent-soft: var(--a-100);
-  --c-on-accent: #f6f7fd;
+  --c-on-accent: #FFF8F4;
 
-  --c-info: #2453c7;      --c-info-bg: #e5ecfb;
-  --c-good: #1b6e44;      --c-good-bg: #e0f1e6;
-  --c-amber: #8f5300;     --c-amber-bg: #fbeed6;
-  --c-rose: #b02e2b;      --c-rose-bg: #fbe6e4;
+  --c-info: #2F5B9A;      --c-info-bg: #DDE5F0;
+  --c-good: #2F6B45;      --c-good-bg: #DDE8DA;
+  --c-amber: #8A5A12;     --c-amber-bg: #F1E6CF;
+  --c-rose: #B3261E;      --c-rose-bg: #F6E4E2;
 
-  --c-r-lg: 12px;
-  --c-r-md: 10px;
-  --c-r-sm: 8px;
-  --c-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --c-shadow-pop: 0 0 0 1px var(--c-hair), 0 16px 40px -12px rgba(16, 24, 40, 0.22);
+  /* Pastel tiles (headline numbers, attention cards) */
+  --tile-peach: #F5DFD4;
+  --tile-sage: #DDE8DA;
+  --tile-sand: #F1E6CF;
+  --tile-sky: #DDE5F0;
+
+  --c-r-lg: 20px;
+  --c-r-md: 14px;
+  --c-r-sm: 10px;
+  --c-shadow-card: 0 1px 2px rgba(45, 30, 20, 0.04), 0 8px 24px -18px rgba(45, 30, 20, 0.18);
+  --c-shadow-pop: 0 0 0 1px var(--c-hair), 0 24px 60px -20px rgba(45, 30, 20, 0.35);
 }
 
 @theme inline {
@@ -156,28 +162,207 @@
   --color-warn-bg: var(--c-amber-bg);
   --color-danger: var(--c-rose);
   --color-danger-bg: var(--c-rose-bg);
+  --color-tile-peach: var(--tile-peach);
+  --color-tile-sage: var(--tile-sage);
+  --color-tile-sand: var(--tile-sand);
+  --color-tile-sky: var(--tile-sky);
   --radius-card: var(--c-r-lg);
   --radius-field: var(--c-r-sm);
   --shadow-card: var(--c-shadow-card);
   --shadow-pop: var(--c-shadow-pop);
 }
 
-/* Align Tailwind's neutral ramp with the Coffer palette, so existing
-   slate-based screens adopt the new system without per-file edits. */
+/* Tailwind's neutral and amber ramps follow the Pebot palette, so every
+   existing screen picks up the warm neutrals and the terracotta accent. */
 @theme {
-  --color-slate-50: #f4f5f7;
-  --color-slate-100: #eceef2;
-  --color-slate-200: #e3e6eb;
-  --color-slate-300: #cfd4dc;
-  --color-slate-400: #9097a5;
-  --color-slate-500: #5c6576;
-  --color-slate-600: #4a5263;
-  --color-slate-700: #2a303c;
-  --color-slate-800: #111622;
-  --color-slate-900: #05070b;
+  --color-slate-50: #F8F6F2;
+  --color-slate-100: #F0ECE6;
+  --color-slate-200: #E7E1D8;
+  --color-slate-300: #D6CEC2;
+  --color-slate-400: #A69E93;
+  --color-slate-500: #7B7369;
+  --color-slate-600: #5E574F;
+  --color-slate-700: #3E3832;
+  --color-slate-800: #27221D;
+  --color-slate-900: #1D1915;
+  --color-gray-50: #F8F6F2;
+  --color-gray-100: #F0ECE6;
+  --color-gray-200: #E7E1D8;
+  --color-gray-300: #D6CEC2;
+  --color-gray-400: #A69E93;
+  --color-gray-500: #7B7369;
+  --color-gray-600: #5E574F;
+  --color-gray-700: #3E3832;
+  --color-gray-800: #27221D;
+  --color-gray-900: #1D1915;
+  --color-amber-50: #FBF3EF;
+  --color-amber-100: #F6E3DA;
+  --color-amber-200: #EEC7B6;
+  --color-amber-300: #E2A388;
+  --color-amber-400: #D07E5F;
+  --color-amber-500: #BF5E3E;
+  --color-amber-600: #B4472A;
+  --color-amber-700: #963A22;
+  --color-amber-800: #7A301D;
+  --color-amber-900: #5E2617;
 }
 
-/* Pebot admin primitives — mirror the Coffer component conventions */
+/* Status colours follow the Pebot palette too (spec 018): red/rose = danger,
+   green/emerald/teal = good, blue/sky/indigo/purple = info, yellow/orange = sand. */
+@theme {
+  --color-red-50: #FCF3F2;
+  --color-red-100: #F6E4E2;
+  --color-red-200: #EEC9C5;
+  --color-red-300: #E2A39C;
+  --color-red-400: #D27166;
+  --color-red-500: #C2453A;
+  --color-red-600: #B3261E;
+  --color-red-700: #931E18;
+  --color-red-800: #741914;
+  --color-red-900: #561310;
+  --color-rose-50: #FCF3F2;
+  --color-rose-100: #F6E4E2;
+  --color-rose-200: #EEC9C5;
+  --color-rose-300: #E2A39C;
+  --color-rose-400: #D27166;
+  --color-rose-500: #C2453A;
+  --color-rose-600: #B3261E;
+  --color-rose-700: #931E18;
+  --color-rose-800: #741914;
+  --color-rose-900: #561310;
+  --color-pink-50: #FCF3F2;
+  --color-pink-100: #F6E4E2;
+  --color-pink-200: #EEC9C5;
+  --color-pink-300: #E2A39C;
+  --color-pink-400: #D27166;
+  --color-pink-500: #C2453A;
+  --color-pink-600: #B3261E;
+  --color-pink-700: #931E18;
+  --color-pink-800: #741914;
+  --color-pink-900: #561310;
+  --color-green-50: #F2F7F1;
+  --color-green-100: #DDE8DA;
+  --color-green-200: #C3D8BE;
+  --color-green-300: #9DBF96;
+  --color-green-400: #6FA067;
+  --color-green-500: #4A8446;
+  --color-green-600: #2F6B45;
+  --color-green-700: #265738;
+  --color-green-800: #1E452C;
+  --color-green-900: #163420;
+  --color-emerald-50: #F2F7F1;
+  --color-emerald-100: #DDE8DA;
+  --color-emerald-200: #C3D8BE;
+  --color-emerald-300: #9DBF96;
+  --color-emerald-400: #6FA067;
+  --color-emerald-500: #4A8446;
+  --color-emerald-600: #2F6B45;
+  --color-emerald-700: #265738;
+  --color-emerald-800: #1E452C;
+  --color-emerald-900: #163420;
+  --color-teal-50: #F2F7F1;
+  --color-teal-100: #DDE8DA;
+  --color-teal-200: #C3D8BE;
+  --color-teal-300: #9DBF96;
+  --color-teal-400: #6FA067;
+  --color-teal-500: #4A8446;
+  --color-teal-600: #2F6B45;
+  --color-teal-700: #265738;
+  --color-teal-800: #1E452C;
+  --color-teal-900: #163420;
+  --color-lime-50: #F2F7F1;
+  --color-lime-100: #DDE8DA;
+  --color-lime-200: #C3D8BE;
+  --color-lime-300: #9DBF96;
+  --color-lime-400: #6FA067;
+  --color-lime-500: #4A8446;
+  --color-lime-600: #2F6B45;
+  --color-lime-700: #265738;
+  --color-lime-800: #1E452C;
+  --color-lime-900: #163420;
+  --color-blue-50: #F1F4F9;
+  --color-blue-100: #DDE5F0;
+  --color-blue-200: #C2D0E5;
+  --color-blue-300: #9AB1D2;
+  --color-blue-400: #6E8DBB;
+  --color-blue-500: #4A6FA6;
+  --color-blue-600: #2F5B9A;
+  --color-blue-700: #264A7E;
+  --color-blue-800: #1E3B64;
+  --color-blue-900: #172D4C;
+  --color-sky-50: #F1F4F9;
+  --color-sky-100: #DDE5F0;
+  --color-sky-200: #C2D0E5;
+  --color-sky-300: #9AB1D2;
+  --color-sky-400: #6E8DBB;
+  --color-sky-500: #4A6FA6;
+  --color-sky-600: #2F5B9A;
+  --color-sky-700: #264A7E;
+  --color-sky-800: #1E3B64;
+  --color-sky-900: #172D4C;
+  --color-indigo-50: #F1F4F9;
+  --color-indigo-100: #DDE5F0;
+  --color-indigo-200: #C2D0E5;
+  --color-indigo-300: #9AB1D2;
+  --color-indigo-400: #6E8DBB;
+  --color-indigo-500: #4A6FA6;
+  --color-indigo-600: #2F5B9A;
+  --color-indigo-700: #264A7E;
+  --color-indigo-800: #1E3B64;
+  --color-indigo-900: #172D4C;
+  --color-violet-50: #F1F4F9;
+  --color-violet-100: #DDE5F0;
+  --color-violet-200: #C2D0E5;
+  --color-violet-300: #9AB1D2;
+  --color-violet-400: #6E8DBB;
+  --color-violet-500: #4A6FA6;
+  --color-violet-600: #2F5B9A;
+  --color-violet-700: #264A7E;
+  --color-violet-800: #1E3B64;
+  --color-violet-900: #172D4C;
+  --color-purple-50: #F1F4F9;
+  --color-purple-100: #DDE5F0;
+  --color-purple-200: #C2D0E5;
+  --color-purple-300: #9AB1D2;
+  --color-purple-400: #6E8DBB;
+  --color-purple-500: #4A6FA6;
+  --color-purple-600: #2F5B9A;
+  --color-purple-700: #264A7E;
+  --color-purple-800: #1E3B64;
+  --color-purple-900: #172D4C;
+  --color-cyan-50: #F1F4F9;
+  --color-cyan-100: #DDE5F0;
+  --color-cyan-200: #C2D0E5;
+  --color-cyan-300: #9AB1D2;
+  --color-cyan-400: #6E8DBB;
+  --color-cyan-500: #4A6FA6;
+  --color-cyan-600: #2F5B9A;
+  --color-cyan-700: #264A7E;
+  --color-cyan-800: #1E3B64;
+  --color-cyan-900: #172D4C;
+  --color-yellow-50: #FBF7EE;
+  --color-yellow-100: #F1E6CF;
+  --color-yellow-200: #E7D4AC;
+  --color-yellow-300: #DCC086;
+  --color-yellow-400: #C9A35B;
+  --color-yellow-500: #B5893F;
+  --color-yellow-600: #8A5A12;
+  --color-yellow-700: #714A0F;
+  --color-yellow-800: #5A3B0C;
+  --color-yellow-900: #432C09;
+  --color-orange-50: #FBF7EE;
+  --color-orange-100: #F1E6CF;
+  --color-orange-200: #E7D4AC;
+  --color-orange-300: #DCC086;
+  --color-orange-400: #C9A35B;
+  --color-orange-500: #B5893F;
+  --color-orange-600: #8A5A12;
+  --color-orange-700: #714A0F;
+  --color-orange-800: #5A3B0C;
+  --color-orange-900: #432C09;
+}
+
+/* Pebot primitives (spec 018) */
 @layer components {
   .c-card {
     border-radius: var(--c-r-lg);
@@ -193,9 +378,9 @@
   }
   .c-title {
     font-weight: 700;
-    font-size: 32px;
-    line-height: 1.15;
-    letter-spacing: -0.025em;
+    font-size: clamp(28px, 2.6vw, 38px);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
     color: var(--c-ink);
   }
   .c-chip {
@@ -231,7 +416,7 @@
     gap: 8px;
     height: 40px;
     padding: 0 16px;
-    border-radius: var(--c-r-sm);
+    border-radius: 12px;
     font-size: 14px;
     font-weight: 600;
     border: 1px solid transparent;
@@ -242,7 +427,7 @@
     color: var(--c-on-accent);
     box-shadow: 0 1px 2px rgba(16, 24, 40, 0.12);
   }
-  .c-btn--primary:hover { background: var(--a-800); }
+  .c-btn--primary:hover { background: var(--a-600); }
   .c-btn--ghost {
     background: var(--c-card);
     border-color: var(--c-hair-strong);
@@ -276,22 +461,24 @@ body {
   margin: 0;
   min-height: 100vh;
   min-width: 320px;
-  background:
-    radial-gradient(circle at top, rgba(255, 249, 243, 0.96), rgba(247, 242, 234, 1) 28%, rgba(240, 236, 230, 1) 100%);
-  color: var(--foreground);
+  background: var(--c-page);
+  color: var(--c-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   letter-spacing: -0.01em;
+  font-feature-settings: "ss01", "cv11";
 }
+
+.tabular-nums, .c-num { font-variant-numeric: tabular-nums; }
 
 body, #__next {
   height: 100%;
 }
 
 ::selection {
-  background: rgba(139, 94, 52, 0.18);
+  background: rgba(180, 71, 42, 0.18);
   color: var(--foreground);
 }
 
@@ -353,14 +540,15 @@ img {
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d97706; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #D6CEC2; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #A69E93; }
 
 /* Mobile-friendly scrollbar - Always visible */
 @media (max-width: 640px) {
   ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #f3f4f6; }
-  ::-webkit-scrollbar-thumb { background: #d97706; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #b45309; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #D6CEC2; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #A69E93; }
   
   /* Enable momentum scrolling on iOS */
   * {

@@ -87,26 +87,26 @@ export default function AdminKitchenPage() {
             <span className={`text-sm px-2 py-1 rounded-lg font-semibold ${
               order.orderType === 'DELIVERY' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-sky-700'
             }`}>
-              {order.orderType === 'DELIVERY' ? '🛵 Delivery' : '🥡 Takeout'}
+              {order.orderType === 'DELIVERY' ? 'Delivery' : 'Takeout'}
             </span>
           )}
           {order.orderType === 'DINE_IN' && (
             <span className="text-sm px-2 py-1 rounded-lg bg-gray-100 text-gray-600">
-              🍽️ Dine-in
+              Dine-in
             </span>
           )}
           {order.table && (
             <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">
-              📍 {order.table.name}
+              {order.table.name}
             </span>
           )}
           {order.deliveryAddress && (
             <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-lg truncate max-w-[200px]" title={order.deliveryAddress}>
-              📍 {order.deliveryAddress}
+              {order.deliveryAddress}
             </span>
           )}
           <span className={`text-sm px-2 py-1 rounded-lg flex items-center gap-1 ${timeInfo.urgent ? 'bg-red-100 text-red-700 font-semibold' : 'bg-gray-100 text-gray-600'}`}>
-            ⏱ {timeInfo.text}
+            {timeInfo.text}
           </span>
         </div>
 
@@ -117,10 +117,10 @@ export default function AdminKitchenPage() {
             className={`mb-3 w-full text-left rounded-xl px-3 py-2 border transition ${hasUnanswered ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
           >
             <span className={`text-[11px] font-bold uppercase tracking-wide ${hasUnanswered ? 'text-accent-text' : 'text-gray-400'}`}>
-              💬 {msgs.length} message{msgs.length > 1 ? 's' : ''}{hasUnanswered ? ' · waiting' : ''}
+              {msgs.length} message{msgs.length > 1 ? 's' : ''}{hasUnanswered ? ' · waiting' : ''}
             </span>
             <p className={`text-sm truncate mt-0.5 ${lastMsg.sender === order.customerName ? 'text-gray-700' : 'text-gray-500'}`}>
-              {lastMsg.type === 'voice' ? '🎤 Voice message' : lastMsg.content}
+              {lastMsg.type === 'voice' ? 'Voice message' : lastMsg.content}
             </p>
           </button>
         )}
@@ -149,7 +149,7 @@ export default function AdminKitchenPage() {
                 disabled={updating === order.id}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all text-lg shadow-md hover:shadow-lg active:scale-[0.98]"
               >
-                🔥 START PREPARING
+                START PREPARING
               </button>
             )}
             {isPreparing && (
@@ -158,7 +158,7 @@ export default function AdminKitchenPage() {
                 disabled={updating === order.id}
                 className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all text-lg shadow-md hover:shadow-lg active:scale-[0.98]"
               >
-                ✅ MARK READY
+                MARK READY
               </button>
             )}
           </div>
@@ -172,7 +172,7 @@ export default function AdminKitchenPage() {
       {/* Sidebar */}
       <div className="w-72 border-r border-gray-200 flex flex-col bg-white">
         <div className="p-6">
-          <h2 className="font-bold text-xl mb-6 text-gray-900">👨‍🍳 Staff Queue</h2>
+          <h2 className="font-bold text-xl mb-6 text-gray-900">Staff Queue</h2>
           
           {/* Stats in Sidebar */}
           <div className="grid grid-cols-3 gap-2 mb-6">
@@ -226,7 +226,7 @@ export default function AdminKitchenPage() {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              <span>📋 All Stations</span>
+              <span>All Stations</span>
               <span className="bg-gray-500 text-white text-xs px-2 py-0.5 rounded-full">{activeOrders.length}</span>
             </button>
             {STATIONS.map((st) => {
@@ -262,8 +262,8 @@ export default function AdminKitchenPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="font-bold text-3xl text-gray-900 mb-1">Order Queue</h1>
-          <p className="text-gray-500">{new Date().toLocaleDateString()} • {new Date().toLocaleTimeString()}</p>
+          <h1 className="c-title">Order Queue</h1>
+          <p className="mt-1.5 text-sm text-muted">{new Date().toLocaleDateString()} • {new Date().toLocaleTimeString()}</p>
         </div>
 
         {/* Station Sections */}
@@ -342,8 +342,8 @@ export default function AdminKitchenPage() {
             <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl max-h-[85vh] flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-bold text-xl text-gray-900">💬 {ticketCode(threadOrder.orderNumber)}</h3>
-                  <p className="text-sm text-gray-500">{threadOrder.customerName}{threadOrder.table ? ` · 📍 ${threadOrder.table.name}` : ''}</p>
+                  <h3 className="font-bold text-xl text-gray-900">{ticketCode(threadOrder.orderNumber)}</h3>
+                  <p className="text-sm text-gray-500">{threadOrder.customerName}{threadOrder.table ? ` · ${threadOrder.table.name}` : ''}</p>
                 </div>
                 <button onClick={() => setThreadOrder(null)} className="text-gray-400 hover:text-gray-600 text-xl px-2">✕</button>
               </div>
@@ -355,7 +355,7 @@ export default function AdminKitchenPage() {
                   (threadOrder.messages || []).map((m) => (
                     <div key={m.id} className={`p-3 rounded-xl text-sm max-w-[85%] ${m.sender === threadOrder.customerName ? 'bg-gray-100 text-gray-800 mr-auto' : 'bg-gray-900 text-white ml-auto'}`}>
                       <div className="flex items-center gap-2 mb-1 text-xs text-gray-400">
-                        <span>{m.sender === threadOrder.customerName ? `🙋 ${m.sender}` : `👨‍🍳 ${m.sender}`}</span>
+                        <span>{m.sender === threadOrder.customerName ? `${m.sender}` : `${m.sender}`}</span>
                         <span>·</span>
                         <span>{new Date(m.createdAt).toLocaleTimeString()}</span>
                       </div>
@@ -390,7 +390,7 @@ export default function AdminKitchenPage() {
                 </div>
               ) : (
                 <a href="/login?next=/kitchen" className="block w-full text-center bg-gray-100 text-gray-600 py-3 rounded-xl font-semibold text-sm hover:bg-gray-200 transition-colors">
-                  🔒 Sign in to reply
+                  Sign in to reply
                 </a>
               )}
             </div>

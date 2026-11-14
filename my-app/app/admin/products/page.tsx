@@ -200,11 +200,11 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ingredients: items }),
       });
-      notif('✅ Ingredients saved!');
+      notif('Ingredients saved!');
       await fetchAvailability(productId);
     } catch (e) {
       console.error('Failed to save product ingredients:', e);
-      notif(`❌ ${userMessage(e, 'Failed to save product ingredients')}`);
+      notif(`${userMessage(e, 'Failed to save product ingredients')}`);
     }
   };
 
@@ -264,7 +264,7 @@ export default function Page() {
       }
     } catch (e) {
       console.error('Failed to load products/categories:', e);
-      notif(`❌ ${userMessage(e, 'Could not load products and categories. Try again.')}`);
+      notif(`${userMessage(e, 'Could not load products and categories. Try again.')}`);
     } finally {
       setLoading(false);
     }
@@ -352,20 +352,20 @@ export default function Page() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: editingProduct.id, ...body }),
         });
-        notif('✅ Product updated!');
+        notif('Product updated!');
       } else {
         await fetchJson('/api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        notif('✅ Product added!');
+        notif('Product added!');
       }
       setShowProductModal(false);
       await fetchAll();
     } catch (e) {
       console.error('Failed to save product:', e);
-      notif(`❌ ${userMessage(e, 'Failed to save product')}`);
+      notif(`${userMessage(e, 'Failed to save product')}`);
     } finally {
       setProductSaving(false);
     }
@@ -378,11 +378,11 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: p.id, available: !p.available }),
       });
-      notif(p.available ? '⚠️ Product hidden from menu' : '✅ Product visible on menu');
+      notif(p.available ? 'Product hidden from menu' : 'Product visible on menu');
       await fetchAll();
     } catch (e) {
       console.error('Failed to update product availability:', e);
-      notif(`❌ ${userMessage(e, 'Failed to update product availability')}`);
+      notif(`${userMessage(e, 'Failed to update product availability')}`);
     }
   }
 
@@ -409,11 +409,11 @@ export default function Page() {
       );
       setDeleteModal({ open: false, targets: [] });
       setSelectedIds(new Set());
-      notif(`🗑️ ${targets.length === 1 ? `"${targets[0].name}" removed` : `${targets.length} products removed`}`);
+      notif(`${targets.length === 1 ? `"${targets[0].name}" removed` : `${targets.length} products removed`}`);
       await fetchAll();
     } catch (err) {
       console.error('Delete error:', err);
-      notif(`❌ ${userMessage(err, 'Error deleting products')}`);
+      notif(`${userMessage(err, 'Error deleting products')}`);
     } finally {
       setDeleteLoading(false);
     }
@@ -472,11 +472,11 @@ export default function Page() {
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-          console.error('❌ Failed to update category:', data);
-          notif(`❌ ${data?.error || 'Failed to update category'}`);
+          console.error('Failed to update category:', data);
+          notif(`${data?.error || 'Failed to update category'}`);
           return;
         }
-        notif('✅ Category updated!');
+        notif('Category updated!');
       } else {
         const res = await fetch('/api/categories', {
           method: 'POST',
@@ -485,18 +485,18 @@ export default function Page() {
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
-          console.error('❌ Failed to create category:', data);
-          notif(`❌ ${data?.error || 'Failed to create category'}`);
+          console.error('Failed to create category:', data);
+          notif(`${data?.error || 'Failed to create category'}`);
           return;
         }
-        notif('✅ Category added!');
+        notif('Category added!');
       }
 
       setShowCatModal(false);
       fetchAll();
     } catch (err) {
-      console.error('❌ Network error while saving category:', err);
-      notif('❌ Network error while saving category');
+      console.error('Network error while saving category:', err);
+      notif('Network error while saving category');
     } finally {
       setCatSaving(false);
     }
@@ -512,14 +512,14 @@ export default function Page() {
       });
       const data = await res.json();
       if (res.ok) {
-        notif('🗑️ Category deleted');
+        notif('Category deleted');
         await fetchAll();
       } else {
-        notif(`❌ ${data.error || 'Failed to delete category'}`);
+        notif(`${data.error || 'Failed to delete category'}`);
       }
     } catch (err) {
       console.error('Delete category error:', err);
-      notif(`❌ ${err instanceof Error ? err.message : 'Error deleting category'}`);
+      notif(`${err instanceof Error ? err.message : 'Error deleting category'}`);
     }
   }
 
@@ -530,26 +530,28 @@ export default function Page() {
   });
 
   const renderProductCard = (p: Product, includeReviews = false) => (
-    <div key={p.id} className="group rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-amber-500">
+    <div key={p.id} className="group c-card p-4 transition-colors hover:border-hair-strong">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-slate-800 font-bold">{p.name}</p>
-          <p className="text-xs text-slate-500">₱{Number(p.price).toFixed(2)}</p>
+          <p className="text-sm font-bold tabular-nums">₱{Number(p.price).toFixed(2)}</p>
         </div>
         <div className="flex gap-1">
           <button
             onClick={() => openEditProduct(p)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm text-white transition-colors hover:bg-amber-500"
-            title="Edit product"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-hair text-muted transition-colors hover:border-ink hover:text-ink"
+            title="Edit dish"
+            aria-label={`Edit ${p.name}`}
           >
-            ✎
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="m14 6 4 4" /></svg>
           </button>
           <button
             onClick={() => openDeleteModal([p])}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-sm text-white transition-colors hover:bg-red-500"
-            title="Delete product"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-hair text-muted transition-colors hover:border-danger hover:bg-danger-bg hover:text-danger"
+            title="Delete dish"
+            aria-label={`Delete ${p.name}`}
           >
-            🗑️
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
           </button>
         </div>
       </div>
@@ -567,7 +569,7 @@ export default function Page() {
       {p.description && <p className="mb-2 line-clamp-2 text-xs text-slate-500">{p.description}</p>}
       <div className="flex items-center gap-2 text-xs">
         <span className="text-gray-500">{p.category?.name}</span>
-        {p.available !== false && <span className="rounded bg-green-100 px-2 py-1 text-green-700">Available</span>}
+        {p.available !== false && <span className="rounded-full bg-good-bg px-2 py-0.5 font-semibold text-good">On the menu</span>}
       </div>
 
       {includeReviews && productReviews[p.id] && productReviews[p.id].totalReviews > 0 && (
@@ -604,44 +606,33 @@ export default function Page() {
   );
 
   return (
-    <div className="h-full overflow-y-auto bg-white p-6 space-y-6">
-      {/* Notification */}
+    <div className="h-full space-y-5 overflow-y-auto bg-page px-6 pb-8 pt-6">
       {notification && (
-        <div className="fixed top-4 right-4 bg-accent text-white px-5 py-3 rounded-xl shadow-2xl z-50 font-medium">
+        <div className="fixed right-4 top-4 z-50 rounded-2xl border border-hair bg-card px-4 py-3 text-sm font-semibold shadow-pop" role="status">
           {notification}
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-slate-800 text-2xl font-bold">Menu Management</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setTab('products')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'products' ? 'bg-accent text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
-          >
-            🍽️ Products
-          </button>
-          <button
-            onClick={() => setTab('all')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'all' ? 'bg-accent text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
-          >
-            🗂️ All Products
-          </button>
-          <button
-            onClick={() => setTab('categories')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'categories' ? 'bg-accent text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
-          >
-            🏷️ Categories
-          </button>
-          <button
-            onClick={() => setTab('options')}
-            className={`px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${tab === 'options' ? 'bg-accent text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
-          >
-            ⚙️ Options
-          </button>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="c-title">Menu</h1>
+          <p className="mt-1.5 text-sm text-muted">
+            {products.length} dish{products.length === 1 ? '' : 'es'} in {categories.length} categor{categories.length === 1 ? 'y' : 'ies'} · {products.filter((p) => p.available).length} on the menu now
+          </p>
         </div>
-      </div>
+        <nav className="flex gap-1 border-b border-hair" aria-label="Menu sections">
+          {([['products', 'Dishes'], ['all', 'All dishes'], ['categories', 'Categories'], ['options', 'Options']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              aria-current={tab === key ? 'page' : undefined}
+              className={`-mb-px whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-semibold transition ${tab === key ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      </header>
 
       {loading ? (
         <div className="flex items-center justify-center h-60 text-gray-500">Loading...</div>
@@ -654,27 +645,28 @@ export default function Page() {
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="min-w-0 flex-1 rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  placeholder="Search dishes"
+                  className="h-10 min-w-0 flex-1 rounded-xl border border-hair bg-card px-4 text-sm outline-none focus:border-accent"
                 />
                 <select
                   value={filterCat}
                   onChange={(e) => setFilterCat(e.target.value === 'ALL' ? 'ALL' : parseInt(e.target.value))}
-                  className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="h-10 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent"
                 >
                   <option value="ALL">All Categories</option>
                   {categories.map((c) => <option key={c.id} value={c.id}>{(c as any).icon} {c.name}</option>)}
                 </select>
                 <button
                   onClick={openAddProduct}
-                  className="whitespace-nowrap rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-500"
+                  className="c-btn c-btn--primary"
                 >
-                  ➕ Add Product
+                  Add Product
                 </button>
                 <button
                   onClick={openAddCat}
-                  className="whitespace-nowrap rounded-xl border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"
+                  className="c-btn c-btn--ghost"
                 >
-                  🏷️ Manage Categories
+                  Manage Categories
                 </button>
               </div>
 
@@ -719,7 +711,7 @@ export default function Page() {
                     onClick={openAddCat}
                     className="w-full bg-accent hover:bg-amber-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors"
                   >
-                    ➕ Add Category
+                    Add Category
                   </button>
                   {categories.map((c) => (
                     <div key={c.id} className="bg-white rounded-2xl p-4 border border-slate-200 hover:border-amber-500 transition-colors group flex items-center gap-4">
@@ -735,13 +727,13 @@ export default function Page() {
                           onClick={() => openEditCat(c)}
                           className="bg-accent hover:bg-amber-500 text-white px-3 py-2 rounded-lg text-sm transition-colors font-medium"
                         >
-                          ✎ Edit
+                          Edit
                         </button>
                         <button
                           onClick={() => deleteCat(c)}
                           className="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm transition-colors font-medium"
                         >
-                          🗑️ Delete
+                          Delete
                         </button>
                       </div>
                     </div>
@@ -854,7 +846,7 @@ export default function Page() {
               </div>
               {/* Price Preview - Shows computed values */}
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mt-4">
-                <p className="text-emerald-700 text-xs font-semibold uppercase tracking-wider mb-3">💰 Price Preview</p>
+                <p className="text-emerald-700 text-xs font-semibold uppercase tracking-wider mb-3">Price Preview</p>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Capital Cost:</span>
@@ -915,10 +907,10 @@ export default function Page() {
                       ))
                     ) : (
                       <>
-                        <option value="coffee">☕ Drinks</option>
-                        <option value="kitchen">🍳 Kitchen</option>
-                        <option value="bar">🥤 Bar</option>
-                        <option value="pastry">🧁 Pastry</option>
+                        <option value="coffee">Drinks</option>
+                        <option value="kitchen">Kitchen</option>
+                        <option value="bar">Bar</option>
+                        <option value="pastry">Pastry</option>
                       </>
                     )}
                   </select>
@@ -948,7 +940,7 @@ export default function Page() {
                 <div className="flex gap-2">
                   <label className="cursor-pointer">
                     <div className={`bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl px-3 py-2.5 text-sm text-center border border-dashed border-slate-400 hover:border-amber-500 transition-colors whitespace-nowrap ${imageUploading ? 'opacity-50' : ''}`}>
-                      {imageUploading ? 'Uploading...' : '📁 Upload'}
+                      {imageUploading ? 'Uploading...' : 'Upload'}
                     </div>
                     <input
                       type="file"
@@ -1112,7 +1104,7 @@ export default function Page() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md border border-red-200 shadow-xl">
             <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-slate-800 font-bold text-lg">⚠️ Confirm Delete</h3>
+              <h3 className="text-slate-800 font-bold text-lg">Confirm Delete</h3>
               <button
                 onClick={() => setDeleteModal({ open: false, targets: [] })}
                 className="text-slate-500 hover:text-slate-800 text-xl"
@@ -1189,7 +1181,7 @@ export default function Page() {
                 ) : null}
                 <label className="cursor-pointer block mb-2">
                   <div className={`bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl px-3 py-2 text-sm text-center border border-dashed border-slate-400 hover:border-amber-500 transition-colors ${catIconUploading ? 'opacity-50' : ''}`}>
-                    {catIconUploading ? 'Uploading...' : '📁 Upload Image'}
+                    {catIconUploading ? 'Uploading...' : 'Upload Image'}
                   </div>
                   <input
                     type="file"

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { setPin } from '@/modules/pins/service';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requirePermission } from '@/lib/auth';
@@ -27,7 +28,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       name, email, password, permissions, active, role,
       phone, address, dateOfBirth, hireDate, position, department,
       emergencyContactName, emergencyContactPhone,
-      hourlyRate, monthlySalary, paymentType,
+      hourlyRate, monthlySalary, paymentType, pin,
     } = body;
 
     const currentStaff = await prisma.user.findUnique({ where: { id: staffId }, select: { email: true } });
@@ -56,6 +57,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate != null ? Number(hourlyRate) : null;
     if (monthlySalary !== undefined) updateData.monthlySalary = monthlySalary != null ? Number(monthlySalary) : null;
     if (paymentType !== undefined) updateData.paymentType = paymentType || null;
+
+    if (pin !== undefined && pin !== '') {
+      try {
+        await setPin(staffId, pin === null ? null : String(pin));
+      } catch (e) {
+        return NextResponse.json({ error: (e as Error).message }, { status: (e as { status?: number }).status ?? 400 });
+      }
+    }
 
     const updated = await prisma.user.update({ where: { id: staffId }, data: updateData, select: STAFF_SELECT });
 

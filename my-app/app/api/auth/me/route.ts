@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { unauthorized } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
@@ -9,27 +8,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ user });
 }
 
-export async function DELETE(req: NextRequest) {
-  const user = await getAuthUser(req);
-  // Auto clock-out: close any open attendance record for this user.
-  if (user) {
-    try {
-      const open = await prisma.attendance.findFirst({
-        where: { userId: user.userId, clockOut: null },
-      });
-      if (open) {
-        const out = new Date();
-        const totalMs = out.getTime() - open.clockIn.getTime();
-        await prisma.attendance.update({
-          where: { id: open.id },
-          data: { clockOut: out, totalHours: Math.round((totalMs / 3600000) * 100) / 100 },
-        });
-      }
-    } catch (attErr) {
-      console.error('[LOGOUT] auto clock-out failed:', attErr);
-    }
-  }
-
+export async function DELETE() {
+  // Signing out no longer clocks a person out: with PIN switching, cashiers sign
+  // out mid-shift. Staff clock out from the sidebar (spec 020).
   const res = NextResponse.json({ ok: true });
   res.cookies.delete('cafeos-token');
   return res;

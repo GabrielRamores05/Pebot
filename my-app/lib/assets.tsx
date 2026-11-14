@@ -179,3 +179,103 @@ export function IconStar({ size, strokeWidth, className }: IconProps) {
     </svg>
   );
 }
+
+// ── Spec 018 icons ───────────────────────────────────────────────────────────
+
+/** Clock with return arrow: history lists. */
+export function IconClockBack({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v4h4" />
+      <path d="M12 8v4l3 2" />
+    </svg>
+  );
+}
+
+export function IconReceipt({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+      <path d="M9 8h6M9 12h6M9 16h3" />
+    </svg>
+  );
+}
+
+export function IconWallet({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <rect x="3" y="6" width="18" height="14" rx="3" />
+      <path d="M3 10h18M16 15h2" />
+      <path d="M6 6l9-3 2 3" />
+    </svg>
+  );
+}
+
+export function IconUsers({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" />
+    </svg>
+  );
+}
+
+export function IconGift({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <rect x="3" y="8" width="18" height="4" rx="1" />
+      <path d="M5 12v9h14v-9M12 8v13" />
+      <path d="M12 8C9 8 7.5 6.8 7.5 5.3S9 3 12 8zM12 8c3 0 4.5-1.2 4.5-2.7S15 3 12 8z" />
+    </svg>
+  );
+}
+
+export function IconReport({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 16v-3M12 16V9M16 16v-5" />
+    </svg>
+  );
+}
+
+/** Plate with cutlery: Pebot's default brand mark. */
+export function IconPlate({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M2.5 4v5a1.5 1.5 0 0 0 3 0V4M4 9v11M21 4c-1.5 1-2 3-2 5v3h2v8" />
+    </svg>
+  );
+}
+
+export function IconCash({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M6 9.5v5M18 9.5v5" />
+    </svg>
+  );
+}
+
+export function IconBell({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+export function IconPanel({ size, strokeWidth, className }: IconProps) {
+  return (
+    <svg {...d(size, strokeWidth, className)}>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M9 4v16" />
+    </svg>
+  );
+}

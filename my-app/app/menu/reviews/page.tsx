@@ -115,7 +115,7 @@ function MenuReviewsContent() {
       <main className="max-w-2xl mx-auto px-4 py-6">
         {/* Write / rate a product */}
         <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50/60 p-4">
-          <p className="text-sm font-semibold text-slate-800 mb-2">⭐ Rate one of our products</p>
+          <p className="text-sm font-semibold text-slate-800 mb-2">Rate one of our products</p>
           {products.length === 0 ? (
             <p className="text-xs text-slate-400">Loading products…</p>
           ) : (

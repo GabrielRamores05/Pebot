@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarList, CHART, Loading, Panel, Pill, Segmented, StatTile } from '@/components/pebot-ui';
 
 interface OrderMetric {
   orderNumber: string;
@@ -32,14 +30,9 @@ interface FulfillmentStats {
   ordersPerHour: { hour: string; count: number }[];
 }
 
-const statusColors: Record<string, string> = {
-  'PENDING': '#ef4444',
-  'PREPARING': '#f59e0b',
-  'COMPLETED': '#10b981',
-  'CANCELLED': '#6b7280',
-};
 
-const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#6b7280'];
+const STATUS_LABEL: Record<string, string> = { PENDING: 'Waiting', PREPARING: 'Preparing', COMPLETED: 'Completed', CANCELLED: 'Cancelled' };
+const STATUS_TONE: Record<string, 'warn' | 'accent' | 'good' | 'plain'> = { PENDING: 'warn', PREPARING: 'accent', COMPLETED: 'good', CANCELLED: 'plain' };
 
 export default function OrderFulfillmentMetrics() {
   const [stats, setStats] = useState<FulfillmentStats | null>(null);
@@ -69,254 +62,120 @@ export default function OrderFulfillmentMetrics() {
 
   const filteredOrders = orders.filter(o => statusFilter === 'ALL' || o.status === statusFilter);
 
-  if (loading || !stats) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen">
-        <div className="text-gray-500 font-medium">Loading fulfillment metrics...</div>
-      </div>
-    );
-  }
+  if (loading || !stats) return <Loading label="Loading kitchen performance…" />;
+
+  const miniChart = (data: object[], x: string, y: string, unit: (v: number) => string, color: string) => (
+    <ResponsiveContainer width="100%" height={240}>
+      <BarChart data={data} margin={{ left: 0, right: 0, top: 4 }}>
+        <CartesianGrid vertical={false} stroke={CHART.grid} />
+        <XAxis dataKey={x} stroke={CHART.axis} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+        <YAxis stroke={CHART.axis} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} width={36} />
+        <Tooltip contentStyle={CHART.tooltip} cursor={{ fill: 'rgba(180,71,42,0.06)' }} formatter={(v) => [unit(Number(v ?? 0)), ''] as [string, string]} />
+        <Bar dataKey={y} fill={color} radius={[6, 6, 0, 0]} maxBarSize={36} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+  const none = <div className="flex h-[240px] items-center justify-center text-sm text-faint">No orders in this period yet.</div>;
 
   return (
-    <div className="w-full h-auto bg-gradient-to-br from-gray-100 to-gray-200 text-gray-900 min-h-screen">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 -mx-6 -mt-4 mb-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Order Fulfillment Metrics</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Kitchen efficiency and order completion tracking</p>
-          </div>
-          <div className="flex gap-3">
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value as any)}
-              className="bg-gray-100 border-0 rounded-2xl px-4 py-2.5 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/30 shadow-sm"
-            >
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-            </select>
-            <button
-              onClick={fetchData}
-              className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 rounded-2xl text-white text-sm font-semibold transition-all shadow-lg hover:shadow-xl"
-            >
-              Refresh
-            </button>
-          </div>
+    <div className="space-y-4 px-6 pb-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted">How fast the kitchen turns orders around.</p>
+        <div className="flex items-center gap-2">
+          <Segmented
+            value={timeRange}
+            onChange={setTimeRange}
+            options={[{ key: 'today', label: 'Today' }, { key: 'week', label: 'This week' }, { key: 'month', label: 'This month' }]}
+          />
+          <button onClick={fetchData} className="c-btn c-btn--ghost">Refresh</button>
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-gray-500 text-sm font-medium">Total Orders</div>
-            <div className="text-3xl font-bold mt-2 text-gray-900">{stats.totalOrders}</div>
-            <div className="text-xs text-gray-400 mt-2">completed & pending</div>
-          </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatTile tone="plain" label="Orders" value={stats.totalOrders} note="All statuses" />
+        <StatTile tone={stats.averagePrepTimeMinutes <= 15 ? 'sage' : 'sand'} label="Average prep time" value={`${stats.averagePrepTimeMinutes.toFixed(1)} min`} note="Target under 15 min" />
+        <StatTile tone={stats.onTimePercentage >= 80 ? 'sage' : 'sand'} label="On time" value={`${stats.onTimePercentage.toFixed(1)}%`} note="Faster than average" />
+        <StatTile tone={stats.completionRate >= 90 ? 'sage' : 'sand'} label="Completed" value={`${stats.completionRate.toFixed(1)}%`} note="Of all orders" />
+        <StatTile tone="peach" label="Busiest hour" value={stats.peakHour} note={`${stats.averageItemsPerOrder.toFixed(1)} items per order`} />
+      </div>
 
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-gray-500 text-sm font-medium">Avg Prep Time</div>
-            <div className="text-3xl font-bold mt-2 text-accent-text">{stats.averagePrepTimeMinutes.toFixed(1)}m</div>
-            <div className="text-xs text-gray-400 mt-2">target: &lt; 15 min</div>
-          </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Average prep time by hour" subtitle="Minutes from order to ready">
+          {stats.prepTimeByHour.length > 0 ? miniChart(stats.prepTimeByHour, 'hour', 'avgTime', (v) => `${v.toFixed(1)} min`, CHART.accent) : none}
+        </Panel>
+        <Panel title="Orders by hour">
+          {stats.ordersPerHour.length > 0 ? miniChart(stats.ordersPerHour, 'hour', 'count', (v) => `${v} orders`, CHART.second) : none}
+        </Panel>
+      </div>
 
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-gray-500 text-sm font-medium">On-Time Rate</div>
-            <div className={`text-3xl font-bold mt-2 ${stats.onTimePercentage >= 80 ? 'text-green-600' : 'text-yellow-600'}`}>
-              {(stats.onTimePercentage).toFixed(1)}%
-            </div>
-            <div className="text-xs text-gray-400 mt-2">faster than avg</div>
-          </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Prep time spread" subtitle="How many orders took how long">
+          <BarList
+            color="bg-[#2F5B9A]"
+            empty="No completed orders yet."
+            rows={stats.prepTimeDistribution.map((d) => ({ key: d.range, label: d.range, value: d.count, display: <span className="font-semibold text-ink">{d.count}</span> }))}
+          />
+        </Panel>
+        <Panel title="Order status">
+          <BarList
+            empty="No orders yet."
+            rows={stats.statusBreakdown.map((d) => ({ key: d.status, label: STATUS_LABEL[d.status] ?? d.status, value: d.count, display: <>{(d.percentage <= 1 ? d.percentage * 100 : d.percentage).toFixed(0)}% · <span className="font-semibold text-ink">{d.count}</span></> }))}
+          />
+        </Panel>
+      </div>
 
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-gray-500 text-sm font-medium">Completion Rate</div>
-            <div className={`text-3xl font-bold mt-2 ${stats.completionRate >= 90 ? 'text-green-600' : 'text-yellow-600'}`}>
-              {(stats.completionRate).toFixed(1)}%
-            </div>
-            <div className="text-xs text-gray-400 mt-2">orders completed</div>
-          </div>
-
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="text-gray-500 text-sm font-medium">Peak Hour</div>
-            <div className="text-3xl font-bold mt-2 text-gray-900">{stats.peakHour}</div>
-            <div className="text-xs text-gray-400 mt-2">busiest time</div>
-          </div>
-        </div>
-
-        {/* Charts Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Prep Time by Hour */}
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold mb-4 text-gray-900">Average Prep Time by Hour</h3>
-            {stats.prepTimeByHour.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={stats.prepTimeByHour}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="hour" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    formatter={(value) => `${(value as number).toFixed(1)}m`}
-                  />
-                  <Legend />
-                  <Bar dataKey="avgTime" fill="#f59e0b" name="Avg Prep Time" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-gray-400 py-8 text-center">No data</div>
-            )}
-          </div>
-
-          {/* Order Status Breakdown */}
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold mb-4 text-gray-900">Order Status Breakdown</h3>
-            {stats.statusBreakdown.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-  data={stats.statusBreakdown}
-  dataKey="count"
-  nameKey="status"
-  cx="50%"
-  cy="50%"
-  outerRadius={100}
-  label={({ index, percent }) => {
-    const entry = stats.statusBreakdown[index];
-    const displayPercent = percent != null ? (percent * 100).toFixed(0) : '0';
-    return `${entry.status} ${displayPercent}%`;
-  }}
->
-  {stats.statusBreakdown.map((entry, index) => (
-    <Cell key={`cell-${index}`} fill={statusColors[entry.status] || '#6b7280'} />
-  ))}
-</Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-gray-400 py-8 text-center">No data</div>
-            )}
-          </div>
-        </div>
-
-        {/* Charts Row 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Orders Per Hour */}
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold mb-4 text-gray-900">Order Volume by Hour</h3>
-            {stats.ordersPerHour.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={stats.ordersPerHour}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="hour" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" />
-                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                  <Legend />
-                  <Line type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2} name="Orders" />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-gray-400 py-8 text-center">No data</div>
-            )}
-          </div>
-
-          {/* Prep Time Distribution */}
-          <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold mb-4 text-gray-900">Prep Time Distribution</h3>
-            {stats.prepTimeDistribution.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={stats.prepTimeDistribution}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="range" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" />
-                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                  <Bar dataKey="count" fill="#6b7280" name="Orders" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-gray-400 py-8 text-center">No data</div>
-            )}
-          </div>
-        </div>
-
-        {/* Orders Table */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm max-h-[500px] flex flex-col">
-          <div className="p-4 border-b border-gray-100 flex gap-4 flex-shrink-0 bg-gray-50 rounded-t-3xl">
-            <h3 className="text-lg font-bold flex-1">Recent Orders</h3>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-gray-100 border-0 rounded-2xl px-4 py-2.5 text-gray-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/30 shadow-sm"
-            >
-              <option value="ALL">All Status</option>
-              <option value="PENDING">Pending</option>
-              <option value="PREPARING">Preparing</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-          </div>
-
-          {filteredOrders.length > 0 ? (
-            <div className="overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 flex-1">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Order #</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Customer</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-600">Items</th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-600">Prep Time</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-600">On-Time?</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Ordered At</th>
+      <Panel
+        padded={false}
+        title="Recent orders"
+        subtitle="Latest 20"
+        actions={
+          <Segmented
+            size="sm"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { key: 'ALL', label: 'All' },
+              { key: 'PENDING', label: 'Waiting' },
+              { key: 'PREPARING', label: 'Preparing' },
+              { key: 'COMPLETED', label: 'Completed' },
+              { key: 'CANCELLED', label: 'Cancelled' },
+            ]}
+          />
+        }
+      >
+        {filteredOrders.length > 0 ? (
+          <div className="max-h-[480px] overflow-auto">
+            <table className="c-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Status</th>
+                  <th className="c-num">Items</th>
+                  <th className="c-num">Prep time</th>
+                  <th>On time</th>
+                  <th>Ordered</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredOrders.slice(0, 20).map((order) => (
+                  <tr key={order.orderNumber} className="hover:bg-page">
+                    <td className="font-semibold tabular-nums">{order.orderNumber}</td>
+                    <td>{order.customerName}</td>
+                    <td><Pill tone={STATUS_TONE[order.status] ?? 'plain'}>{STATUS_LABEL[order.status] ?? order.status}</Pill></td>
+                    <td className="c-num">{order.itemCount}</td>
+                    <td className="c-num font-semibold">{order.prepTimeMinutes > 0 ? `${order.prepTimeMinutes} min` : '—'}</td>
+                    <td>{order.prepTimeMinutes > 0 ? <Pill tone={order.isOnTime ? 'good' : 'danger'}>{order.isOnTime ? 'On time' : 'Slow'}</Pill> : <span className="text-faint">—</span>}</td>
+                    <td className="text-muted">{new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredOrders.slice(0, 20).map((order) => (
-                    <tr key={order.orderNumber} className="border-b border-gray-100 hover:bg-amber-50/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-accent-text font-semibold">{order.orderNumber}</td>
-                      <td className="px-4 py-3">{order.customerName}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                            order.status === 'COMPLETED'
-                              ? 'bg-green-100 text-green-700'
-                              : order.status === 'PREPARING'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : order.status === 'PENDING'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-gray-100 text-gray-600'
-                          }`}
-                        >
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">{order.itemCount}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-accent-text">
-                        {order.prepTimeMinutes > 0 ? `${order.prepTimeMinutes}m` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {order.prepTimeMinutes > 0 ? (
-                          <span className={order.isOnTime ? 'text-green-600' : 'text-red-500'}>
-                            {order.isOnTime ? '✓' : '✗'}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-sm">
-                        {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-b-3xl">No orders found</div>
-          )}
-        </div>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="px-5 pb-8 pt-2 text-center text-sm text-faint">No orders match.</p>
+        )}
+      </Panel>
     </div>
   );
 }

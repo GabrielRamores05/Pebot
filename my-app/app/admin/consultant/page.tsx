@@ -96,15 +96,12 @@ export default function ConsultantPage() {
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-gray-50">
-      <header className="border-b border-gray-200 bg-white px-6 py-4">
-        <div className="flex items-center gap-4 max-w-4xl mx-auto">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
-            <span className="text-2xl">🤖</span>
-          </div>
+    <div className="flex h-screen w-full flex-col bg-page">
+      <header className="px-6 pb-2 pt-6">
+        <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{branding.shopName} Consultant</h1>
-            <p className="text-sm text-gray-500">AI-powered assistant for your restaurant</p>
+            <h1 className="c-title">{branding.shopName} Consultant</h1>
+            <p className="mt-1.5 text-sm text-muted">AI-powered assistant for your restaurant</p>
           </div>
         </div>
       </header>
@@ -118,8 +115,7 @@ export default function ConsultantPage() {
             >
               {msg.role === 'assistant' && (
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-accent-text">
-                  <span className="text-sm">🤖</span>
-                </div>
+                  </div>
               )}
               <div
                 className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
@@ -140,8 +136,7 @@ export default function ConsultantPage() {
           {loading && (
             <div className="flex gap-3 justify-start">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-accent-text">
-                <span className="text-sm">🤖</span>
-              </div>
+                </div>
               <div className="bg-white shadow border border-gray-200 rounded-2xl px-4 py-3">
                 <div className="flex items-center gap-1.5">
                   <div className="h-2 w-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.3s]"></div>

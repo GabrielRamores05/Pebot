@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-14
 
-**Status**: Draft
+**Status**: Implemented (browser check and accountant review pending)
 
 **Input**: From the commercial brief, workstream A: "Senior Citizen / PWD 20% discount with VAT exemption (RA 9994 / RA 10754)", "service charge", "shifts and cash drawer, X/Z-style end-of-day reports". Pebot is sold to Philippine restaurants, and every one of them serves senior citizens and PWDs every day.
 

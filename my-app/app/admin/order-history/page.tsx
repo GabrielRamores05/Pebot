@@ -1,8 +1,18 @@
 'use client';
 
+import { printInvoice, printKitchenTicket } from '@/lib/print-documents';
+import VoidOrderDialog from '@/components/VoidOrderDialog';
+import type { InvoiceOrder } from '@/lib/invoice';
+
+/** Print failures are shown in the console and as a toast-free status (spec 019). */
+function alertPrint(error?: string) {
+  console.error('Print failed:', error);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pebot:print-failed', { detail: error }));
+}
+
 import { useState, useEffect, useCallback } from 'react';
+import { downloadCsv } from '@/lib/csv';
 import { useRouter } from 'next/navigation';
-import { IconHistory } from '@/lib/assets';
 
 interface OrderItem {
   id: number;
@@ -64,6 +74,7 @@ export default function OrderHistoryPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showInvoice, setShowInvoice] = useState(false);
+  const [voiding, setVoiding] = useState(false);
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -149,41 +160,47 @@ export default function OrderHistoryPage() {
 
   if (loading || !authorized) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-950">
-        <div className="text-amber-400 text-lg">Loading order history...</div>
+      <div className="flex-1 flex items-center justify-center bg-page">
+        <div className="text-sm text-muted">Loading order history…</div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-linear-to-br from-amber-100 to-amber-200 rounded-xl flex items-center justify-center text-xl">
-              <IconHistory size={20} />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Order History</h1>
-              <p className="text-xs text-gray-500">
-                {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} found
-                {orders.length > 0 && ` (showing ${Math.min(itemsPerPage, filteredOrders.length)} of ${filteredOrders.length})`}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={fetchOrders}
-            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 rounded-xl text-sm font-medium text-white transition"
-          >
-            ↻ Refresh
-          </button>
+    <div className="flex-1 overflow-y-auto bg-page text-ink">
+      <header className="flex flex-wrap items-end justify-between gap-4 px-6 pb-2 pt-6">
+        <div>
+          <h1 className="c-title">Order history</h1>
+          <p className="mt-1.5 text-sm text-muted">
+            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} found
+            {orders.length > 0 && ` · showing ${Math.min(itemsPerPage, filteredOrders.length)} of ${filteredOrders.length}`}
+          </p>
         </div>
-      </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => downloadCsv('orders', filteredOrders, [
+              { label: 'Order', value: (o) => o.orderNumber },
+              { label: 'Date', value: (o) => new Date(o.createdAt).toLocaleString('en-PH') },
+              { label: 'Customer', value: (o) => o.loyaltyCustomerName || o.customerName },
+              { label: 'Type', value: (o) => o.orderType },
+              { label: 'Table', value: (o) => o.table?.name ?? '' },
+              { label: 'Status', value: (o) => o.status },
+              { label: 'Payment', value: (o) => o.paymentMethod },
+              { label: 'Items', value: (o) => o.items.map((i) => `${i.quantity}× ${i.product?.name ?? 'Item'}`).join('; ') },
+              { label: 'Total (PHP)', value: (o) => o.totalAmount.toFixed(2) },
+            ])}
+            disabled={filteredOrders.length === 0}
+            className="c-btn c-btn--ghost disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+          <button onClick={fetchOrders} className="c-btn c-btn--ghost">Refresh</button>
+        </div>
+      </header>
 
-      <div className="p-6 space-y-6">
+      <div className="space-y-4 px-6 pb-8 pt-2">
         {/* Filters */}
-        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm flex flex-wrap gap-4 items-end">
+        <div className="c-card p-4 border border-gray-200 shadow-sm flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-64">
             <label className="block text-sm font-medium text-gray-600 mb-1">Search</label>
             <input
@@ -236,7 +253,7 @@ export default function OrderHistoryPage() {
         </div>
 
         {/* Orders Table */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="c-card border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -285,12 +302,12 @@ export default function OrderHistoryPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">
-                          {order.paymentMethod === 'CASH' ? '💵 Cash' :
-                           order.paymentMethod === 'GCASH' ? '📱 GCash' :
-                           order.paymentMethod === 'PAYMAYA' ? '📱 PayMaya' : order.paymentMethod}
+                          {order.paymentMethod === 'CASH' ? 'Cash' :
+                           order.paymentMethod === 'GCASH' ? 'GCash' :
+                           order.paymentMethod === 'PAYMAYA' || order.paymentMethod === 'MAYA' ? 'Maya' : order.paymentMethod}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className="text-accent-text" title="View Invoice">🧾</span>
+                          <span className="text-xs font-semibold text-accent-text" title="View receipt">Receipt</span>
                         </td>
                       </tr>
                     );
@@ -331,7 +348,7 @@ export default function OrderHistoryPage() {
       {selectedOrder && showInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowInvoice(false)}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+            className="c-card shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Invoice Header */}
@@ -446,88 +463,46 @@ export default function OrderHistoryPage() {
               {/* Print Buttons */}
               <div className="flex gap-3">
                 <button
-                  onClick={() => {
-                    const printWindow = window.open('', '_blank', 'width=350,height=600');
-                    if (!printWindow) return;
-
-                    const bs = businessSettings;
-                    const invVatRate = bs?.vatRate ?? 12;
-                    const invHasVat = invVatRate > 0;
-                    const invSubtotal = invHasVat ? selectedOrder.totalAmount / (1 + invVatRate / 100) : selectedOrder.totalAmount;
-                    const invVatAmount = invHasVat ? selectedOrder.totalAmount - invSubtotal : 0;
-
-                    printWindow.document.write(`
-                      <!DOCTYPE html>
-                      <html>
-                      <head>
-                        <title>Receipt #${selectedOrder.orderNumber}</title>
-                        <style>
-                          @page { margin: 0; size: 80mm auto; }
-                          @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-                          body { font-family: 'Courier New', monospace; width: 72mm; margin: 0 auto; padding: 5mm; font-size: 11px; line-height: 1.3; }
-                          .header { text-align: center; border-bottom: 1px dashed #666; padding-bottom: 8px; margin-bottom: 8px; }
-                          .header h2 { margin: 0; font-size: 14px; }
-                          .header p { margin: 2px 0; font-size: 9px; color: #666; }
-                          .items { border-bottom: 1px dashed #666; padding-bottom: 8px; margin-bottom: 8px; }
-                          .item { display: flex; justify-content: space-between; margin: 3px 0; }
-                          .totals { margin-bottom: 8px; }
-                          .totals .row { display: flex; justify-content: space-between; }
-                          .total-row { font-weight: bold; font-size: 14px; border-top: 1px dashed #666; padding-top: 5px; margin-top: 5px; }
-                          .footer { text-align: center; font-size: 9px; color: #666; margin-top: 10px; }
-                          .vat-breakdown { font-size: 8px; color: #888; border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 8px; }
-                        </style>
-                      </head>
-                      <body>
-                        <div class="header">
-                          <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                          <h2>${bs?.businessName || 'My Restaurant'}</h2>
-                          ${bs?.businessAddress ? `<p>${bs?.businessAddress}</p>` : ''}
-                          ${(bs?.tin || bs?.branchCode) ? `<p>TIN: ${bs?.tin || ''}${bs?.branchCode ? '-' + bs?.branchCode : ''}</p>` : ''}
-                          <p>#${selectedOrder.orderNumber}</p>
-                        </div>
-                        <div class="items">
-                          ${selectedOrder.items.map(item => `
-                            <div class="item">
-                              <span class="item-name">${item.quantity}x ${item.product.name}</span>
-                              <span>₱${item.subtotal.toFixed(2)}</span>
-                            </div>
-                          `).join('')}
-                        </div>
-                        <div class="totals">
-                          <div class="row"><span>Subtotal:</span><span>₱${invSubtotal.toFixed(2)}</span></div>
-                          <div class="row"><span>VAT (${invVatRate}%):</span><span>₱${invVatAmount.toFixed(2)}</span></div>
-                          <div class="row total-row"><span>TOTAL:</span><span>₱${selectedOrder.totalAmount.toFixed(2)}</span></div>
-                        </div>
-                        <div class="vat-breakdown">
-                          <strong>VAT Breakdown:</strong><br/>
-                          Total Sales: ₱${selectedOrder.totalAmount.toFixed(2)}<br/>
-                          VATable: ₱${invSubtotal.toFixed(2)}<br/>
-                          VAT: ₱${invVatAmount.toFixed(2)}
-                        </div>
-                        <div class="footer">
-                          ${bs?.footerMessage || 'Thank you for your visit!'}
-                        </div>
-                      </body>
-                      </html>
-                    `);
-                    printWindow.document.close();
-                    printWindow.focus();
-                    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+                  onClick={async () => {
+                    const r = await printInvoice(selectedOrder as unknown as InvoiceOrder, businessSettings, { copyLabel: 'Reprint' });
+                    if (!r.ok) alertPrint(r.error);
                   }}
-                  className="flex-1 py-2.5 bg-accent hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
+                  className="c-btn c-btn--primary flex-1"
                 >
-                  🖨️ Thermal Print
+                  Print invoice
                 </button>
                 <button
-                  onClick={() => window.print()}
-                  className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
+                  onClick={async () => {
+                    const r = await printInvoice(selectedOrder as unknown as InvoiceOrder, businessSettings, { paper: 'A4', copyLabel: 'Reprint' });
+                    if (!r.ok) alertPrint(r.error);
+                  }}
+                  className="c-btn c-btn--ghost flex-1"
                 >
-                  📄 A4 / Plain
+                  A4 copy
                 </button>
+                <button
+                  onClick={async () => {
+                    const r = await printKitchenTicket(selectedOrder as unknown as InvoiceOrder, businessSettings);
+                    if (!r.ok) alertPrint(r.error);
+                  }}
+                  className="c-btn c-btn--ghost flex-1"
+                >
+                  Kitchen ticket
+                </button>
+                {selectedOrder.status !== 'CANCELLED' && (
+                  <button onClick={() => setVoiding(true)} className="c-btn flex-1 border-hair text-danger hover:bg-danger-bg">Void / refund</button>
+                )}
               </div>
             </div>
           </div>
         </div>
+      )}
+      {voiding && selectedOrder && (
+        <VoidOrderDialog
+          order={selectedOrder as unknown as { id: number; orderNumber: string; totalAmount: number; paymentMethod?: string; status?: string }}
+          onClose={() => setVoiding(false)}
+          onVoided={() => { setVoiding(false); setShowInvoice(false); fetchOrders(); }}
+        />
       )}
     </div>
   );

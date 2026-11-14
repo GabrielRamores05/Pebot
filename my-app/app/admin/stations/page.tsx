@@ -63,7 +63,7 @@ export default function StationsPage() {
       setStations(await fetchJson<Station[]>('/api/stations'));
     } catch (e) {
       console.error('Failed to load stations:', e);
-      notif(`⚠️ ${userMessage(e, 'Could not load the stations. Try again.')}`);
+      notif(`${userMessage(e, 'Could not load the stations. Try again.')}`);
     } finally {
       setLoading(false);
     }
@@ -89,7 +89,7 @@ export default function StationsPage() {
       notif(`${meta.icon} ${meta.label} → ${newCount} staff`);
     } catch (e) {
       console.error('Failed to update staff count:', e);
-      notif(`⚠️ ${userMessage(e, 'Could not change the staff count. Try again.')}`);
+      notif(`${userMessage(e, 'Could not change the staff count. Try again.')}`);
     }
     setSaving(null);
   }
@@ -111,7 +111,7 @@ export default function StationsPage() {
       setNewName('');
       setNewStaff(1);
       setNewEmoji('📦');
-      notif(`✅ Station "${name}" created`);
+      notif(`Station "${name}" created`);
     } catch (e) {
       console.error('Failed to create station:', e);
       setAddError(userMessage(e, 'Failed to create'));
@@ -132,10 +132,10 @@ export default function StationsPage() {
         body: JSON.stringify({ id: editing.id, stationType: name }),
       });
       setStations((prev) => prev.map((s) => s.id === updated.id ? updated : s));
-      notif(`✏️ Renamed to "${name}"`);
+      notif(`Renamed to "${name}"`);
     } catch (e) {
       console.error('Failed to rename station:', e);
-      notif(`⚠️ ${userMessage(e, 'Could not rename the station. Try again.')}`);
+      notif(`${userMessage(e, 'Could not rename the station. Try again.')}`);
     }
     setEditing(null);
     setSaving(null);
@@ -150,10 +150,10 @@ export default function StationsPage() {
         body: JSON.stringify({ id: station.id }),
       });
       setStations((prev) => prev.filter((s) => s.id !== station.id));
-      notif(`🗑️ Station "${station.stationType}" deleted`);
+      notif(`Station "${station.stationType}" deleted`);
     } catch (e) {
       console.error('Failed to delete station:', e);
-      notif(`⚠️ ${userMessage(e, 'Could not delete the station. Try again.')}`);
+      notif(`${userMessage(e, 'Could not delete the station. Try again.')}`);
     }
     setSaving(null);
   }
@@ -169,10 +169,10 @@ export default function StationsPage() {
         body: JSON.stringify({ id: editingEmoji.id, emoji: newEmoji }),
       });
       setStations((prev) => prev.map((s) => s.id === updated.id ? updated : s));
-      notif(`😊 Icon updated to "${newEmoji}"`);
+      notif(`Icon updated to "${newEmoji}"`);
     } catch (e) {
       console.error('Failed to update station icon:', e);
-      notif(`⚠️ ${userMessage(e, 'Could not update the icon. Try again.')}`);
+      notif(`${userMessage(e, 'Could not update the icon. Try again.')}`);
     }
     setEditingEmoji(null);
     setSaving(null);
@@ -180,20 +180,20 @@ export default function StationsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-gray-50 min-h-screen">
+      <div className="flex items-center justify-center h-full bg-page min-h-screen">
         <div className="text-gray-500 text-sm font-medium">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 text-gray-900 min-h-screen p-6">
+    <div className="flex-1 overflow-y-auto bg-page text-ink min-h-screen p-6">
       {/* Header */}
       <div className="mb-5">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900 mb-1">🏭 Station Staff</h1>
-            <p className="text-sm text-gray-500">Manage stations and staff counts.</p>
+            <h1 className="c-title">Station Staff</h1>
+            <p className="mt-1.5 text-sm text-muted">Manage stations and staff counts.</p>
           </div>
           <button
             onClick={() => { setShowAdd(true); setAddError(''); }}
@@ -285,7 +285,7 @@ export default function StationsPage() {
               {/* Status indicator */}
               {station.staffCount === 0 && (
                 <div className="bg-red-50 text-red-600 text-xs px-2 py-1.5 rounded-lg text-center font-medium mb-2">
-                  ⚠️ No staff
+                  No staff
                 </div>
               )}
 

@@ -10,6 +10,14 @@ const mocks = vi.hoisted(() => ({
   createExpenseCategory: vi.fn(),
   findUserById: vi.fn(),
   listAttendanceForPayroll: vi.fn(),
+  countHolidaysForYear: vi.fn(),
+  createHolidays: vi.fn(),
+  listHolidaysBetween: vi.fn(),
+  listScheduleDates: vi.fn(),
+  listPayableStaff: vi.fn(),
+  sumServiceCharge: vi.fn(),
+  listUserIdsWithAttendance: vi.fn(),
+  listPayrollsEndingIn: vi.fn(),
   createPayroll: vi.fn(),
   updatePayrollStatus: vi.fn(),
   listPayrolls: vi.fn(),
@@ -33,6 +41,14 @@ vi.mock('../../../modules/hr/repository', () => ({
   updatePayrollStatus: mocks.updatePayrollStatus,
   findUserById: mocks.findUserById,
   listAttendanceForPayroll: mocks.listAttendanceForPayroll,
+  countHolidaysForYear: mocks.countHolidaysForYear,
+  createHolidays: mocks.createHolidays,
+  listHolidaysBetween: mocks.listHolidaysBetween,
+  listScheduleDates: mocks.listScheduleDates,
+  listPayableStaff: mocks.listPayableStaff,
+  sumServiceCharge: mocks.sumServiceCharge,
+  listUserIdsWithAttendance: mocks.listUserIdsWithAttendance,
+  listPayrollsEndingIn: mocks.listPayrollsEndingIn,
 }));
 vi.mock('../../../modules/orders/repository', () => ({
   createPaymentAndCompleteOrder: mocks.createPaymentAndCompleteOrder,
@@ -53,6 +69,8 @@ import {
   createExpenseCategory,
   listPayrolls,
   createPayroll,
+  runPayrollForAll,
+  thirteenthMonthReport,
   updatePayrollStatus,
   createPayment,
   listPayments,
@@ -184,6 +202,66 @@ describe('finance service', () => {
         userId: 1, regularHours: 16, overtimeHours: 2, processedById: 5,
       }));
       expect(result.id).toBe(1);
+    });
+  });
+
+  describe('payroll compliance (spec 021)', () => {
+    beforeEach(() => {
+      mocks.countHolidaysForYear.mockResolvedValue(16);
+      mocks.listHolidaysBetween.mockResolvedValue([{ date: '2026-11-30', type: 'REGULAR_HOLIDAY' }]);
+      mocks.listScheduleDates.mockResolvedValue([]);
+      mocks.createPayroll.mockImplementation(async (d: { userId: number }) => ({ id: d.userId, ...d }));
+    });
+
+    it('pays a regular holiday at 200% and records the breakdown', async () => {
+      mocks.findUserById.mockResolvedValue({ id: 1, hourlyRate: 100, paymentType: 'HOURLY', monthlySalary: null });
+      mocks.listAttendanceForPayroll.mockResolvedValue([
+        { totalHours: 8, clockIn: new Date('2026-11-29T09:00:00'), clockOut: new Date('2026-11-29T17:00:00') },
+        { totalHours: 8, clockIn: new Date('2026-11-30T09:00:00'), clockOut: new Date('2026-11-30T17:00:00') },
+      ]);
+      await createPayroll({ userId: 1, periodStart: '2026-11-16', periodEnd: '2026-11-30' }, 5);
+      const saved = mocks.createPayroll.mock.calls[0][0];
+      const b = JSON.parse(saved.breakdown);
+      expect(b).toMatchObject({ basicPay: 1600, holidayPremium: 800, daysWorked: 2 });
+    });
+
+    it('fills in the default holidays for the year the first time', async () => {
+      mocks.countHolidaysForYear.mockResolvedValue(0);
+      mocks.findUserById.mockResolvedValue({ id: 1, hourlyRate: 100, paymentType: 'HOURLY', monthlySalary: null });
+      mocks.listAttendanceForPayroll.mockResolvedValue([]);
+      await createPayroll({ userId: 1, periodStart: '2026-11-16', periodEnd: '2026-11-30' }, 5);
+      expect(mocks.createHolidays).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ date: '2026-11-30', type: 'REGULAR_HOLIDAY' })]));
+    });
+
+    it('runs payroll for everyone and shares the service charge among those who worked', async () => {
+      mocks.listPayableStaff.mockResolvedValue([
+        { id: 1, name: 'Ana', paymentType: 'HOURLY', hourlyRate: 80, monthlySalary: null },
+        { id: 2, name: 'Ben', paymentType: 'HOURLY', hourlyRate: 80, monthlySalary: null },
+        { id: 3, name: 'Cara', paymentType: 'HOURLY', hourlyRate: null, monthlySalary: null },
+      ]);
+      mocks.sumServiceCharge.mockResolvedValue(1000);
+      mocks.listUserIdsWithAttendance.mockResolvedValue([1, 2]);
+      mocks.findUserById.mockImplementation(async (id: number) => ({ id, hourlyRate: 80, paymentType: 'HOURLY', monthlySalary: null }));
+      mocks.listAttendanceForPayroll.mockResolvedValue([]);
+      const r = await runPayrollForAll({ periodStart: '2026-11-01', periodEnd: '2026-11-15', includeServiceCharge: true }, 5);
+      expect(r.created).toBe(2);
+      expect(r.skipped).toEqual([{ name: 'Cara', reason: 'No hourly rate' }]);
+      const shares = mocks.createPayroll.mock.calls.map((c) => JSON.parse(c[0].breakdown).serviceChargeShare);
+      expect(shares).toEqual([500, 500]);
+    });
+
+    it('works out 13th-month pay from basic pay earned in the year', async () => {
+      mocks.listPayrollsEndingIn.mockResolvedValue([
+        { userId: 1, grossPay: 13000, breakdown: JSON.stringify({ basicPay: 12000 }), user: { id: 1, name: 'Ana', position: 'Cashier' } },
+        { userId: 1, grossPay: 12500, breakdown: JSON.stringify({ basicPay: 12000 }), user: { id: 1, name: 'Ana', position: 'Cashier' } },
+        { userId: 2, grossPay: 6000, breakdown: null, user: { id: 2, name: 'Ben', position: 'Cook' } },
+      ]);
+      const r = await thirteenthMonthReport({ year: 2026 });
+      expect(r.staff).toEqual([
+        expect.objectContaining({ name: 'Ana', basicEarned: 24000, thirteenthMonth: 2000, runs: 2 }),
+        expect.objectContaining({ name: 'Ben', basicEarned: 6000, thirteenthMonth: 500 }),
+      ]);
+      expect(r.total).toBe(2500);
     });
   });
 

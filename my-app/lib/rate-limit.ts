@@ -47,3 +47,9 @@ export function rateLimit(
 export function resetRateLimit(key: string): void {
   attempts.delete(key);
 }
+
+/** Take back one counted attempt (a success on a shared key should not use up others' tries). */
+export function undoAttempt(key: string): void {
+  const existing = attempts.get(key);
+  if (existing && existing.count > 0) existing.count -= 1;
+}

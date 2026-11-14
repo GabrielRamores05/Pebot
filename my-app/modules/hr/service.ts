@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { defaultHolidays } from '@/lib/labor-pay';
 import { fromZodError, ValidationError } from 'zod-validation-error';
 import {
   ClockInInputSchema,
@@ -47,6 +48,23 @@ export async function clockIn(input: unknown, approvedById: number) {
   });
 
   return record;
+}
+
+/** Whether the signed-in person is on shift (spec 020). */
+export async function myShift(userId: number) {
+  const active = await repo.findActiveAttendance(userId);
+  return { clockedIn: Boolean(active), since: active?.clockIn ?? null, attendanceId: active?.id ?? null };
+}
+
+/** Clock the signed-in person in, or out when they already are (spec 020). */
+export async function toggleMyShift(userId: number) {
+  const active = await repo.findActiveAttendance(userId);
+  if (active) {
+    await clockOut({ attendanceId: active.id }, userId);
+    return { clockedIn: false, since: null, attendanceId: null };
+  }
+  const record = await clockIn({ userId }, userId);
+  return { clockedIn: true, since: record.clockIn, attendanceId: record.id };
 }
 
 export async function clockOut(input: unknown, approvedById: number) {
@@ -196,3 +214,48 @@ export async function createPerformanceReview(input: unknown, approvedById: numb
 }
 
 export { ValidationError };
+
+// ----- Spec 021: holidays and leave balances -----
+
+const HolidaySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-12-08.'),
+  name: z.string().trim().min(2).max(80),
+  type: z.enum(['REGULAR_HOLIDAY', 'SPECIAL_HOLIDAY']),
+});
+
+/** The year's holidays, filling the defaults fixed by law the first time. */
+export async function listHolidays(year: number) {
+  if ((await repo.countHolidaysForYear(year)) === 0) await repo.createHolidays(defaultHolidays(year));
+  return repo.listHolidaysBetween(`${year}-01-01`, `${year}-12-31`);
+}
+
+export async function saveHoliday(input: unknown) {
+  return repo.upsertHoliday(parseInput(HolidaySchema, input));
+}
+
+export async function removeHoliday(id: number) {
+  return repo.deleteHoliday(id);
+}
+
+/** Leave allowance, days used (approved) and days left per person and leave type for a year. */
+export async function leaveBalances(year: number) {
+  const from = `${year}-01-01`;
+  const to = `${year}-12-31`;
+  const [staff, types, approved] = await Promise.all([repo.listActiveStaffBasic(), repo.listActiveLeaveTypes(), repo.listApprovedLeaveBetween(from, to)]);
+  const yStart = new Date(year, 0, 1).getTime();
+  const yEnd = new Date(year, 11, 31).getTime();
+  const daysIn = (a: Date, b: Date) => {
+    const s = Math.max(new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime(), yStart);
+    const e = Math.min(new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime(), yEnd);
+    return e >= s ? Math.round((e - s) / 86400000) + 1 : 0;
+  };
+  return staff.map((p) => ({
+    userId: p.id,
+    name: p.name,
+    position: p.position,
+    balances: types.map((t) => {
+      const used = approved.filter((r) => r.userId === p.id && r.leaveTypeId === t.id).reduce((n, r) => n + daysIn(r.startDate, r.endDate), 0);
+      return { leaveTypeId: t.id, leaveType: t.name, allowance: t.daysPerYear, used, left: Math.max(0, t.daysPerYear - used) };
+    }),
+  }));
+}

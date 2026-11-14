@@ -8,6 +8,29 @@ import { checkFeatureAccess } from '@/lib/auth';
 
 const ORDER_TYPES = ['DINE_IN', 'TAKEOUT', 'DELIVERY'];
 
+/** Spec 019 printing settings. Returns an error message or the values. */
+function parsePrintSettings(body: Record<string, unknown>):
+  | { error: string }
+  | { receiptPrinter?: string | null; kitchenPrinter?: string | null; paperWidth?: string; autoPrintInvoice?: boolean; autoPrintKitchen?: boolean } {
+  const out: { receiptPrinter?: string | null; kitchenPrinter?: string | null; paperWidth?: string; autoPrintInvoice?: boolean; autoPrintKitchen?: boolean } = {};
+  for (const key of ['receiptPrinter', 'kitchenPrinter'] as const) {
+    if (body[key] === undefined) continue;
+    if (body[key] === null || body[key] === '') { out[key] = null; continue; }
+    if (typeof body[key] !== 'string' || (body[key] as string).length > 200) return { error: 'Printer name is not valid.' };
+    out[key] = (body[key] as string).trim();
+  }
+  if (body.paperWidth !== undefined) {
+    if (!['58', '80', 'A4'].includes(String(body.paperWidth))) return { error: 'Paper width must be 58, 80 or A4.' };
+    out.paperWidth = String(body.paperWidth);
+  }
+  for (const key of ['autoPrintInvoice', 'autoPrintKitchen'] as const) {
+    if (body[key] === undefined) continue;
+    if (typeof body[key] !== 'boolean') return { error: 'Auto-print must be on or off.' };
+    out[key] = body[key] as boolean;
+  }
+  return out;
+}
+
 /** Spec 017 settings: VAT registration and service charge. Returns an error message or the values. */
 function parseMoneySettings(body: Record<string, unknown>):
   | { error: string }
@@ -103,6 +126,8 @@ export async function PUT(req: NextRequest) {
 
     const money = parseMoneySettings(body);
     if ('error' in money) return badRequest(money.error);
+    const printing = parsePrintSettings(body);
+    if ('error' in printing) return badRequest(printing.error);
 
     let settings = await prisma.businessSettings.findFirst();
 
@@ -129,19 +154,20 @@ export async function PUT(req: NextRequest) {
           aiFolderAccess: aiFolderAccess ?? settings.aiFolderAccess,
           aiReadBirPricing: aiReadBirPricing ?? settings.aiReadBirPricing,
           ...money,
+          ...printing,
         },
       });
     } else {
       settings = await prisma.businessSettings.create({
         data: {
-          businessName: String(businessName) || 'My Restaurant',
-          businessAddress: String(businessAddress) || '',
-          tin: String(tin) || '',
-          branchCode: String(branchCode) || '0000',
+          businessName: (businessName != null && String(businessName).trim() !== '' ? String(businessName) : 'My Restaurant'),
+          businessAddress: (businessAddress != null && String(businessAddress).trim() !== '' ? String(businessAddress) : ''),
+          tin: (tin != null && String(tin).trim() !== '' ? String(tin) : ''),
+          branchCode: (branchCode != null && String(branchCode).trim() !== '' ? String(branchCode) : '0000'),
           vatRate: vatRate != null ? Number(vatRate) : 12,
-          receiptSerialPrefix: String(receiptSerialPrefix) || 'INV',
+          receiptSerialPrefix: (receiptSerialPrefix != null && String(receiptSerialPrefix).trim() !== '' ? String(receiptSerialPrefix) : 'INV'),
           lastReceiptNumber: 0,
-          footerMessage: String(footerMessage) || 'Thank you for your visit!',
+          footerMessage: (footerMessage != null && String(footerMessage).trim() !== '' ? String(footerMessage) : 'Thank you for your visit!'),
           loyaltyEnabled: loyaltyEnabled ?? true,
           studentPwdDiscountRate: studentPwdDiscountRate != null ? Number(studentPwdDiscountRate) : 20,
           gcashAccountName: gcashAccountName ?? null,
@@ -154,6 +180,7 @@ export async function PUT(req: NextRequest) {
           aiFolderAccess: aiFolderAccess ?? false,
           aiReadBirPricing: aiReadBirPricing ?? false,
           ...money,
+          ...printing,
         },
       });
     }

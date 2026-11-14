@@ -7,7 +7,7 @@
  *   resources/icon.png           ← extraResources
  */
 
-const { app, BrowserWindow, shell, Menu, Tray, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, shell, Menu, Tray, nativeImage, dialog, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
@@ -396,11 +396,12 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: 'Pebot',
-    backgroundColor: '#92400e',
+    backgroundColor: '#F4F1EC',
     show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
     icon: ICON_PATH,
   });
@@ -416,6 +417,55 @@ function createWindow() {
   });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
+
+// ─── Printing (spec 019) ──────────────────────────────────────────────────────
+// Only the main Pebot window may print; documents are rendered in a hidden,
+// sandboxed window with no access to the app or the network.
+const MAX_PRINT_HTML = 2 * 1024 * 1024;
+
+function fromMainWindow(event) {
+  return Boolean(mainWindow && event.sender === mainWindow.webContents);
+}
+
+ipcMain.handle('pebot:list-printers', async (event) => {
+  if (!fromMainWindow(event)) return [];
+  try {
+    const printers = await mainWindow.webContents.getPrintersAsync();
+    return printers.map((p) => ({ name: p.name, displayName: p.displayName || p.name, isDefault: Boolean(p.isDefault) }));
+  } catch (err) {
+    log('Could not list printers: ' + err.message);
+    return [];
+  }
+});
+
+ipcMain.handle('pebot:print-html', async (event, html, options) => {
+  if (!fromMainWindow(event)) return { ok: false, error: 'Not allowed' };
+  if (typeof html !== 'string' || html.length === 0 || html.length > MAX_PRINT_HTML) {
+    return { ok: false, error: 'Nothing to print' };
+  }
+  const deviceName = options && typeof options.printer === 'string' && options.printer.trim() ? options.printer.trim() : '';
+  const win = new BrowserWindow({
+    show: false,
+    // Own in-memory session: blocking requests here must never touch the app's session.
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false, partition: 'pebot-print' },
+  });
+  // Block anything the document might try to load from outside.
+  win.webContents.session.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_d, cb) => cb({ cancel: true }));
+  try {
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    return await new Promise((resolve) => {
+      win.webContents.print(
+        { silent: Boolean(deviceName), deviceName: deviceName || undefined, printBackground: true, margins: { marginType: 'none' } },
+        (success, reason) => resolve(success ? { ok: true } : { ok: false, error: reason || 'Print failed' }),
+      );
+    });
+  } catch (err) {
+    log('Print failed: ' + err.message);
+    return { ok: false, error: err.message };
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+  }
+});
 
 // ─── Log Window ────────────────────────────────────────────────────────────────
 function openLogWindow() {

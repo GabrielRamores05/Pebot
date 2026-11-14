@@ -192,7 +192,7 @@ function InvoiceDisplay({ order, branding }: { order: Order; branding: BrandingS
         disabled={downloading}
         className="bg-black hover:bg-gray-800 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-full transition-colors flex items-center gap-1"
       >
-        {downloading ? 'Saving...' : '📥 Download Invoice'}
+        {downloading ? 'Saving...' : 'Download Invoice'}
       </button>
     </div>
   );
@@ -423,9 +423,9 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
             setOrder((prev) => {
               if (prev && prev.status !== data.status) {
                 const messages: Record<string, string> = {
-                  PREPARING: '👨‍🍳 Your order is being prepared!',
-                  COMPLETED: '✅ Your order is ready! Please collect it.',
-                  CANCELLED: '❌ Your order has been cancelled.',
+                  PREPARING: 'Your order is being prepared!',
+                  COMPLETED: 'Your order is ready! Please collect it.',
+                  CANCELLED: 'Your order has been cancelled.',
                 };
                 if (messages[data.status]) {
                   showToast(messages[data.status]);
@@ -451,9 +451,9 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
           setOrder((prev) => {
             if (prev && prev.status !== updated.status) {
               const messages: Record<string, string> = {
-                PREPARING: '👨‍🍳 Your order is being prepared!',
-                COMPLETED: '✅ Your order is ready! Please collect it.',
-                CANCELLED: '❌ Your order has been cancelled.',
+                PREPARING: 'Your order is being prepared!',
+                COMPLETED: 'Your order is ready! Please collect it.',
+                CANCELLED: 'Your order has been cancelled.',
               };
               if (messages[updated.status]) {
                 showToast(messages[updated.status]);
@@ -584,7 +584,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
             </div>
             {waitData.queuePosition > 0 && (
               <p className="text-center text-sm text-gray-500">
-                📋 Queue position: <span className="font-bold text-gray-700">#{waitData.queuePosition}</span>
+                Queue position: <span className="font-bold text-gray-700">#{waitData.queuePosition}</span>
               </p>
             )}
           </div>
@@ -654,7 +654,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
             onClick={() => setShowCancelConfirm(true)}
             className="w-full border-2 border-red-300 text-red-600 bg-red-50 font-bold py-3 rounded-2xl hover:bg-red-100 transition-colors"
           >
-            ✕ Cancel Order
+            Cancel Order
           </button>
         )}
 
@@ -667,7 +667,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
               try {
                 const res = await fetch(`/api/orders/${orderNumber}/follow-up`, { method: 'POST' });
                 if (res.ok) {
-                  showToast('✅ Follow-up sent to staff!');
+                  showToast('Follow-up sent to staff!');
                   setFollowUpCooldown(180);
                   const timer = setInterval(() => {
                     setFollowUpCooldown((prev) => {
@@ -676,10 +676,10 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
                     });
                   }, 1000);
                 } else {
-                  showToast('❌ Could not send follow-up');
+                  showToast('Could not send follow-up');
                 }
               } catch {
-                showToast('❌ Network error');
+                showToast('Network error');
               }
               setFollowUpSending(false);
             }}
@@ -693,8 +693,8 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
             {followUpSending
               ? 'Sending...'
               : followUpCooldown > 0
-                ? `⏳ Follow up again in ${Math.floor(followUpCooldown / 60)}:${String(followUpCooldown % 60).padStart(2, '0')}`
-                : '📣 Follow Up Order'}
+                ? `Follow up again in ${Math.floor(followUpCooldown / 60)}:${String(followUpCooldown % 60).padStart(2, '0')}`
+                : 'Follow Up Order'}
           </button>
         )}
 
@@ -772,8 +772,8 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
               <div className="flex justify-between">
                 <span>Order type</span>
                 <span className="font-medium text-gray-800">
-                  {order.orderType === 'DINE_IN' ? '🍽️ Dine-in' :
-                   order.orderType === 'TAKEOUT' ? '🥡 Takeout' : '🛵 Delivery'}
+                  {order.orderType === 'DINE_IN' ? 'Dine-in' :
+                   order.orderType === 'TAKEOUT' ? 'Takeout' : 'Delivery'}
                 </span>
               </div>
             )}
@@ -789,9 +789,9 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
                   order.paymentMethod === 'CASH' ? 'text-green-700' :
                   order.paymentMethod === 'GCASH' ? 'text-blue-700' : 'text-blue-700'
                 }`}>
-                {order.paymentMethod === 'CASH' ? '💵 Cash' :
-                   order.paymentMethod === 'GCASH' ? '📱 GCash' :
-                   order.paymentMethod === 'PAYMAYA' ? '📱 PayMaya' : order.paymentMethod}
+                {order.paymentMethod === 'CASH' ? 'Cash' :
+                   order.paymentMethod === 'GCASH' ? 'GCash' :
+                   order.paymentMethod === 'PAYMAYA' ? 'PayMaya' : order.paymentMethod}
                 </span>
               </div>
             )}
@@ -828,7 +828,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
         {/* Follow Up / Messages */}
         {order.status !== 'CANCELLED' && order.status !== 'COMPLETED' && (
           <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
-            <h3 className="font-bold text-gray-800">💬 Follow Up</h3>
+            <h3 className="font-bold text-gray-800">Follow Up</h3>
             <p className="text-xs text-gray-500">Send a message or voice note to the staff about your order</p>
 
             {/* Messages list */}
@@ -845,7 +845,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="text-xs font-semibold text-gray-500">
-                        {m.sender === order?.customerName ? `🙋 ${m.sender}` : `🍳 ${m.sender}`}
+                        {m.sender === order?.customerName ? `${m.sender}` : `${m.sender}`}
                       </span>
                       <span className="text-xs text-gray-400">
                         {new Date(m.createdAt).toLocaleTimeString()}
@@ -897,7 +897,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
                     onClick={stopRecording}
                     className="flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-red-500 transition animate-pulse"
                   >
-                    ⏹ Stop ({recordingTime}s)
+                    Stop ({recordingTime}s)
                   </button>
                   <div className="flex items-center gap-1">
                     <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
@@ -910,7 +910,7 @@ export default function OrderStatusPage({ params }: { params: { orderNumber: str
                   disabled={sending}
                   className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-200 transition border border-gray-200 disabled:opacity-40"
                 >
-                  🎙️ Voice Message
+                  Voice Message
                 </button>
               )}
               {sending && <span className="text-xs text-gray-400">Sending...</span>}

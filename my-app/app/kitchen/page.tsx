@@ -55,22 +55,22 @@ export default function KitchenPage() {
   function renderOrderCard(order: Order, items: OrderItem[], showActions: boolean) {
     const isPending = order.status === 'PENDING';
     const isPreparing = order.status === 'PREPARING';
-    const borderColor = isPending ? 'border-yellow-500/50' : isPreparing ? 'border-blue-500/50' : 'border-green-500/50';
+    const borderColor = isPending ? 'border-yellow-500/50' : isPreparing ? 'border-[#B4472A]/60' : 'border-green-500/50';
     const statusBadge = isPending
       ? 'bg-yellow-500/20 text-yellow-300'
       : isPreparing
-        ? 'bg-blue-500/20 text-blue-300'
+        ? 'bg-[#B4472A]/20 text-[#F0B8A4]'
         : 'bg-green-500/20 text-green-300';
     const msgs = order.messages || [];
     const lastMsg = msgs[msgs.length - 1];
     const hasUnanswered = msgs.length > 0 && lastMsg.sender === order.customerName;
 
     return (
-      <div key={`${order.id}-${items[0]?.id}`} className={`bg-gray-900 border-2 ${borderColor} ${hasUnanswered ? 'ring-2 ring-amber-400' : ''} rounded-xl p-4 flex flex-col`}>
+      <div key={`${order.id}-${items[0]?.id}`} className={`bg-[#211C18] border-2 ${borderColor} ${hasUnanswered ? 'ring-2 ring-amber-400' : ''} rounded-xl p-4 flex flex-col`}>
         <div className="flex items-start justify-between mb-2">
           <div>
             <p className="font-mono font-bold text-lg">{ticketCode(order.orderNumber)}</p>
-            <p className="text-gray-400 text-sm">{order.customerName}</p>
+            <p className="text-[#A69E93] text-sm">{order.customerName}</p>
           </div>
           <div className="text-right">
             <span className={`text-xs px-2 py-1 rounded-full font-semibold ${statusBadge}`}>
@@ -78,15 +78,15 @@ export default function KitchenPage() {
             </span>
             {order.orderType && order.orderType !== 'DINE_IN' && (
               <p className="text-xs mt-1 font-semibold">
-                {order.orderType === 'DELIVERY' ? '🛵 Delivery' : '🥡 Takeout'}
+                {order.orderType === 'DELIVERY' ? 'Delivery' : 'Takeout'}
               </p>
             )}
-            {order.table && <p className="text-gray-500 text-xs mt-1">📍 {order.table.name}</p>}
-            {order.deliveryAddress && <p className="text-gray-500 text-xs mt-1">📍 {order.deliveryAddress}</p>}
+            {order.table && <p className="text-[#7B7369] text-xs mt-1">{order.table.name}</p>}
+            {order.deliveryAddress && <p className="text-[#7B7369] text-xs mt-1">{order.deliveryAddress}</p>}
           </div>
         </div>
 
-        <p className="text-gray-500 text-xs mb-3">⏱ {timeSince(order.createdAt)}</p>
+        <p className="text-[#7B7369] text-xs mb-3">{timeSince(order.createdAt)}</p>
 
         {msgs.length > 0 && (
           <button
@@ -95,11 +95,11 @@ export default function KitchenPage() {
               hasUnanswered ? 'bg-amber-400/10 border-amber-400/40' : 'bg-white/5 border-white/10 hover:bg-white/10'
             }`}
           >
-            <span className={`text-[11px] font-bold uppercase tracking-wide ${hasUnanswered ? 'text-amber-300' : 'text-gray-400'}`}>
-              💬 {msgs.length} message{msgs.length > 1 ? 's' : ''}{hasUnanswered ? ' · waiting' : ''}
+            <span className={`text-[11px] font-bold uppercase tracking-wide ${hasUnanswered ? 'text-amber-300' : 'text-[#A69E93]'}`}>
+              {msgs.length} message{msgs.length > 1 ? 's' : ''}{hasUnanswered ? ' · waiting' : ''}
             </span>
-            <p className={`text-sm truncate mt-0.5 ${lastMsg.sender === order.customerName ? 'text-gray-200' : 'text-gray-400'}`}>
-              {lastMsg.type === 'voice' ? '🎤 Voice message' : lastMsg.content}
+            <p className={`text-sm truncate mt-0.5 ${lastMsg.sender === order.customerName ? 'text-gray-200' : 'text-[#A69E93]'}`}>
+              {lastMsg.type === 'voice' ? 'Voice message' : lastMsg.content}
             </p>
           </button>
         )}
@@ -118,9 +118,9 @@ export default function KitchenPage() {
               <button
                 onClick={() => setConfirmAction({ orderId: order.id, action: 'PREPARING', label: 'Start Preparing' })}
                 disabled={updating === order.id}
-                className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-lg transition"
+                className="w-full bg-[#B4472A] hover:bg-[#C65A3B] disabled:opacity-50 text-white font-bold py-2.5 rounded-lg transition"
               >
-                🔥 Start Preparing
+                Start Preparing
               </button>
             )}
             {isPreparing && (
@@ -129,7 +129,7 @@ export default function KitchenPage() {
                 disabled={updating === order.id}
                 className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-lg transition"
               >
-                ✅ Mark Ready
+                Mark Ready
               </button>
             )}
           </div>
@@ -141,11 +141,11 @@ export default function KitchenPage() {
   // If not signed in as staff, show prompt instead of order data
   if (!isStaff) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1f2937_0%,#0f172a_45%,#020617_100%)] text-white p-4 lg:p-6">
+      <div className="min-h-screen bg-[#16120F] text-white p-4 lg:p-6">
         <div className="max-w-md mx-auto py-12 text-center">
           <h2 className="text-2xl font-bold mb-4">Staff Sign In Required</h2>
-          <p className="text-gray-400 mb-8">This kitchen screen is for staff only.</p>
-          <a href="/login?next=/kitchen" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-500 transition">
+          <p className="text-[#A69E93] mb-8">This kitchen screen is for staff only.</p>
+          <a href="/login?next=/kitchen" className="inline-block bg-[#B4472A] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#C65A3B] transition">
             Sign in to view kitchen
           </a>
         </div>
@@ -154,22 +154,22 @@ export default function KitchenPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#1f2937_0%,#0f172a_45%,#020617_100%)] text-white p-4 lg:p-6">
+    <div className="min-h-screen bg-[#16120F] text-white p-4 lg:p-6">
       {/* Header */}
-      <header className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-2xl shadow-slate-950/40 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between lg:p-5">
+      <header className="mb-6 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between lg:p-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Back of house</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white lg:text-3xl">🍳 Staff Queue</h1>
-          <p className="mt-1 text-sm text-slate-400">{new Date().toLocaleDateString()} &middot; {new Date().toLocaleTimeString()}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#A69E93]">Kitchen display</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white lg:text-3xl">Kitchen</h1>
+          <p className="mt-1 text-sm text-[#A69E93]">{new Date().toLocaleDateString()} &middot; {new Date().toLocaleTimeString()}</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
             <p className="text-xs uppercase tracking-[0.16em] text-yellow-300/80">Pending</p>
             <p className="mt-1 text-lg font-bold text-yellow-300">{activeOrders.filter((o) => o.status === 'PENDING').length}</p>
           </div>
-          <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 px-3 py-2">
-            <p className="text-xs uppercase tracking-[0.16em] text-blue-300/80">Preparing</p>
-            <p className="mt-1 text-lg font-bold text-blue-300">{activeOrders.filter((o) => o.status === 'PREPARING').length}</p>
+          <div className="rounded-2xl border border-[#B4472A]/40 bg-[#B4472A]/15 px-3 py-2">
+            <p className="text-xs uppercase tracking-[0.16em] text-[#F0B8A4]/80">Preparing</p>
+            <p className="mt-1 text-lg font-bold text-[#F0B8A4]">{activeOrders.filter((o) => o.status === 'PREPARING').length}</p>
           </div>
           <div className="rounded-2xl border border-green-500/30 bg-green-500/10 px-3 py-2">
             <p className="text-xs uppercase tracking-[0.16em] text-green-300/80">Done</p>
@@ -182,13 +182,13 @@ export default function KitchenPage() {
       <div className="mb-4 flex gap-2">
         <button
           onClick={() => setStatusFilter('active')}
-          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${statusFilter === 'active' ? 'bg-white text-slate-900' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${statusFilter === 'active' ? 'bg-white text-[#16120F]' : 'bg-[#2B2520] text-[#D6CEC2] hover:bg-[#3A322B]'}`}
         >
           Active Orders
         </button>
         <button
           onClick={() => setStatusFilter('completed')}
-          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${statusFilter === 'completed' ? 'bg-white text-slate-900' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${statusFilter === 'completed' ? 'bg-white text-[#16120F]' : 'bg-[#2B2520] text-[#D6CEC2] hover:bg-[#3A322B]'}`}
         >
           Completed
         </button>
@@ -198,7 +198,7 @@ export default function KitchenPage() {
       <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
         <button
           onClick={() => setActiveStation('all')}
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${activeStation === 'all' ? 'bg-white text-slate-900' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+          className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${activeStation === 'all' ? 'bg-white text-[#16120F]' : 'bg-[#2B2520] text-[#D6CEC2] hover:bg-[#3A322B]'}`}
         >
           All Stations ({statusFilter === 'active' ? activeOrders.length : completedOrders.length})
         </button>
@@ -208,7 +208,7 @@ export default function KitchenPage() {
             <button
               key={st.key}
               onClick={() => setActiveStation(st.key)}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition flex items-center gap-2 ${activeStation === st.key ? 'bg-white text-gray-900' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              className={`px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition flex items-center gap-2 ${activeStation === st.key ? 'bg-white text-[#16120F]' : 'bg-[#2B2520] text-[#A69E93] hover:bg-[#3A322B]'}`}
             >
               {st.icon} {st.label}
               {count > 0 && (
@@ -230,7 +230,7 @@ export default function KitchenPage() {
               <h2 className={`text-xl font-bold mb-3 flex items-center gap-2`}>
                 <span className={`${st.badge} text-white w-8 h-8 rounded-lg flex items-center justify-center text-lg`}>{st.icon}</span>
                 {st.label} Station
-                <span className="text-gray-500 text-sm font-normal">({entries.length})</span>
+                <span className="text-[#7B7369] text-sm font-normal">({entries.length})</span>
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {entries.map((e) => renderOrderCard(e.order, e.items, statusFilter === 'active'))}
@@ -242,7 +242,7 @@ export default function KitchenPage() {
         // Show single station
         <section>
           {stationGroups[activeStation].length === 0 ? (
-            <div className="bg-gray-900 rounded-xl h-64 flex items-center justify-center text-gray-500">
+            <div className="bg-[#211C18] rounded-xl h-64 flex items-center justify-center text-[#7B7369]">
               <div className="text-center">
                 <p className="text-4xl mb-2">✅</p>
                 <p className="text-lg">All caught up at {STATIONS.find((s) => s.key === activeStation)?.label}!</p>
@@ -258,7 +258,7 @@ export default function KitchenPage() {
 
       {/* Empty state for all stations */}
       {activeStation === 'all' && displayOrders.length === 0 && (
-        <div className="bg-gray-900 rounded-xl h-64 flex items-center justify-center text-gray-500">
+        <div className="bg-[#211C18] rounded-xl h-64 flex items-center justify-center text-[#7B7369]">
           <div className="text-center">
             <p className="text-4xl mb-2">{statusFilter === 'active' ? '✅' : '📋'}</p>
             <p className="text-lg">{statusFilter === 'active' ? 'No active orders!' : 'No completed orders today'}</p>
@@ -269,18 +269,18 @@ export default function KitchenPage() {
       {/* Confirm Modal */}
       {confirmAction && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-[#211C18] border border-[#3A322B] rounded-xl p-6 max-w-sm w-full mx-4">
             <h3 className="text-xl font-bold mb-2">{confirmAction.label}?</h3>
-            <p className="text-gray-400 text-sm mb-4">This will update the order status.</p>
+            <p className="text-[#A69E93] text-sm mb-4">This will update the order status.</p>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmAction(null)} className="flex-1 bg-gray-700 text-white py-2.5 rounded-lg hover:bg-gray-600 transition">
+              <button onClick={() => setConfirmAction(null)} className="flex-1 bg-[#3A322B] text-white py-2.5 rounded-lg hover:bg-[#4A4038] transition">
                 Cancel
               </button>
               <button
                 onClick={() => confirmStatusChange(confirmAction.orderId, confirmAction.action)}
                 disabled={updating !== null}
                 className={`flex-1 text-white py-2.5 rounded-lg font-bold transition ${
-                  confirmAction.action === 'PREPARING' ? 'bg-blue-600 hover:bg-blue-500' : 'bg-green-600 hover:bg-green-500'
+                  confirmAction.action === 'PREPARING' ? 'bg-[#B4472A] hover:bg-[#C65A3B]' : 'bg-green-600 hover:bg-green-500'
                 } disabled:opacity-50`}
               >
                 {updating ? 'Updating...' : 'Confirm'}
@@ -293,23 +293,23 @@ export default function KitchenPage() {
       {/* Message Thread Modal */}
       {threadOrder && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-lg w-full mx-4 max-h-[85vh] flex flex-col">
+          <div className="bg-[#211C18] border border-[#3A322B] rounded-xl p-6 max-w-lg w-full mx-4 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-xl font-bold">💬 {ticketCode(threadOrder.orderNumber)}</h3>
-                <p className="text-gray-400 text-sm">{threadOrder.customerName}{threadOrder.table ? ` · 📍 ${threadOrder.table.name}` : ''}</p>
+                <h3 className="text-xl font-bold">{ticketCode(threadOrder.orderNumber)}</h3>
+                <p className="text-[#A69E93] text-sm">{threadOrder.customerName}{threadOrder.table ? ` · ${threadOrder.table.name}` : ''}</p>
               </div>
-              <button onClick={() => setThreadOrder(null)} className="text-gray-400 hover:text-gray-200 text-xl px-2">✕</button>
+              <button onClick={() => setThreadOrder(null)} className="text-[#A69E93] hover:text-gray-200 text-xl px-2">✕</button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-4">
               {(threadOrder.messages || []).length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-8">No messages yet</p>
+                <p className="text-sm text-[#7B7369] text-center py-8">No messages yet</p>
               ) : (
                 (threadOrder.messages || []).map((m) => (
-                  <div key={m.id} className={`p-3 rounded-xl text-sm max-w-[85%] ${m.sender === threadOrder.customerName ? 'bg-gray-800 text-gray-100 mr-auto' : 'bg-blue-600 text-white ml-auto'}`}>
-                    <div className="flex items-center gap-2 mb-1 text-xs text-gray-400">
-                      <span>{m.sender === threadOrder.customerName ? `🙋 ${m.sender}` : `👨‍🍳 ${m.sender}`}</span>
+                  <div key={m.id} className={`p-3 rounded-xl text-sm max-w-[85%] ${m.sender === threadOrder.customerName ? 'bg-[#2B2520] text-gray-100 mr-auto' : 'bg-[#B4472A] text-white ml-auto'}`}>
+                    <div className="flex items-center gap-2 mb-1 text-xs text-[#A69E93]">
+                      <span>{m.sender === threadOrder.customerName ? `${m.sender}` : `${m.sender}`}</span>
                       <span>·</span>
                       <span>{new Date(m.createdAt).toLocaleTimeString()}</span>
                     </div>
@@ -331,20 +331,20 @@ export default function KitchenPage() {
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && sendReply()}
                   placeholder={`Reply as ${staffName}...`}
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 bg-[#2B2520] border border-[#3A322B] rounded-xl px-4 py-3 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#B4472A]"
                   disabled={replySending}
                 />
                 <button
                   onClick={sendReply}
                   disabled={!replyText.trim() || replySending}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-5 rounded-xl font-semibold text-sm transition disabled:opacity-40"
+                  className="bg-[#B4472A] hover:bg-[#C65A3B] text-white px-5 rounded-xl font-semibold text-sm transition disabled:opacity-40"
                 >
                   Send
                 </button>
               </div>
             ) : (
               <a href="/login?next=/kitchen" className="block w-full text-center bg-white/10 text-gray-200 py-3 rounded-xl font-semibold text-sm hover:bg-white/20 transition-colors">
-                🔒 Sign in to reply
+                Sign in to reply
               </a>
             )}
           </div>

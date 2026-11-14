@@ -8,6 +8,8 @@ import {
 } from '@/modules/orders/schema';
 import type { CreateOrderInput } from '@/modules/orders/schema';
 import { STATUTORY_DISCOUNT_RATE, serviceChargeRateFor, type CheckoutDiscount } from '@/lib/checkout';
+import { refundDrawerMovement } from '@/lib/approvals';
+import { requireApprover } from '@/modules/pins/service';
 import * as repo from '@/modules/orders/repository';
 import { emitEvent } from '@/lib/socket';
 import { logAction } from '@/lib/audit-log';
@@ -309,6 +311,7 @@ export async function createOrder(input: unknown, options: CreateOrderOptions = 
     discountReason: discountPlan.reason,
     discountHolders: discountPlan.holders,
     countInDrawer: paymentMethod === 'CASH' && data.paymentConfirmed === true && options.source !== 'tablet',
+    paid: data.paymentConfirmed === true,
     orderItemsData,
     discountLineItems,
     affectedProductIds: [...new Set(affectedProductIds)],
@@ -511,6 +514,68 @@ export async function updateOrder(idOrNumber: string, input: unknown) {
 // ---------------------------------------------------------------------------
 // Follow-up
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Void / refund (spec 020)
+// ---------------------------------------------------------------------------
+
+const VoidInputSchema = z.object({
+  reason: z.string().trim().min(3, 'Say why the order is voided.').max(200),
+  pin: z.string(),
+});
+
+/**
+ * Void an order with a manager's PIN. Stock and loyalty are put back like a
+ * cancellation; a paid order is recorded as refunded, and cash refunded from a
+ * drawer other than the one it was counted in is paid out of the open drawer.
+ */
+export async function voidOrder(idOrNumber: string, input: unknown, staff: { userId: number; name: string }) {
+  const data = parseInput(VoidInputSchema, input);
+  const approver = await requireApprover(data.pin, staff.userId);
+
+  const existing = await repo.findOrderForMessage(idOrNumber);
+  if (!existing) throw setErrorStatus(new Error('Order not found'), 404);
+  if (existing.status === 'CANCELLED') throw setErrorStatus(new Error('This order is already voided or cancelled.'), 409);
+
+  const full = await repo.findOrderForVoid(existing.id);
+  if (!full) throw setErrorStatus(new Error('Order not found'), 404);
+  const refundAmount = full.paidAt ? Number(full.totalAmount) : 0;
+
+  const order = await repo.updateOrderInTransaction({
+    orderId: existing.id,
+    updateData: { status: 'CANCELLED', voidReason: data.reason, voidedAt: new Date(), voidedById: approver.id, refundAmount },
+    isPaymentConfirmation: false,
+    isCancel: true,
+    isStatusTransitionActive: true,
+    locationId: LOCATION_ID,
+  });
+  await refundLoyaltyForCancelledOrder(existing.id);
+
+  const openSessionId = await repo.findOpenCashSessionId(LOCATION_ID);
+  const movement = refundDrawerMovement(
+    { paidAt: full.paidAt, paymentMethod: full.paymentMethod, cashSessionId: full.cashSessionId, totalAmount: Number(full.totalAmount), orderNumber: full.orderNumber },
+    openSessionId,
+    data.reason,
+  );
+  if (movement && openSessionId != null) {
+    await repo.createCashMovement({ sessionId: openSessionId, ...movement, userId: staff.userId, userName: staff.name });
+  }
+
+  await logAction({
+    userId: staff.userId,
+    action: 'ORDER_VOID',
+    resource: 'order',
+    resourceId: existing.id,
+    details: { orderNumber: full.orderNumber, reason: data.reason, approvedBy: approver.name, refundAmount, cashPaidOut: movement?.amount ?? 0 },
+  });
+
+  emitEvent('order-status-update', order);
+  emitEvent('order-status-update', order, `order-${order.orderNumber}`);
+  emitEvent('queue-update', { type: 'resequenced' });
+  emitEvent('analytics-update', { type: 'order-voided', order });
+
+  return { ...order, approvedBy: approver.name, cashPaidOut: movement?.amount ?? 0 };
+}
 
 export async function followUp(idOrNumber: string) {
   const order = await repo.findOrderForFollowUp(idOrNumber);

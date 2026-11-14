@@ -1,6 +1,17 @@
 'use client';
 
+import { printInvoice, printKitchenTicket } from '@/lib/print-documents';
+import type { InvoiceOrder } from '@/lib/invoice';
+
+/** Print failures are shown in the console and as a toast-free status (spec 019). */
+function alertPrint(error?: string) {
+  console.error('Print failed:', error);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pebot:print-failed', { detail: error }));
+}
+
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { formatPeso } from '@/lib/format';
+import VoidOrderDialog from '@/components/VoidOrderDialog';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSocket } from '@/hooks/useSocket';
@@ -28,11 +39,14 @@ interface CurrentUser {
 }
 
 const TOP_TABS: { id: TopTab; label: string }[] = [
-  { id: 'orders',   label: '📋 Live Orders' },
-  { id: 'queue',    label: '🍳 Staff Queue' },
-  { id: 'tables',   label: '🪑 Tables' },
-  { id: 'stations', label: '🏭 Stations' },
+  { id: 'orders',   label: 'Board' },
+  { id: 'queue',    label: 'Staff queue' },
+  { id: 'tables',   label: 'Tables' },
+  { id: 'stations', label: 'Stations' },
 ];
+
+/** Minutes after which an open ticket is called out as late. */
+const LATE_AFTER_MIN = 15;
 
 interface OrderItem {
   id: number;
@@ -85,11 +99,12 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// Ticket colours follow the stage: sand = waiting, peach = cooking, sage = ready.
 const KANBAN_COLUMNS = [
-  { status: 'PENDING' as const,   label: 'Pending',   emoji: '⏳', accent: 'border-amber-300', headerBg: 'bg-amber-50', headerText: 'text-accent-text', badge: 'bg-amber-100 text-accent-text' },
-  { status: 'PREPARING' as const, label: 'Preparing', emoji: '👨‍🍳', accent: 'border-blue-300',   headerBg: 'bg-blue-50',   headerText: 'text-blue-700',   badge: 'bg-blue-100 text-blue-700' },
-  { status: 'COMPLETED' as const, label: 'Ready',     emoji: '✅', accent: 'border-green-300',  headerBg: 'bg-green-50',  headerText: 'text-green-700',  badge: 'bg-green-100 text-green-700' },
-  { status: 'CANCELLED' as const, label: 'Cancelled', emoji: '✕',  accent: 'border-red-300',    headerBg: 'bg-red-50',    headerText: 'text-red-700',    badge: 'bg-red-100 text-red-700' },
+  { status: 'PENDING' as const,   label: 'Waiting',   dot: 'bg-[#C9A35B]', card: 'bg-tile-sand',  next: { status: 'PREPARING', label: 'Start' } },
+  { status: 'PREPARING' as const, label: 'Preparing', dot: 'bg-accent',    card: 'bg-tile-peach', next: { status: 'COMPLETED', label: 'Mark ready' } },
+  { status: 'COMPLETED' as const, label: 'Ready',     dot: 'bg-good',      card: 'bg-tile-sage',  next: null },
+  { status: 'CANCELLED' as const, label: 'Cancelled', dot: 'bg-hair-strong', card: 'bg-panel',    next: null },
 ];
 
 export default function AdminPage() {
@@ -139,6 +154,10 @@ export default function AdminPage() {
   const [showInvoice, setShowInvoice] = useState(false);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
   const [selected, setSelected] = useState<Order | null>(null);
+  // Spec 020: void/refund and moving an order to another table.
+  const [voidTarget, setVoidTarget] = useState<Order | null>(null);
+  const [tableList, setTableList] = useState<{ id: number; name: string }[]>([]);
+  const [moveMsg, setMoveMsg] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const selectedRef = useRef<Order | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -425,74 +444,97 @@ export default function AdminPage() {
     );
   }
 
-  return (
-    <div className={`flex flex-col h-screen ${mobileMode ? 'bg-gray-100 overflow-y-auto' : 'bg-gradient-to-br from-gray-50 to-gray-100'} text-gray-900`}>
-      {/* Top Tab Navigation - Apple Style */}
-      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-2 sm:px-6 flex-shrink-0 shadow-sm">
-        <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto">
-          {TOP_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3 sm:px-5 py-3 font-medium text-xs sm:text-sm border-b-2 transition-all whitespace-nowrap rounded-t-lg ${
-                activeTab === tab.id
-                  ? 'border-black text-black bg-gray-50/50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+  const openOrders = orders.filter((o) => o.status === 'PENDING' || o.status === 'PREPARING');
+  const lateCount = openOrders.filter((o) => minutesSince(o.createdAt) >= LATE_AFTER_MIN).length;
+  const avgWait = openOrders.length
+    ? Math.round(openOrders.reduce((sum, o) => sum + minutesSince(o.createdAt), 0) / openOrders.length)
+    : 0;
+  const oldest = openOrders.reduce((m, o) => Math.max(m, minutesSince(o.createdAt)), 0);
 
-      {/* Tab Content */}
+  return (
+    <div className="flex h-full min-h-screen flex-col bg-page text-ink">
+      {/* Header */}
+      <header className="flex flex-wrap items-end justify-between gap-4 px-6 pb-4 pt-6">
+        <div className="min-w-0">
+          <h1 className="c-title">Live orders</h1>
+          <p className="mt-1.5 text-sm text-muted">
+            <span className="font-semibold text-ink">{ordersByStatus.PENDING.length} waiting</span> · {ordersByStatus.PREPARING.length} preparing ·{' '}
+            {ordersByStatus.COMPLETED.length} ready
+            {openOrders.length > 0 && <> · oldest open ticket <span className="font-semibold text-ink">{oldest} min</span></>}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-xl bg-panel p-1" role="tablist" aria-label="Live order views">
+            {TOP_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`h-9 rounded-[10px] px-3.5 text-[13px] font-semibold transition ${activeTab === tab.id ? 'bg-card text-ink shadow-card' : 'text-muted hover:text-ink'}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {activeTab === 'orders' && (
+            <>
+              <button
+                onClick={() => setMobileMode(!mobileMode)}
+                className="c-btn c-btn--ghost h-11"
+                title={mobileMode ? 'Show columns side by side' : 'Stack columns (phones)'}
+              >
+                {mobileMode ? 'Columns' : 'Stacked'}
+              </button>
+              <button onClick={() => setShowVoicePanel(true)} className="c-btn c-btn--ghost h-11" title="Voice announcements">
+                Voice
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Tab content */}
       {activeTab === 'queue' && (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0"><StaffQueuePanel /></div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"><StaffQueuePanel /></div>
       )}
       {activeTab === 'tables' && (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0"><TablesPanel /></div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"><TablesPanel /></div>
       )}
       {activeTab === 'stations' && (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0"><StationsPanel /></div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"><StationsPanel /></div>
       )}
       {activeTab === 'orders' && (
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* Kanban Toolbar - Premium Style */}
-        <div className={`flex flex-col sm:flex-row items-center justify-between px-2 sm:px-6 py-2 sm:py-4 border-b bg-white/50 backdrop-blur-sm shrink-0 gap-2 ${mobileMode ? 'border-gray-200' : ''}`}>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <span className={`font-medium ${mobileMode ? 'text-sm' : 'text-xs sm:text-sm'} text-gray-500`}>{orders.length} orders</span>
-            <button
-              onClick={() => setMobileMode(!mobileMode)}
-              className={`px-2 py-1 rounded-full font-medium text-xs transition-all ${
-                mobileMode 
-                  ? 'bg-black text-white' 
-                  : 'bg-gray-100 text-gray-600 border border-gray-200'
-              }`}
-            >
-              {mobileMode ? '📱 Mobile' : '🖥️ Desktop'}
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowVoicePanel(true)}
-              className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition text-sm shadow-sm border border-gray-200"
-              title="Voice Settings"
-            >🔊</button>
-          </div>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {/* Headline numbers */}
+        <div className="grid grid-cols-2 gap-3 px-6 pb-4 md:grid-cols-4">
+          {[
+            { label: 'Open tickets', value: String(openOrders.length), note: `${ordersByStatus.COMPLETED.length} ready to hand over`, tile: 'bg-tile-peach' },
+            { label: 'Average wait', value: `${avgWait} min`, note: 'Waiting and preparing', tile: 'bg-tile-sand' },
+            { label: 'Late', value: String(lateCount), note: `Open more than ${LATE_AFTER_MIN} min`, tile: lateCount > 0 ? 'bg-danger-bg' : 'bg-tile-sage' },
+            { label: 'Today so far', value: String(orders.length), note: `${ordersByStatus.CANCELLED.length} cancelled`, tile: 'bg-tile-sky' },
+          ].map((t) => (
+            <div key={t.label} className={`rounded-[18px] px-4 py-3 ${t.tile}`}>
+              <p className="text-xs font-semibold text-muted">{t.label}</p>
+              <p className="mt-0.5 text-2xl font-bold tabular-nums tracking-[-0.03em]">{t.value}</p>
+              <p className="truncate text-xs text-muted">{t.note}</p>
+            </div>
+          ))}
         </div>
 
-        {/* Kanban Board - Premium Apple Style */}
-        <div className={`flex-1 flex ${mobileMode ? 'flex-col' : 'md:gap-4'} p-1 md:p-4 overflow-x-auto ${mobileMode ? 'overflow-y-scroll' : 'overflow-y-hidden'} touch-pan-y min-h-0`}>
+        {/* Board */}
+        <div className={`flex min-h-0 flex-1 gap-4 overflow-x-auto px-6 pb-6 ${mobileMode ? 'flex-col overflow-y-auto' : ''} touch-pan-y`}>
           {KANBAN_COLUMNS.map((col) => {
             const colOrders = ordersByStatus[col.status] || [];
             const isDragOver = dragOverColumn === col.status;
+            const colTotal = colOrders.reduce((sum, o) => sum + o.totalAmount, 0);
             return (
-              <div
+              <section
                 key={col.status}
                 data-kanban-col={col.status}
-                className={`flex flex-col ${mobileMode ? 'w-full min-w-full mb-4' : 'min-w-[70vw] sm:min-w-[240px] md:min-w-[260px]'} flex-1 rounded-2xl border transition-all shadow-sm ${mobileMode ? 'bg-white border-gray-200' : ''} ${
-                  isDragOver ? `${col.accent} bg-white` : 'border-gray-200 bg-white/80'
+                aria-label={col.label}
+                className={`flex min-h-0 flex-col rounded-[20px] border transition-colors ${mobileMode ? 'w-full' : col.status === 'CANCELLED' ? 'min-w-[170px] flex-[0.6]' : 'min-w-[220px] flex-1'} ${
+                  isDragOver ? 'border-accent bg-accent-soft/40' : 'border-hair bg-card'
                 }`}
                 onDragOver={(e) => { e.preventDefault(); if (!mobileMode) setDragOverColumn(col.status); }}
                 onDragLeave={() => setDragOverColumn(null)}
@@ -506,73 +548,103 @@ export default function AdminPage() {
                   dragItemRef.current = null;
                 }}
               >
-                {/* Column Header */}
-                <div className={`px-2 sm:px-4 py-2 sm:py-3.5 rounded-t-2xl ${col.headerBg} border-b border-gray-100 flex items-center justify-between shrink-0 ${mobileMode ? 'border-gray-200' : ''}`}>
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-lg">{col.emoji}</span>
-                    <span className={`font-semibold text-sm ${col.headerText}`}>{col.label}</span>
+                <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-4">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${col.dot}`} aria-hidden />
+                    <h2 className="text-[15px] font-bold">{col.label}</h2>
+                    <span className="rounded-full bg-panel px-2 text-xs font-semibold tabular-nums text-muted">{colOrders.length}</span>
                   </div>
-                  <span className={`text-xs min-w-[24px] text-center px-2 py-0.5 rounded-full font-bold ${col.badge}`}>
-                    {colOrders.length}
-                  </span>
+                  <span className="text-xs tabular-nums text-faint">{formatPeso(colTotal)}</span>
                 </div>
 
-                {/* Cards */}
-                <div className={`flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-2 ${mobileMode ? 'min-h-[150px]' : ''}`}>
+                <div className={`min-h-0 flex-1 space-y-2.5 overflow-y-auto overflow-x-hidden px-3 pb-3 ${mobileMode ? 'min-h-[120px]' : ''}`}>
                   {colOrders.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400 text-sm">
-                      <div className="mb-2 text-2xl">📭</div>
-                      No orders
+                    <div className="flex h-24 items-center justify-center rounded-[16px] border border-dashed border-hair text-xs text-faint">
+                      {col.status === 'PENDING' ? 'New orders land here' : col.status === 'CANCELLED' ? 'Nothing cancelled' : 'Drag a ticket here'}
                     </div>
                   ) : (
-                    colOrders.map((order) => (
-                      <div
-                        key={order.id}
-                        draggable={!mobileMode}
-                        onDragStart={() => { dragItemRef.current = order; }}
-                        onDragEnd={() => { dragItemRef.current = null; setDragOverColumn(null); }}
-                        onTouchStart={(e) => !mobileMode && handleTouchStart(order, e)}
-                        onTouchMove={(e) => !mobileMode && handleTouchMove(e)}
-                        onTouchEnd={() => !mobileMode && handleTouchEnd()}
-                        onClick={() => {
-                          if (touchDragging) return;
-                          setSelected(order);
-                          setUnreadOrders((prev) => { const next = new Set(prev); next.delete(order.orderNumber); return next; });
-                        }}
-                        className={`bg-white rounded-lg sm:rounded-xl p-1.5 sm:p-2.5 cursor-grab active:cursor-grabbing hover:shadow-md hover:shadow-gray-200/50 transition-all select-none border shadow-sm ${mobileMode ? 'border-gray-200 mb-1.5 touch-pan-y' : 'border-gray-100'}`}
-                      >
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="font-mono font-bold text-[10px] text-gray-900">#{order.orderNumber.split('-').pop()}</span>
-                          <div className="flex items-center gap-0.5">
-                            {unreadOrders.has(order.orderNumber) && (
-                              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                            )}
-                            {order.loyaltyPromo && <span className="text-[9px]">⭐</span>}
-                            {order.paymentMethod && order.paymentMethod !== 'CASH' && (
-                              <span className="text-[9px]">{order.paymentMethod === 'GCASH' ? '📱' : order.paymentMethod === 'PAYMAYA' ? '📱' : '💵'}</span>
+                    colOrders.map((order) => {
+                      const age = minutesSince(order.createdAt);
+                      const late = (order.status === 'PENDING' || order.status === 'PREPARING') && age >= LATE_AFTER_MIN;
+                      const shown = order.items.slice(0, 4);
+                      const more = order.items.length - shown.length;
+                      return (
+                        <article
+                          key={order.id}
+                          draggable={!mobileMode}
+                          onDragStart={() => { dragItemRef.current = order; }}
+                          onDragEnd={() => { dragItemRef.current = null; setDragOverColumn(null); }}
+                          onTouchStart={(e) => !mobileMode && handleTouchStart(order, e)}
+                          onTouchMove={(e) => !mobileMode && handleTouchMove(e)}
+                          onTouchEnd={() => !mobileMode && handleTouchEnd()}
+                          onClick={() => {
+                            if (touchDragging) return;
+                            setSelected(order);
+                            setUnreadOrders((prev) => { const next = new Set(prev); next.delete(order.orderNumber); return next; });
+                          }}
+                          className={`cursor-grab select-none rounded-[16px] p-3.5 transition active:cursor-grabbing hover:shadow-card ${col.card} ${mobileMode ? 'touch-pan-y' : ''}`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="rounded-full bg-card/70 px-2 py-0.5 text-[11px] font-bold tabular-nums">#{order.orderNumber.split('-').pop()}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${late ? 'bg-danger text-white' : 'bg-card/70 text-muted'}`}>
+                              {timeAgo(order.createdAt)}{late ? ' · late' : ''}
+                            </span>
+                            {unreadOrders.has(order.orderNumber) && <span className="h-2 w-2 rounded-full bg-danger" title="New message" />}
+                            {order.loyaltyPromo && <span className="ml-auto rounded-full bg-card/70 px-2 py-0.5 text-[11px] font-semibold text-accent-text">Reward</span>}
+                          </div>
+                          <h3 className="mt-2 truncate text-[17px] font-bold tracking-[-0.02em]">
+                            {order.table ? order.table.name : order.customerName}
+                          </h3>
+                          {order.table && <p className="-mt-0.5 truncate text-xs text-muted">{order.customerName}</p>}
+                          <ul className="mt-2 space-y-0.5 rounded-[12px] bg-card/60 px-3 py-2 text-[13px]">
+                            {shown.map((item) => (
+                              <li key={item.id} className="flex gap-2">
+                                <span className="w-6 shrink-0 font-semibold tabular-nums">{item.quantity}×</span>
+                                <span className="min-w-0 truncate">{item.product.name}</span>
+                              </li>
+                            ))}
+                            {more > 0 && <li className="pl-8 text-xs text-muted">+{more} more</li>}
+                          </ul>
+                          <div className="mt-2.5 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[15px] font-bold tabular-nums">{formatPeso(order.totalAmount)}</p>
+                              <p className="text-[11px] text-muted">
+                                {order.items.reduce((n, i) => n + i.quantity, 0)} items
+                                {order.paymentMethod ? ` · ${order.paymentMethod === 'GCASH' ? 'GCash' : order.paymentMethod === 'PAYMAYA' || order.paymentMethod === 'MAYA' ? 'Maya' : order.paymentMethod === 'CASH' ? 'Cash' : order.paymentMethod}` : ''}
+                              </p>
+                            </div>
+                            {col.next && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); updateStatus(order.id, col.next!.status); }}
+                                className="h-9 shrink-0 whitespace-nowrap rounded-full bg-ink px-3.5 text-[13px] font-semibold text-white transition hover:bg-[#3E3832]"
+                              >
+                                {col.next.label}
+                              </button>
                             )}
                           </div>
-                        </div>
-                        <p className="text-[11px] font-semibold text-gray-900 truncate">{order.customerName}</p>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <span className="text-[9px] text-gray-500">
-                            {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                          </span>
-                          <span className="text-[11px] font-bold text-gray-900">₱{order.totalAmount.toFixed(0)}</span>
-                        </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <span className="text-[8px] text-gray-400">{timeAgo(order.createdAt)}</span>
-                          {order.table && <span className="text-[8px] text-gray-500">📍 {order.table.name}</span>}
-                        </div>
-                      </div>
-                    ))
+                        </article>
+                      );
+                    })
                   )}
                 </div>
-              </div>
+              </section>
             );
           })}
         </div>
       </div>
+      )}
+
+      {voidTarget && (
+        <VoidOrderDialog
+          order={voidTarget}
+          onClose={() => setVoidTarget(null)}
+          onVoided={(updated) => {
+            const u = updated as unknown as Order;
+            setOrders((prev) => prev.map((o) => (o.id === u.id ? { ...o, ...u } : o)));
+            setSelected((prev) => (prev && prev.id === u.id ? { ...prev, ...u } : prev));
+            setVoidTarget(null);
+          }}
+        />
       )}
 
       {/* Touch drag ghost - Premium Style */}
@@ -624,6 +696,38 @@ export default function AdminPage() {
                 ))}
               </div>
 
+              {/* Move to another table (merging = moving each order to the same table) */}
+              <div className="flex items-center gap-2">
+                <select
+                  value=""
+                  onFocus={() => { if (tableList.length === 0) fetch('/api/tables').then((r) => r.json()).then((t) => setTableList(Array.isArray(t) ? t : [])).catch(() => {}); }}
+                  onChange={async (e) => {
+                    const tableId = Number(e.target.value);
+                    if (!tableId) return;
+                    const res = await fetch(`/api/orders/${selected.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId }) });
+                    if (res.ok) {
+                      const updated = await res.json();
+                      setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+                      setSelected(updated);
+                      setMoveMsg(`Moved to ${updated.table?.name ?? 'the new table'}.`);
+                    } else {
+                      setMoveMsg('Could not move the order.');
+                    }
+                  }}
+                  className="h-10 flex-1 rounded-xl border border-hair bg-card px-3 text-sm outline-none focus:border-accent"
+                  aria-label="Move to table"
+                >
+                  <option value="">{selected.table ? `At ${selected.table.name} · move to…` : 'Seat at a table…'}</option>
+                  {tableList.filter((t) => t.name !== selected.table?.name).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                {selected.status !== 'CANCELLED' && (
+                  <button onClick={() => setVoidTarget(selected)} className="c-btn h-10 border-hair text-danger hover:bg-danger-bg">
+                    Void / refund
+                  </button>
+                )}
+              </div>
+              {moveMsg && <p className="text-xs text-muted">{moveMsg}</p>}
+
               {/* Invoice Button */}
               <button
                 onClick={() => {
@@ -632,7 +736,7 @@ export default function AdminPage() {
                 }}
                 className="w-full py-3 bg-accent hover:bg-amber-500 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2"
               >
-                🧾 View Invoice
+                View Invoice
               </button>
 
               {/* Order Items - Collapsible Dropdown */}
@@ -673,8 +777,8 @@ export default function AdminPage() {
 
               {/* Order Info - Premium Style */}
               <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm text-gray-600">
-                <p className="flex items-center gap-2">🕐 {new Date(selected.createdAt).toLocaleString()}</p>
-                {selected.table && <p className="flex items-center gap-2">📍 {selected.table.name}</p>}
+                <p className="flex items-center gap-2">{new Date(selected.createdAt).toLocaleString()}</p>
+                {selected.table && <p className="flex items-center gap-2">{selected.table.name}</p>}
                 {selected.paymentMethod && (
                   <p className="flex items-center gap-2">💳 <span className={`font-semibold ${
                   selected.paymentMethod === 'CASH' ? 'text-green-600' :
@@ -696,7 +800,7 @@ export default function AdminPage() {
               {/* Messages - Premium Style */}
               <div className="bg-gray-50 rounded-2xl p-4">
                 <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-gray-700">
-                  💬 Messages
+                  Messages
                   {orderMessages.length > 0 && (
                     <span className="text-[10px] bg-gray-900 text-white px-2 py-0.5 rounded-full">{orderMessages.length}</span>
                   )}
@@ -712,7 +816,7 @@ export default function AdminPage() {
                           : 'bg-white border border-gray-200'
                       }`}>
                         <div className="flex items-center gap-1 mb-1 text-[10px] text-gray-500">
-                          <span>{m.sender === 'staff' || m.sender === currentUser?.name ? `💼 ${m.sender}` : `🙋 ${m.sender}`}</span>
+                          <span>{m.sender === 'staff' || m.sender === currentUser?.name ? `${m.sender}` : `${m.sender}`}</span>
                           <span>·</span>
                           <span>{new Date(m.createdAt).toLocaleTimeString()}</span>
                         </div>
@@ -754,7 +858,7 @@ export default function AdminPage() {
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowVoicePanel(false)} />
           <div className="relative ml-auto w-full max-w-md bg-white border-l border-gray-200 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0 bg-gray-50/50">
-              <h3 className="font-bold text-lg text-gray-900">🔊 AI Voice Settings</h3>
+              <h3 className="font-bold text-lg text-gray-900">AI Voice Settings</h3>
               <button onClick={() => setShowVoicePanel(false)} className="text-gray-400 hover:text-gray-600 text-xl transition w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -1023,94 +1127,31 @@ export default function AdminPage() {
                 {/* Print Buttons */}
                 <div className="flex gap-2 mt-4">
                   <button
-                    onClick={() => {
-                      const printWindow = window.open('', '_blank', 'width=350,height=600');
-                      if (printWindow) {
-                        const invVatRate = businessSettings?.vatRate ?? 12;
-                        const invHasVat = invVatRate > 0;
-                        const invSubtotal = invHasVat ? selectedOrder.totalAmount / (1 + invVatRate / 100) : selectedOrder.totalAmount;
-                        const invVatAmount = invHasVat ? selectedOrder.totalAmount - invSubtotal : 0;
-
-                        printWindow.document.write(`
-                          <!DOCTYPE html>
-                          <html>
-                          <head>
-                            <title>Receipt #${selectedOrder.orderNumber}</title>
-                            <style>
-                              @page { margin: 0; size: 80mm auto; }
-                              @media print {
-                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                              }
-                              body {
-                                font-family: 'Courier New', monospace;
-                                width: 72mm;
-                                margin: 0 auto;
-                                padding: 5mm;
-                                font-size: 11px;
-                                line-height: 1.3;
-                              }
-                              .header { text-align: center; border-bottom: 1px dashed #666; padding-bottom: 8px; margin-bottom: 8px; }
-                              .header h2 { margin: 0; font-size: 14px; }
-                              .header p { margin: 2px 0; font-size: 9px; color: #666; }
-                              .items { border-bottom: 1px dashed #666; padding-bottom: 8px; margin-bottom: 8px; }
-                              .item { display: flex; justify-content: space-between; margin: 3px 0; }
-                              .item-name { flex: 1; }
-                              .item-qty { color: #666; font-size: 10px; }
-                              .totals { margin-bottom: 8px; }
-                              .totals .row { display: flex; justify-content: space-between; }
-                              .total-row { font-weight: bold; font-size: 14px; border-top: 1px dashed #666; padding-top: 5px; margin-top: 5px; }
-                              .footer { text-align: center; font-size: 9px; color: #666; margin-top: 10px; }
-                              .vat-breakdown { font-size: 8px; color: #888; border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 8px; }
-                            </style>
-                          </head>
-                          <body>
-                            <div class="header">
-                              <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                              <h2>${businessSettings?.businessName || 'My Restaurant'}</h2>
-                              ${businessSettings?.businessAddress ? `<p>${businessSettings.businessAddress}</p>` : ''}
-                              ${(businessSettings?.tin || businessSettings?.branchCode) ? `<p>TIN: ${businessSettings.tin || ''}${businessSettings?.branchCode ? '-' + businessSettings.branchCode : ''}</p>` : ''}
-                              <p>#${selectedOrder.orderNumber}</p>
-                            </div>
-                            <div class="items">
-                              ${selectedOrder.items.map(item => `
-                                <div class="item">
-                                  <span class="item-name">${item.quantity}x ${item.product.name}</span>
-                                  <span>₱${item.subtotal.toFixed(2)}</span>
-                                </div>
-                              `).join('')}
-                            </div>
-                            <div class="totals">
-                              <div class="row"><span>Subtotal:</span><span>₱${invSubtotal.toFixed(2)}</span></div>
-                              <div class="row"><span>VAT (${invVatRate}%):</span><span>₱${invVatAmount.toFixed(2)}</span></div>
-                              <div class="row total-row"><span>TOTAL:</span><span>₱${selectedOrder.totalAmount.toFixed(2)}</span></div>
-                              ${(selectedOrder as any).amountPaid ? `<div class="row"><span>Cash:</span><span>₱${(selectedOrder as any).amountPaid.toFixed(2)}</span></div><div class="row"><span>Change:</span><span>₱${((selectedOrder as any).amountPaid - selectedOrder.totalAmount).toFixed(2)}</span></div>` : ''}
-                            </div>
-                            <div class="vat-breakdown">
-                              <strong>VAT Breakdown:</strong><br/>
-                              Total Sales: ₱${selectedOrder.totalAmount.toFixed(2)}<br/>
-                              VATable: ₱${invSubtotal.toFixed(2)}<br/>
-                              VAT: ₱${invVatAmount.toFixed(2)}
-                            </div>
-                            <div class="footer">
-                              ${businessSettings?.footerMessage || 'Thank you for your visit!'}
-                            </div>
-                          </body>
-                          </html>
-                        `);
-                        printWindow.document.close();
-                        printWindow.focus();
-                        setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
-                      }
+                    onClick={async () => {
+                      const r = await printInvoice(selectedOrder as unknown as InvoiceOrder, businessSettings, { copyLabel: 'Reprint' });
+                      if (!r.ok) alertPrint(r.error);
                     }}
-                    className="flex-1 py-2.5 bg-accent hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
+                    className="c-btn c-btn--primary flex-1"
                   >
-                    🖨️ Thermal
+                    Print invoice
                   </button>
                   <button
-                    onClick={() => window.print()}
-                    className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
+                    onClick={async () => {
+                      const r = await printInvoice(selectedOrder as unknown as InvoiceOrder, businessSettings, { paper: 'A4', copyLabel: 'Reprint' });
+                      if (!r.ok) alertPrint(r.error);
+                    }}
+                    className="c-btn c-btn--ghost flex-1"
                   >
-                    📄 A4/Plain
+                    A4 copy
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const r = await printKitchenTicket(selectedOrder as unknown as InvoiceOrder, businessSettings);
+                      if (!r.ok) alertPrint(r.error);
+                    }}
+                    className="c-btn c-btn--ghost flex-1"
+                  >
+                    Kitchen ticket
                   </button>
                 </div>
               </div>

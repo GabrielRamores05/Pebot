@@ -26,6 +26,7 @@ function order(
     vatAmount: t.vatAmount,
     vatExemptSales: t.vatExemptSales,
     serviceCharge: t.serviceCharge,
+    paid: true,
     ...over,
   };
 }
@@ -92,7 +93,7 @@ describe('summarizeDay (spec 017, US5)', () => {
     const legacy: DayOrder = {
       orderNumber: 'OLD-1', status: 'COMPLETED', paymentMethod: 'CASH', orderType: 'DINE_IN',
       totalAmount: 80, grossAmount: 0, loyaltyDiscount: 0, discountAmount: 20, discountReason: 'STUDENT_PWD',
-      discountHolders: null, vatRemoved: 0, vatableSales: 0, vatAmount: 0, vatExemptSales: 0, serviceCharge: 0,
+      discountHolders: null, vatRemoved: 0, vatableSales: 0, vatAmount: 0, vatExemptSales: 0, serviceCharge: 0, paid: true,
     };
     const s = summarizeDay([legacy]);
     expect(s.gross).toBe(100);
@@ -100,6 +101,27 @@ describe('summarizeDay (spec 017, US5)', () => {
     expect(s.net).toBe(80);
     expect(s.payments).toEqual([{ method: 'CASH', count: 1, amount: 80 }]);
     expect(s.ordersWithoutVatBreakdown).toBe(1);
+  });
+
+  it('leaves orders that were never paid out of sales and lists them separately', () => {
+    const waiting = order({ lines: [line(112)], ...vat }, { status: 'PENDING', paid: false });
+    const s = summarizeDay([withService, waiting]);
+    expect(s.orderCount).toBe(1);
+    expect(s.net).toBe(550);
+    expect(s.payments).toEqual([{ method: 'CASH', count: 1, amount: 550 }]);
+    expect(s.unpaid).toEqual({ count: 1, amount: 112 });
+  });
+
+  it('lists voids and refunds with their reasons (spec 020)', () => {
+    const voided = order({ lines: [line(250)], ...vat }, { status: 'CANCELLED', voidReason: 'Wrong order', refundAmount: 250 });
+    const unpaidVoid = order({ lines: [line(120)], ...vat }, { status: 'CANCELLED', voidReason: 'Customer left', refundAmount: 0, paid: false });
+    const s = summarizeDay([withService, voided, unpaidVoid]);
+    expect(s.voids).toEqual([
+      { orderNumber: voided.orderNumber, reason: 'Wrong order', refund: 250 },
+      { orderNumber: unpaidVoid.orderNumber, reason: 'Customer left', refund: 0 },
+    ]);
+    expect(s.refundTotal).toBe(250);
+    expect(s.net).toBe(550);
   });
 
   it('is all zeros for a day with no orders', () => {

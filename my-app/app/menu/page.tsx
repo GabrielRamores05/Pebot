@@ -145,7 +145,7 @@ function MyOrdersPanel({ onClose }: { onClose: () => void }) {
                     </span>
                     {loyaltyPromo && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        🎁 Loyalty
+                        Loyalty
                       </span>
                     )}
                   </div>
@@ -546,7 +546,7 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
             <h3 className="truncate text-left text-[12.5px] font-semibold leading-tight text-stone-900">{product.name}</h3>
             {bestSeller && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-amber-800">
-                🔥 Best Seller
+                Best Seller
               </span>
             )}
             {lowStock && (
@@ -584,8 +584,8 @@ function ProductCard({ product, catIcon, cartItem, onAdd, onUpdate, isDetailOpen
             >
               <span className={`text-[10px] font-medium ${reviewSummary && reviewSummary.total > 0 ? 'text-amber-600' : 'text-stone-400'}`}>
                 {reviewSummary && reviewSummary.total > 0
-                  ? `⭐ ${reviewSummary.avg.toFixed(1)} · ${reviewSummary.total} review${reviewSummary.total > 1 ? 's' : ''}`
-                  : '☆☆☆☆☆ Be first to review'}
+                  ? `${reviewSummary.avg.toFixed(1)} · ${reviewSummary.total} review${reviewSummary.total > 1 ? 's' : ''}`
+                  : 'Be first to review'}
               </span>
               <span className="text-[9px] text-stone-400 underline decoration-dotted">Rate it ›</span>
             </div>
@@ -1401,12 +1401,12 @@ function MenuPageInner() {
             <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2 text-center">Welcome! 👋</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-2 text-center">Welcome!</h2>
               <p className="text-gray-500 text-center mb-4">Enter your name and group size</p>
 
               {entryError && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm">
-                  ❌ {entryError}
+                  {entryError}
                 </div>
               )}
 
@@ -1416,7 +1416,7 @@ function MenuPageInner() {
                 </label>
                 {customerName ? (
                   <div className="w-full border-2 border-green-300 bg-green-50 rounded-xl px-4 py-3 text-sm font-medium text-green-800">
-                    👤 {customerName}
+                    {customerName}
                     <p className="text-[10px] text-green-600 mt-1">Registered member • Name cannot be changed. Ask staff to update.</p>
                   </div>
                 ) : (
@@ -1462,7 +1462,7 @@ function MenuPageInner() {
                 disabled={entryLoading || !entryName.trim()}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-lg transition-colors"
               >
-                {entryLoading ? '⏳ Checking In...' : '✅ Start Ordering'}
+                {entryLoading ? 'Checking In...' : 'Start Ordering'}
               </button>
             </div>
           </div>
@@ -1653,31 +1653,31 @@ function MenuPageInner() {
           </div>
         )}
 
-        <header className="w-full border-b border-[#eadfcf] bg-[#fffaf4]/90 text-stone-900 shadow-[0_12px_30px_rgba(85,54,30,0.06)] backdrop-blur-xl">
+        <header className="w-full border-b border-hair bg-card/90 text-ink backdrop-blur-xl">
           <div className="flex w-full items-center justify-between gap-3 px-4 pb-2 pt-3 sm:px-6 lg:px-8">
             <div className="min-w-0 flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[#f0e0ca] bg-linear-to-br from-[#f7efe4] to-[#e7d3b6] shadow-sm">
+              <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-ink text-lg font-black text-white">
                 {branding.logoUrl ? (
-                  <img src={branding.logoUrl} alt="Shop Logo" className="h-full w-full object-cover" />
+                  <img src={branding.logoUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-xl">🍽️</span>
+                  <span>{branding.shopName.slice(0, 1)}</span>
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a6c45]">Welcome to</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-faint">Welcome to</p>
                 <h1 className="text-[18px] font-bold -tracking-[0.3px] text-stone-900">{branding.shopName}</h1>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowOrders(true)} className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#f0e0ca] bg-white/90 text-stone-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white" aria-label="Orders">
-                <span className="text-xl">🧾</span>
+              <button onClick={() => setShowOrders(true)} className="relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-hair bg-card px-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-hair-strong" aria-label="My orders">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" /></svg><span className="hidden md:inline">My orders</span>
               </button>
-              <button onClick={() => setShowMoodModal(true)} className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#f0e0ca] bg-white/90 text-stone-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white" aria-label="Mood">
-                <span className="text-xl">😀</span>
+              <button onClick={() => setShowMoodModal(true)} className="relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-hair bg-card px-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-hair-strong" aria-label="How are you today?">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8" /><path d="M9 9.5h.01M15 9.5h.01" /></svg><span className="hidden lg:inline">Mood</span>
                </button>
-               <button onClick={() => startTableScanner()} className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#f0e0ca] bg-white/90 text-stone-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white" aria-label="Switch Table">
-                <span className="text-xl">🔄</span>
+               <button onClick={() => startTableScanner()} className="relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-hair bg-card px-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-hair-strong" aria-label="Switch table">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 9h13l-3-3M20 15H7l3 3" /></svg><span className="hidden lg:inline">Table</span>
               </button>
 
               {showTableScanner && (
@@ -1731,7 +1731,7 @@ function MenuPageInner() {
                         <option value="" disabled>Select a table...</option>
                         {availableTables.map(table => {
                           const availableChairs = table.capacity - table.currentOccupants;
-                          const statusLabel = table.status === 'AVAILABLE' ? '✅ Available' : table.status === 'OCCUPIED' ? '⏳ Occupied' : '🧹 Needs Cleaning';
+                          const statusLabel = table.status === 'AVAILABLE' ? 'Available' : table.status === 'OCCUPIED' ? 'Occupied' : 'Needs Cleaning';
                           return (
                             <option key={table.id} value={table.name}>
                               {statusLabel} - Table {table.name} ({availableChairs} chairs available)
@@ -1748,16 +1748,14 @@ function MenuPageInner() {
                 </div>
               )}
 
-              <button onClick={() => setShowLoyalty(true)} className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#f0e0ca] bg-[#f7efe7] text-stone-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#f3e5d7]" aria-label="Rewards">
-                <span className="text-xl">💳</span>
+              <button onClick={() => setShowLoyalty(true)} className="relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-hair bg-card px-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-hair-strong bg-accent-soft text-accent-text" aria-label="Rewards">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M12 7v13M3 11h18" /><path d="M12 7c-1.5-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3.5-2-5 1" /></svg><span className="hidden md:inline">Rewards</span>
               </button>
-              <Link href="/cart" className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#1f1a17] text-white shadow-[0_12px_25px_rgba(31,26,23,0.25)] transition hover:-translate-y-0.5 hover:bg-[#2b2724]" aria-label="Cart">
+              <Link href="/cart" className="relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-ink px-3.5 text-sm font-semibold text-white shadow-[0_12px_25px_rgba(31,26,23,0.25)] transition hover:-translate-y-0.5" aria-label={`Cart, ${itemCount} item${itemCount === 1 ? '' : 's'}`}>
                 <CartIcon />
+                <span className="hidden sm:inline">Cart</span>
                 {itemCount > 0 && (
-                  <>
-                    <span className="font-bold text-[11px] tabular-nums">{itemCount}</span>
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white" />
-                  </>
+                  <span className="min-w-5 rounded-full bg-accent px-1.5 text-center text-[11px] font-bold tabular-nums">{itemCount}</span>
                 )}
               </Link>
             </div>
@@ -1766,7 +1764,7 @@ function MenuPageInner() {
           {/* Reviews entrance */}
           <div className="flex w-full items-center gap-2 px-4 pb-3 sm:px-6 lg:px-8">
             <Link href="/menu/reviews" className="inline-flex items-center gap-1.5 rounded-full border border-[#f0e0ca] bg-white/90 px-4 py-2 text-[13px] font-medium text-stone-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
-              ⭐ Reviews
+              Reviews
             </Link>
           </div>
 
@@ -1780,7 +1778,7 @@ function MenuPageInner() {
                 onChange={(e) => setSearch(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
-                placeholder="Search drinks, food..."
+                placeholder="Search the menu"
                 className="flex-1 bg-transparent text-[15px] text-stone-800 placeholder:text-stone-400 focus:outline-none"
               />
               {search && (
@@ -1792,7 +1790,7 @@ function MenuPageInner() {
 
             {tableFromQr && (
               <div className="mt-2 text-center flex items-center justify-center gap-2">
-                <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full text-sm font-medium">🍽️ Ordering from {tableFromQr}</span>
+                <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full text-sm font-medium">Ordering from {tableFromQr}</span>
                 <button
                   onClick={async () => {
                     if (!tableFromQr) return;
@@ -1823,7 +1821,7 @@ function MenuPageInner() {
                   }}
                   className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-red-200 transition-colors"
                 >
-                  🚪 Leave
+                  Leave
                 </button>
               </div>
             )}

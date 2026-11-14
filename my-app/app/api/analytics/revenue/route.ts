@@ -127,7 +127,8 @@ export async function GET(req: NextRequest) {
     const payments = new Map<string, { amount: number; count: number }>();
     
      orders.forEach(o => {
-       const method = o.payment?.method || 'Cash';
+       // The method saved on the order is the source of truth; a separate payment record only exists for some flows.
+       const method = o.payment?.method || o.paymentMethod || 'CASH';
        const existing = payments.get(method) || { amount: 0, count: 0 };
        existing.amount += o.totalAmount;
        existing.count += 1;

@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@/lib/prisma-client';
 import { computeCheckout, type CheckoutInput } from '@/lib/checkout';
+import { nextInvoiceNumber } from '@/lib/invoice';
 
 // ---------------------------------------------------------------------------
 // Orders – location-scoped helpers
@@ -173,6 +174,8 @@ export async function createPaymentAndCompleteOrder(
       where: { id: orderId },
       data: { status: 'COMPLETED' },
     });
+    await tx.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paidAt: new Date() } });
+    await assignInvoiceNumberTx(tx, orderId);
     if (paymentData.method === 'CASH') {
       await countInOpenDrawerTx(tx, orderId, locationId);
     }
@@ -369,6 +372,8 @@ export interface CreateOrderParams {
   discountHolders: string | null;
   /** Paid in cash at this PC: count it in the open cash drawer, if any. */
   countInDrawer: boolean;
+  /** Payment was confirmed when the order was placed. */
+  paid?: boolean;
   orderItemsData: CreateOrderTxItem[];
   discountLineItems: CreateOrderDiscountItem[];
   affectedProductIds: number[];
@@ -390,6 +395,45 @@ async function countInOpenDrawerTx(tx: Tx, orderId: number, locationId: number) 
   if (!order || order.paymentMethod !== 'CASH' || order.cashSessionId) return;
   const drawer = await findOpenCashSessionTx(tx, locationId);
   if (drawer) await tx.order.update({ where: { id: orderId }, data: { cashSessionId: drawer.id } });
+}
+
+/**
+ * Give a paid order the next number in the owner's invoice series, once (spec 019).
+ * Runs inside the payment transaction so two terminals can't get the same number.
+ */
+async function assignInvoiceNumberTx(tx: Tx, orderId: number) {
+  const order = await tx.order.findUnique({ where: { id: orderId }, select: { invoiceNumber: true, paidAt: true } });
+  if (!order || order.invoiceNumber || !order.paidAt) return;
+  // A fresh install has no settings row until someone opens Settings; create the default one.
+  const settings =
+    (await tx.businessSettings.findFirst({ select: { id: true, receiptSerialPrefix: true, lastReceiptNumber: true } })) ??
+    (await tx.businessSettings.create({ data: { businessName: 'My Restaurant' }, select: { id: true, receiptSerialPrefix: true, lastReceiptNumber: true } }));
+  const updated = await tx.businessSettings.update({
+    where: { id: settings.id },
+    data: { lastReceiptNumber: { increment: 1 } },
+    select: { lastReceiptNumber: true },
+  });
+  await tx.order.update({
+    where: { id: orderId },
+    data: { invoiceNumber: nextInvoiceNumber(settings.receiptSerialPrefix, updated.lastReceiptNumber - 1) },
+  });
+}
+
+/** The fields a void needs (spec 020). */
+export async function findOrderForVoid(orderId: number) {
+  return prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, orderNumber: true, paidAt: true, paymentMethod: true, cashSessionId: true, totalAmount: true },
+  });
+}
+
+export async function findOpenCashSessionId(locationId: number): Promise<number | null> {
+  const s = await prisma.cashSession.findFirst({ where: { locationId, closedAt: null }, select: { id: true } });
+  return s?.id ?? null;
+}
+
+export async function createCashMovement(data: { sessionId: number; kind: 'IN' | 'OUT'; amount: number; reason: string; userId: number; userName: string }) {
+  return prisma.cashMovement.create({ data });
 }
 
 /** Business settings the bill depends on (spec 017). */
@@ -471,6 +515,7 @@ export async function createOrder(params: CreateOrderParams): Promise<any> {
         vatExemptSales: bill.vatExemptSales,
         serviceCharge: bill.serviceCharge,
         cashSessionId: drawer?.id ?? null,
+        paidAt: params.paid ? new Date() : null,
         loyaltyPromo: isLoyaltyOrder,
         paymentMethod: params.paymentMethod,
         paymentScreenshot: params.paymentScreenshot,
@@ -485,6 +530,13 @@ export async function createOrder(params: CreateOrderParams): Promise<any> {
         table: true,
       },
     });
+
+    // Paid at the till: number the sales invoice now (spec 019).
+    if (params.paid) {
+      await assignInvoiceNumberTx(tx, newOrder.id);
+      const numbered = await tx.order.findUnique({ where: { id: newOrder.id }, select: { invoiceNumber: true } });
+      (newOrder as { invoiceNumber?: string | null }).invoiceNumber = numbered?.invoiceNumber ?? null;
+    }
 
     // Spend the rewards
     for (const voucher of vouchers) {
@@ -630,7 +682,7 @@ export { LoyaltyVoucherError, InsufficientStockError };
 
 export interface UpdateOrderParams {
   orderId: number;
-  updateData: { status?: string; tableId?: number | null };
+  updateData: { status?: string; tableId?: number | null; voidReason?: string; voidedAt?: Date; voidedById?: number; refundAmount?: number };
   addItems?: { productId: number; quantity: number }[];
   isPaymentConfirmation: boolean;
   isCancel: boolean;
@@ -685,6 +737,8 @@ export async function updateOrderInTransaction(params: UpdateOrderParams): Promi
     }
 
     if (params.isPaymentConfirmation) {
+      await tx.order.updateMany({ where: { id: params.orderId, paidAt: null }, data: { paidAt: new Date() } });
+      await assignInvoiceNumberTx(tx, params.orderId);
       await countInOpenDrawerTx(tx, params.orderId, params.locationId);
     }
 

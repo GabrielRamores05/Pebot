@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '@/hooks/useSocket';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
+import { StatTile } from '@/components/pebot-ui';
 
 type TableStatus = 'AVAILABLE' | 'OCCUPIED' | 'NEEDS_CLEANING';
 
@@ -47,10 +48,10 @@ interface Table {
   sessions?: TableVisit[];
 }
 
-const STATUS_CONFIG: Record<TableStatus, { label: string; color: string; dot: string }> = {
-  AVAILABLE:      { label: 'Available',      color: 'bg-green-500/20  border-green-500  text-green-400', dot: 'bg-green-400' },
-  OCCUPIED:       { label: 'Occupied',       color: 'bg-yellow-500/20 border-yellow-500 text-yellow-400', dot: 'bg-yellow-400' },
-  NEEDS_CLEANING: { label: 'Needs Cleaning', color: 'bg-red-500/20    border-red-500    text-red-400', dot: 'bg-red-400' },
+const STATUS_CONFIG: Record<TableStatus, { label: string; color: string; dot: string; stripe: string; tone: 'sage' | 'sand' | 'peach' }> = {
+  AVAILABLE:      { label: 'Available',      color: 'bg-green-500/20  border-green-500  text-green-400', dot: 'bg-good', stripe: 'border-l-good', tone: 'sage' },
+  OCCUPIED:       { label: 'Occupied',       color: 'bg-yellow-500/20 border-yellow-500 text-yellow-400', dot: 'bg-warn', stripe: 'border-l-warn', tone: 'sand' },
+  NEEDS_CLEANING: { label: 'Needs cleaning', color: 'bg-red-500/20    border-red-500    text-red-400', dot: 'bg-danger', stripe: 'border-l-danger', tone: 'peach' },
 };
 
 const NEXT_STATUS: Record<TableStatus, TableStatus> = {
@@ -146,7 +147,7 @@ export default function TablesPage() {
       })) : [];
       setTables(validTables);
     } catch (err) {
-      console.error('❌ Failed to fetch tables:', err);
+      console.error('Failed to fetch tables:', err);
     } finally {
       setLoading(false);
     }
@@ -234,7 +235,7 @@ export default function TablesPage() {
       }
       return data;
     } catch (err) {
-      console.error('❌ Failed to patch table:', err);
+      console.error('Failed to patch table:', err);
       throw err;
     }
   }
@@ -325,7 +326,7 @@ export default function TablesPage() {
       }
 
       if (!res.ok) {
-        console.error('❌ Failed to create table:', { status: res.status, statusText: res.statusText, rawText, data });
+        console.error('Failed to create table:', { status: res.status, statusText: res.statusText, rawText, data });
         const serverMessage =
           (data && (data.error || data.details)) ||
           rawText ||
@@ -337,7 +338,7 @@ export default function TablesPage() {
       setNewTableName('');
       fetchTables();
     } catch (err) {
-      console.error('❌ Network error while creating table:', err);
+      console.error('Network error while creating table:', err);
       alert('Network error while creating table. Please check your connection.');
     } finally {
       setAdding(false);
@@ -433,13 +434,13 @@ export default function TablesPage() {
   const filteredTables = tables.filter((t) => sectionFilter === 'ALL' ? true : t.section === sectionFilter);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 text-gray-900 min-h-screen p-6">
+    <div className="flex-1 overflow-y-auto bg-page text-ink min-h-screen p-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900 mb-1">🪑 Table Management</h1>
-            <p className="text-sm text-gray-500">Manage all tables, track occupancy time, and monitor alerts.</p>
+            <h1 className="c-title">Tables</h1>
+            <p className="mt-1.5 text-sm text-muted">Tap a table to change its status. Long stays are flagged so no one waits too long for the bill.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -477,10 +478,8 @@ export default function TablesPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         {Object.entries(STATUS_CONFIG).map(([status, cfg]) => (
-          <div key={status} className="bg-white rounded-xl p-4 shadow-sm">
-            <p className="text-2xl font-semibold text-gray-900">{byStatus(status as TableStatus).length}</p>
-            <p className="text-xs font-medium text-gray-500 mt-0.5">{cfg.label}</p>
-          </div>
+          <StatTile key={status} tone={cfg.tone} label={cfg.label} value={byStatus(status as TableStatus).length}
+            note={status === 'OCCUPIED' ? `${tables.reduce((n, t) => n + (t.currentOccupants ?? 0), 0)} guests seated` : `of ${tables.length} tables`} />
         ))}
       </div>
 
@@ -570,13 +569,13 @@ export default function TablesPage() {
             const occupancyText = table.status === 'OCCUPIED' ? formatOccupancyTime(table.occupiedSince) : null;
             
             return (
-              <div key={table.id} className={`bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${alertBorder}`}
+              <div key={table.id} className={`c-card border-l-4 ${cfg.stripe} p-3 transition hover:-translate-y-0.5 cursor-pointer ${alertBorder ? `ring-2 ${alertBorder.replace('border-', 'ring-')}` : ''}`}
                    onClick={() => cycleStatus(table)}>
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <p className="text-gray-900 font-semibold text-sm">{table.name}</p>
+                    <p className="text-base font-bold text-ink">{table.name}</p>
                     <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
-                      👥 {(table.currentOccupants ?? 0)}/{table.capacity}
+                      {(table.currentOccupants ?? 0)}/{table.capacity}
                       {typeof table.currentOccupants === 'number' && table.currentOccupants > 0 && (
                         <>
                            <button
@@ -613,20 +612,20 @@ export default function TablesPage() {
                         e.stopPropagation();
                         showQr(table);
                       }}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-colors shadow-sm"
-                      title="Show QR code"
+                      className="h-9 rounded-xl border border-hair bg-card px-2.5 text-xs font-semibold text-muted transition-colors hover:text-ink"
+                      title="Show the QR code guests scan to order"
                     >
-                      📱
+                      QR
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         openEdit(table);
                       }}
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-colors shadow-sm"
+                      className="h-9 rounded-xl border border-hair bg-card px-2.5 text-xs font-semibold text-muted transition-colors hover:text-ink"
                       title="Edit table"
                     >
-                      ⚙️
+                      Edit
                     </button>
                   </div>
                 </div>
@@ -635,14 +634,14 @@ export default function TablesPage() {
                   <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                   <span className="text-sm font-medium text-gray-600">{cfg.label}</span>
                   {occupancyText && (
-                    <span className="text-xs text-gray-400 ml-auto">⏱️ {occupancyText}</span>
+                    <span className="text-xs text-gray-400 ml-auto">{occupancyText}</span>
                   )}
                 </div>
 
                 {table.guests && table.guests.length > 0 && (
                   <div className="mb-3 bg-gray-50 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-medium text-gray-600">😊 Guest Moods</span>
+                      <span className="text-xs font-medium text-gray-600">Guest Moods</span>
                     </div>
                     <div className="space-y-1">
                       {table.guests.map((g, idx) => (
@@ -663,7 +662,7 @@ export default function TablesPage() {
                 {table.sessions && table.sessions.length > 0 && (
                   <div className="mb-3 bg-blue-50 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-medium text-gray-600">🧾 This Visit&apos;s Orders</span>
+                      <span className="text-xs font-medium text-gray-600">This Visit&apos;s Orders</span>
                       {table.sessions[0].orders && table.sessions[0].orders.length > 0 && (
                         <span className="ml-auto text-[10px] font-medium text-blue-600 bg-blue-100 rounded-full px-2 py-0.5">
                           {table.sessions[0].orders.length} order{table.sessions[0].orders.length > 1 ? 's' : ''}
@@ -693,7 +692,7 @@ export default function TablesPage() {
                   }}
                   className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-xl text-sm font-medium transition-colors"
                 >
-                  🔄 Change Status
+                  Change Status
                 </button>
               </div>
             );
@@ -709,7 +708,7 @@ export default function TablesPage() {
       {editTable && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md p-4" onClick={() => { setEditTable(null); setDeleteConfirm(false); }}>
           <div className="bg-white rounded-xl p-5 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-gray-900 font-semibold text-lg mb-4">✏️ Edit Table</h3>
+            <h3 className="text-gray-900 font-semibold text-lg mb-4">Edit Table</h3>
 
             <div className="space-y-4">
               <div>
@@ -774,7 +773,7 @@ export default function TablesPage() {
                 onClick={() => setDeleteConfirm(true)}
                 className="w-full mt-4 text-red-500 hover:text-red-400 text-sm font-medium py-3 rounded-2xl hover:bg-red-50 transition-colors"
               >
-                🗑️ Delete Table
+                Delete Table
               </button>
             ) : (
               <div className="mt-4 bg-red-50 border border-red-100 rounded-2xl p-4 text-center">
@@ -793,7 +792,7 @@ export default function TablesPage() {
       {qrTable && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md p-4" onClick={() => setQrTable(null)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl text-center" onClick={e => e.stopPropagation()}>
-            <h3 className="text-gray-900 font-bold text-xl mb-1">📱 QR Code</h3>
+            <h3 className="text-gray-900 font-bold text-xl mb-1">QR Code</h3>
             <p className="text-gray-500 text-sm mb-5">{qrTable.name}</p>
 
             {qrLoading ? (
@@ -814,7 +813,7 @@ export default function TablesPage() {
                   <button
                     onClick={printQr}
                     className="flex-1 bg-black hover:bg-gray-800 text-white font-semibold py-3 rounded-2xl transition-all text-sm shadow-lg hover:shadow-xl"
-                  >🖨️ Print</button>
+                  >Print</button>
                 </div>
               </>
             ) : (
