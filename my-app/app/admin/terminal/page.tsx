@@ -8,6 +8,7 @@ import { calculateLoyaltyDiscountForItems } from '@/lib/pos-utils';
 import { CheckoutError, computeCheckout, serviceChargeRateFor, type CheckoutTotals } from '@/lib/checkout';
 import DiscountPicker, { discountProblem, toCheckoutDiscount, toOrderDiscount, type TerminalDiscount } from './DiscountPicker';
 import CashDrawerPanel from './CashDrawerPanel';
+import { addHeld, heldLabel, removeHeld, splitLines, type HeldTicket } from '@/lib/held-tickets';
 import { printInvoice, printKitchenTicket } from '@/lib/print-documents';
 import type { InvoiceOrder } from '@/lib/invoice';
 
@@ -200,6 +201,21 @@ export default function PosTerminalPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | number>('all');
   const [cart, setCart] = useState<CartItem[]>([]);
+  // Spec 020: tickets held on this register, and splitting a ticket.
+  const [held, setHeld] = useState<HeldTicket<CartItem>[]>([]);
+  const [showHeld, setShowHeld] = useState(false);
+  const [splitTake, setSplitTake] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('pebot-held-tickets');
+      if (raw) setHeld(JSON.parse(raw));
+    } catch { /* storage unavailable: holding still works for this session */ }
+  }, []);
+  const saveHeld = (list: HeldTicket<CartItem>[]) => {
+    setHeld(list);
+    try { localStorage.setItem('pebot-held-tickets', JSON.stringify(list)); } catch { /* ignore */ }
+  };
+  const lineKey = (i: CartItem) => String(i.key ?? i.productId);
   // Option picker state: which product is being configured
   interface PickerGroup { id: number; group: { id: number; name: string; selectionType: 'single' | 'multi' }; options: { id: number; name: string; priceDelta: number }[] }
   const [picker, setPicker] = useState<{ product: Product; groups: PickerGroup[]; categoryId?: number } | null>(null);
@@ -828,6 +844,35 @@ export default function PosTerminalPage() {
   }
 
   const ROW = 'flex items-center justify-between gap-3';
+  const ticketName = () => {
+    const table = tables.find((t) => t.id === selectedTable)?.name;
+    return table ?? (customerName.trim() && customerName.trim() !== 'Walk-In' ? customerName.trim() : `Ticket ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+  };
+  const holdTicket = () => {
+    if (cart.length === 0) return;
+    saveHeld(addHeld(held, { id: String(Date.now()), name: ticketName(), savedAt: new Date().toISOString(), lines: cart, orderType, tableId: selectedTable, customerName }));
+    clearCart();
+    setCustomerName('Walk-In');
+    setSelectedTable(null);
+  };
+  // Resuming puts the ticket on screen back on hold first, so nothing is lost.
+  const resumeTicket = (t: HeldTicket<CartItem>) => {
+    setCart(t.lines);
+    setOrderType(t.orderType);
+    setSelectedTable(t.tableId);
+    setCustomerName(t.customerName);
+    saveHeld(removeHeld(cart.length > 0 ? addHeld(held, { id: String(Date.now()), name: ticketName(), savedAt: new Date().toISOString(), lines: cart, orderType, tableId: selectedTable, customerName }) : held, t.id));
+    setShowHeld(false);
+  };
+  const finishSplit = () => {
+    if (!splitTake) return;
+    const keyed = cart.map((c) => ({ ...c, key: lineKey(c) }));
+    const { kept, moved } = splitLines(keyed, splitTake);
+    if (moved.length === 0 || kept.length === 0) { setSplitTake(null); return; }
+    saveHeld(addHeld(held, { id: String(Date.now()), name: `${ticketName()} (split)`, savedAt: new Date().toISOString(), lines: moved, orderType, tableId: selectedTable, customerName }));
+    setCart(kept);
+    setSplitTake(null);
+  };
   const typeLabel = orderType === 'DINE_IN' ? 'Dine-in' : orderType === 'TAKEOUT' ? 'Takeout' : 'Delivery';
   const tableName = tables.find((t) => t.id === selectedTable)?.name;
   const segBtn = (active: boolean) =>
@@ -1007,12 +1052,61 @@ export default function PosTerminalPage() {
           <div className="space-y-3 border-b border-[var(--pos-border)] p-4">
             <div className={ROW}>
               <h2 className="text-base font-bold tracking-[-0.01em]">Ticket</h2>
-              {cart.length > 0 && (
-                <button onClick={clearCart} className="text-xs font-semibold text-[var(--pos-ink-soft)] hover:text-[var(--pos-danger)]">
-                  Clear ticket
-                </button>
-              )}
+              <div className="relative flex items-center gap-1">
+                {held.length > 0 && (
+                  <button onClick={() => setShowHeld((v) => !v)} className="h-8 rounded-lg bg-[var(--pos-accent-soft)] px-2.5 text-xs font-semibold text-[var(--pos-accent-hover)]">
+                    Held ({held.length})
+                  </button>
+                )}
+                {cart.length > 0 && (
+                  <>
+                    <button onClick={holdTicket} className="h-8 rounded-lg px-2.5 text-xs font-semibold text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)] hover:text-[var(--pos-ink)]" title="Save this ticket and start a new one">Hold</button>
+                    {cart.reduce((n, i) => n + i.quantity, 0) > 1 && (
+                      <button onClick={() => setSplitTake(splitTake ? null : {})} className="h-8 rounded-lg px-2.5 text-xs font-semibold text-[var(--pos-ink-soft)] hover:bg-[var(--pos-muted)] hover:text-[var(--pos-ink)]" title="Move some items to a separate ticket">Split</button>
+                    )}
+                    <button onClick={clearCart} className="h-8 rounded-lg px-2.5 text-xs font-semibold text-[var(--pos-ink-soft)] hover:text-[var(--pos-danger)]">Clear</button>
+                  </>
+                )}
+                {showHeld && held.length > 0 && (
+                  <div className="absolute right-0 top-9 z-30 w-72 rounded-[14px] border border-[var(--pos-border)] bg-[var(--pos-surface)] p-1.5 shadow-[var(--shadow-modal)]">
+                    {held.map((t) => (
+                      <div key={t.id} className="flex items-center gap-1 rounded-[10px] hover:bg-[var(--pos-muted)]">
+                        <button onClick={() => resumeTicket(t)} className="min-w-0 flex-1 px-2.5 py-2 text-left">
+                          <span className="block truncate text-sm font-semibold">{heldLabel(t).split(' · ')[0]}</span>
+                          <span className="block truncate text-xs text-[var(--pos-ink-soft)]">{heldLabel(t).split(' · ').slice(1).join(' · ')} · held {new Date(t.savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                        </button>
+                        <button onClick={() => saveHeld(removeHeld(held, t.id))} className="mr-1 h-7 w-7 rounded-lg text-[var(--pos-ink-soft)] hover:bg-[var(--pos-danger-soft)] hover:text-[var(--pos-danger)]" aria-label={`Discard ${t.name}`}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
+            {splitTake && (
+              <div className="space-y-2 rounded-[14px] bg-[var(--pos-paper)] p-3">
+                <p className="text-xs font-semibold text-[var(--pos-ink-soft)]">Choose what goes on the new ticket</p>
+                {cart.map((i) => {
+                  const k = lineKey(i);
+                  const n = splitTake[k] ?? 0;
+                  return (
+                    <div key={k} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate">{i.name}</span>
+                      <span className="flex items-center rounded-full border border-[var(--pos-border)] bg-[var(--pos-surface)]">
+                        <button onClick={() => setSplitTake({ ...splitTake, [k]: Math.max(0, n - 1) })} className="h-7 w-7 rounded-full text-[var(--pos-ink-soft)]" aria-label={`One less ${i.name} on the new ticket`}>−</button>
+                        <span className="w-10 text-center text-xs font-semibold tabular-nums">{n}/{i.quantity}</span>
+                        <button onClick={() => setSplitTake({ ...splitTake, [k]: Math.min(i.quantity, n + 1) })} className="h-7 w-7 rounded-full text-[var(--pos-ink-soft)]" aria-label={`One more ${i.name} on the new ticket`}>+</button>
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setSplitTake(null)} className="h-9 flex-1 rounded-[10px] border border-[var(--pos-border)] text-xs font-semibold">Cancel</button>
+                  <button onClick={finishSplit} className="h-9 flex-1 rounded-[10px] bg-[var(--pos-accent)] text-xs font-semibold text-white disabled:opacity-50" disabled={!Object.values(splitTake).some((v) => v > 0)}>
+                    Move to new ticket
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-1 rounded-[12px] bg-[var(--pos-muted)] p-1">
               {(['DINE_IN', 'TAKEOUT', 'DELIVERY'] as const).map((type) => (
                 <button
