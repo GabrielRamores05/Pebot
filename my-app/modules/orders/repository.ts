@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@/lib/prisma-client';
 import { computeCheckout, type CheckoutInput } from '@/lib/checkout';
+import { nextInvoiceNumber } from '@/lib/invoice';
 
 // ---------------------------------------------------------------------------
 // Orders – location-scoped helpers
@@ -174,6 +175,7 @@ export async function createPaymentAndCompleteOrder(
       data: { status: 'COMPLETED' },
     });
     await tx.order.updateMany({ where: { id: orderId, paidAt: null }, data: { paidAt: new Date() } });
+    await assignInvoiceNumberTx(tx, orderId);
     if (paymentData.method === 'CASH') {
       await countInOpenDrawerTx(tx, orderId, locationId);
     }
@@ -395,6 +397,28 @@ async function countInOpenDrawerTx(tx: Tx, orderId: number, locationId: number) 
   if (drawer) await tx.order.update({ where: { id: orderId }, data: { cashSessionId: drawer.id } });
 }
 
+/**
+ * Give a paid order the next number in the owner's invoice series, once (spec 019).
+ * Runs inside the payment transaction so two terminals can't get the same number.
+ */
+async function assignInvoiceNumberTx(tx: Tx, orderId: number) {
+  const order = await tx.order.findUnique({ where: { id: orderId }, select: { invoiceNumber: true, paidAt: true } });
+  if (!order || order.invoiceNumber || !order.paidAt) return;
+  // A fresh install has no settings row until someone opens Settings; create the default one.
+  const settings =
+    (await tx.businessSettings.findFirst({ select: { id: true, receiptSerialPrefix: true, lastReceiptNumber: true } })) ??
+    (await tx.businessSettings.create({ data: { businessName: 'My Restaurant' }, select: { id: true, receiptSerialPrefix: true, lastReceiptNumber: true } }));
+  const updated = await tx.businessSettings.update({
+    where: { id: settings.id },
+    data: { lastReceiptNumber: { increment: 1 } },
+    select: { lastReceiptNumber: true },
+  });
+  await tx.order.update({
+    where: { id: orderId },
+    data: { invoiceNumber: nextInvoiceNumber(settings.receiptSerialPrefix, updated.lastReceiptNumber - 1) },
+  });
+}
+
 /** Business settings the bill depends on (spec 017). */
 export async function findCheckoutSettings() {
   return prisma.businessSettings.findFirst({
@@ -489,6 +513,13 @@ export async function createOrder(params: CreateOrderParams): Promise<any> {
         table: true,
       },
     });
+
+    // Paid at the till: number the sales invoice now (spec 019).
+    if (params.paid) {
+      await assignInvoiceNumberTx(tx, newOrder.id);
+      const numbered = await tx.order.findUnique({ where: { id: newOrder.id }, select: { invoiceNumber: true } });
+      (newOrder as { invoiceNumber?: string | null }).invoiceNumber = numbered?.invoiceNumber ?? null;
+    }
 
     // Spend the rewards
     for (const voucher of vouchers) {
@@ -690,6 +721,7 @@ export async function updateOrderInTransaction(params: UpdateOrderParams): Promi
 
     if (params.isPaymentConfirmation) {
       await tx.order.updateMany({ where: { id: params.orderId, paidAt: null }, data: { paidAt: new Date() } });
+      await assignInvoiceNumberTx(tx, params.orderId);
       await countInOpenDrawerTx(tx, params.orderId, params.locationId);
     }
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import LicensePanel from './license/LicensePanel';
+import PrintingPanel from './PrintingPanel';
 import { fetchJson, userMessage } from '@/lib/fetch-json';
 import AdminToolsSection from '../AdminToolsSection';
 
@@ -33,7 +34,7 @@ const BRANDING_UPDATED_EVENT = 'branding:updated';
 
 // ── Settings Page ────────────────────────────────────────────────────────────
 export default function SettingsPage() {
-  const [tab, setTab] = useState<'branding' | 'business' | 'loyalty' | 'payments' | 'ai' | 'tools' | 'license'>('business');
+  const [tab, setTab] = useState<'branding' | 'business' | 'printing' | 'loyalty' | 'payments' | 'ai' | 'tools' | 'license'>('business');
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   // Branding
@@ -366,7 +367,7 @@ export default function SettingsPage() {
 
          {/* Tabs */}
         <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 mb-4 w-fit shadow-sm">
-          {(['business', 'branding', 'loyalty', 'payments', 'ai', 'tools', 'license'] as const).map((t) => (
+          {(['business', 'printing', 'branding', 'loyalty', 'payments', 'ai', 'tools', 'license'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -374,7 +375,7 @@ export default function SettingsPage() {
                 tab === t ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {t === 'business' ? 'Business' : t === 'branding' ? 'Branding' : t === 'loyalty' ? 'Loyalty' : t === 'payments' ? 'Payments' : t === 'tools' ? 'Account & Data' : t === 'license' ? 'License' : 'AI Consultant'}
+              {t === 'business' ? 'Business' : t === 'printing' ? 'Printing' : t === 'branding' ? 'Branding' : t === 'loyalty' ? 'Loyalty' : t === 'payments' ? 'Payments' : t === 'tools' ? 'Account & Data' : t === 'license' ? 'License' : 'AI Consultant'}
             </button>
           ))}
         </div>
@@ -1071,6 +1072,7 @@ export default function SettingsPage() {
       )}
 
       {tab === 'license' && <LicensePanel />}
+      {tab === 'printing' && <PrintingPanel />}
 
       {/* TOOLS TAB — account, QR codes, backup/restore */}
       {tab === 'tools' && (

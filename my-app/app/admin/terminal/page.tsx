@@ -8,6 +8,8 @@ import { calculateLoyaltyDiscountForItems } from '@/lib/pos-utils';
 import { CheckoutError, computeCheckout, serviceChargeRateFor, type CheckoutTotals } from '@/lib/checkout';
 import DiscountPicker, { discountProblem, toCheckoutDiscount, toOrderDiscount, type TerminalDiscount } from './DiscountPicker';
 import CashDrawerPanel from './CashDrawerPanel';
+import { printInvoice, printKitchenTicket } from '@/lib/print-documents';
+import type { InvoiceOrder } from '@/lib/invoice';
 
 interface InventoryData { quantity: number; lowStockThreshold: number; }
 interface Product { id: number; name: string; description?: string; price: number; imageUrl?: string; available: boolean; inventory?: InventoryData; vatExempt?: boolean; marginType?: string; marginValue?: number; capitalCost?: number; }
@@ -92,6 +94,11 @@ interface BusinessSettings {
   vatRegistered?: boolean;
   serviceChargeRate?: number;
   serviceChargeOrderTypes?: string;
+  receiptPrinter?: string | null;
+  kitchenPrinter?: string | null;
+  paperWidth?: string | null;
+  autoPrintInvoice?: boolean;
+  autoPrintKitchen?: boolean;
 }
 
 function escapeHtml(str: string): string {
@@ -225,6 +232,9 @@ export default function PosTerminalPage() {
   const [orderType, setOrderType] = useState('DINE_IN');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [autoPrint, setAutoPrint] = useState(false);
+  // The saved order behind the receipt on screen, for printing the invoice (spec 019).
+  const [lastOrder, setLastOrder] = useState<InvoiceOrder | null>(null);
+  const [printMsg, setPrintMsg] = useState<string | null>(null);
   const [overrideStock, setOverrideStock] = useState(false);
   const [cashInput, setCashInput] = useState('');
   const [orderFeedback, setOrderFeedback] = useState<'idle' | 'success'>('idle');
@@ -412,6 +422,7 @@ export default function PosTerminalPage() {
         if (settingsRes.ok) {
           const settingsData = await settingsRes.json();
           setBusinessSettings(settingsData);
+          setAutoPrint(Boolean(settingsData.autoPrintInvoice));
         } else {
           // Use defaults if not configured
           setBusinessSettings({
@@ -765,7 +776,7 @@ export default function PosTerminalPage() {
       
       setReceipt({
         orderNumber: data.orderNumber,
-        receiptSerial: data.receiptSerial || `INV-${Date.now()}`,
+        receiptSerial: (data as { invoiceNumber?: string | null }).invoiceNumber || data.orderNumber,
         customerName: customerName.trim() || 'Guest',
         totalAmount: num('totalAmount', total),
         items: cart.map(i => ({ name: i.name, quantity: i.quantity, price: i.price, vatExempt: i.vatExempt })),
@@ -787,6 +798,15 @@ export default function PosTerminalPage() {
         cashReceived: paymentMethod === 'CASH' ? cashReceived : undefined,
         change: paymentMethod === 'CASH' ? cashReceived - num('totalAmount', total) : undefined,
       });
+      setLastOrder(data as InvoiceOrder);
+      setPrintMsg(null);
+      const paidCash = paymentMethod === 'CASH' ? { received: cashReceived, change: cashReceived - num('totalAmount', total) } : null;
+      if (autoPrint) {
+        printInvoice(data as InvoiceOrder, businessSettings, { cash: paidCash }).then((r) => { if (!r.ok) setPrintMsg(`Invoice did not print: ${r.error ?? 'printer problem'}`); });
+      }
+      if (businessSettings?.autoPrintKitchen) {
+        printKitchenTicket(data as InvoiceOrder, businessSettings).then((r) => { if (!r.ok) setPrintMsg(`Kitchen ticket did not print: ${r.error ?? 'printer problem'}`); });
+      }
       clearCart();
       setCustomerName('Walk-In');
       setSelectedTable(null);
@@ -1478,173 +1498,47 @@ export default function PosTerminalPage() {
                   {isDownloading ? 'Saving...' : 'Save Image'}
                 </button>
               </div>
-              {/* Thermal Print Options */}
-              <div className="flex gap-2">
+              {printMsg && <p className="rounded-xl bg-danger-bg px-3 py-2 text-sm text-danger" role="alert">{printMsg}</p>}
+              <div className="grid grid-cols-3 gap-2">
                 <button
-                  onClick={() => {
-                    const printWindow = window.open('', '_blank', 'width=350,height=600');
-                    if (printWindow) {
-                      const vatAmount = receipt.vatAmount;
-                      printWindow.document.write(`
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                          <title>Receipt #${escapeHtml(receipt.orderNumber)}</title>
-                          <style>
-                            @page { margin: 0; size: 80mm auto; }
-                            @media print {
-                              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                            }
-                            body {
-                              font-family: 'Courier New', monospace;
-                              width: 72mm;
-                              margin: 0 auto;
-                              padding: 5mm;
-                              font-size: 11px;
-                              line-height: 1.3;
-                            }
-                            .header { text-align: center; border-bottom: 1px dashed #666; padding-bottom: 6px; margin-bottom: 6px; }
-                            .header h2 { margin: 0; font-size: 14px; }
-                            .header p { margin: 2px 0; font-size: 9px; color: #666; }
-                            .info { margin-bottom: 8px; }
-                            .info-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 10px; }
-                            .items { border-bottom: 1px dashed #666; padding-bottom: 8px; margin-bottom: 8px; }
-                            .item { display: flex; justify-content: space-between; margin: 3px 0; }
-                            .item-name { flex: 1; }
-                            .item-qty { color: #666; font-size: 10px; }
-                            .totals { margin-bottom: 8px; }
-                            .totals .row { display: flex; justify-content: space-between; }
-                            .total-row { font-weight: bold; font-size: 14px; border-top: 1px dashed #666; padding-top: 5px; margin-top: 5px; }
-                            .footer { text-align: center; font-size: 9px; color: #666; margin-top: 10px; }
-                            .vat-breakdown { font-size: 8px; color: #888; border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 8px; }
-                          </style>
-                        </head>
-                        <body>
-                          <div class="header">
-                            <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                            <h2>${businessSettings?.businessName || 'My Restaurant'}</h2>
-                            ${businessSettings?.businessAddress ? `<p>${businessSettings.businessAddress}</p>` : ''}
-                            ${(businessSettings?.tin || businessSettings?.branchCode) ? `<p>TIN: ${businessSettings.tin || ''}${businessSettings?.branchCode ? '-' + businessSettings.branchCode : ''}</p>` : ''}
-        
-                            <p>#${escapeHtml(receipt.orderNumber)}</p>
-                          </div>
-                          <div class="info">
-                            <div class="info-row"><span>Date:</span><span>${new Date(receipt.createdAt).toLocaleDateString()}</span></div>
-                            <div class="info-row"><span>Time:</span><span>${new Date(receipt.createdAt).toLocaleTimeString()}</span></div>
-                            ${receipt.customerName ? `<div class="info-row"><span>Customer:</span><span>${escapeHtml(receipt.customerName)}</span></div>` : ''}
-                            ${receipt.tableName ? `<div class="info-row"><span>Table:</span><span>${escapeHtml(receipt.tableName)}</span></div>` : ''}
-                            ${receipt.orderType ? `<div class="info-row"><span>Order:</span><span>${receipt.orderType === 'DINE_IN' ? 'Dine-in' : receipt.orderType === 'TAKEOUT' ? 'Takeout' : 'Delivery'}</span></div>` : ''}
-                            ${receipt.deliveryAddress ? `<div class="info-row"><span>Deliver to:</span><span>${escapeHtml(receipt.deliveryAddress)}</span></div>` : ''}
-                            <div class="info-row"><span>Payment:</span><span>${receipt.paymentMethod}</span></div>
-                          </div>
-                          <div class="items">
-                            ${receipt.items.map(item => `
-                              <div class="item">
-                                <span class="item-name">${item.quantity}x ${escapeHtml(item.name)}</span>
-                                <span>₱${(item.price * item.quantity).toFixed(2)}</span>
-                              </div>
-                            `).join('')}
-                          </div>
-                          <div class="totals">
-                            <div class="row"><span>Subtotal:</span><span>₱${receipt.subtotal.toFixed(2)}</span></div>
-                              ${receiptAdjustments(receipt).map((line) => `<div class="row"><span>${escapeHtml(line.label)}:</span><span>${signedPeso(line.amount)}</span></div>`).join('')}
-                              <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
-                            ${receipt.paymentMethod === 'CASH' && receipt.cashReceived !== undefined ? `
-                              <div class="row"><span>Cash:</span><span>₱${receipt.cashReceived.toFixed(2)}</span></div>
-                              ${receipt.change !== undefined && receipt.change > 0 ? `<div class="row"><span>Change:</span><span>₱${receipt.change.toFixed(2)}</span></div>` : ''}
-                            ` : ''}
-                          </div>
-                          <div class="vat-breakdown">
-                            <strong>VAT Breakdown:</strong><br/>
-                            Total Sales: ₱${receipt.totalAmount.toFixed(2)}<br/>
-                            VATable: ₱${receipt.vatTaxableTotal.toFixed(2)}<br/>
-                            VAT: ₱${receipt.vatAmount.toFixed(2)}
-                          </div>
-                          <div class="footer">
-                            ${escapeHtml(businessSettings?.footerMessage || 'Thank you for your visit!')}
-                          </div>
-                        </body>
-                        </html>
-                      `);
-                      printWindow.document.close();
-                      printWindow.focus();
-                      setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
-                    }
+                  disabled={!lastOrder}
+                  onClick={async () => {
+                    if (!lastOrder) return;
+                    const r = await printInvoice(lastOrder, businessSettings, {
+                      cash: receipt.paymentMethod === 'CASH' && receipt.cashReceived != null ? { received: receipt.cashReceived, change: receipt.change ?? 0 } : null,
+                    });
+                    setPrintMsg(r.ok ? null : `Invoice did not print: ${r.error ?? 'printer problem'}`);
                   }}
-                  className="flex-1 py-3 bg-accent hover:bg-amber-500 text-white font-semibold rounded-2xl transition-all duration-200 hover:shadow-lg flex items-center justify-center gap-2"
+                  className="c-btn c-btn--primary col-span-1 disabled:opacity-50"
                 >
-                  🖨️ Thermal
+                  Print invoice
+                </button>
+                <button
+                  disabled={!lastOrder}
+                  onClick={async () => {
+                    if (!lastOrder) return;
+                    const r = await printInvoice(lastOrder, businessSettings, { paper: 'A4' });
+                    setPrintMsg(r.ok ? null : `Invoice did not print: ${r.error ?? 'printer problem'}`);
+                  }}
+                  className="c-btn c-btn--ghost disabled:opacity-50"
+                >
+                  A4 copy
+                </button>
+                <button
+                  disabled={!lastOrder}
+                  onClick={async () => {
+                    if (!lastOrder) return;
+                    const r = await printKitchenTicket(lastOrder, businessSettings);
+                    setPrintMsg(r.ok ? null : `Kitchen ticket did not print: ${r.error ?? 'printer problem'}`);
+                  }}
+                  className="c-btn c-btn--ghost disabled:opacity-50"
+                >
+                  Kitchen ticket
                 </button>
               </div>
               <button
-                onClick={() => {
-                  if (autoPrint) {
-                    // Open thermal print for auto-print
-                    const printWindow = window.open('', '_blank', 'width=350,height=600');
-                    if (printWindow) {
-                      printWindow.document.write(`
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                          <title>Receipt #${escapeHtml(receipt.orderNumber)}</title>
-                          <style>
-                            @page { margin: 0; size: 80mm auto; }
-                            body { font-family: 'Courier New', monospace; width: 72mm; margin: 0 auto; padding: 5mm; font-size: 11px; line-height: 1.3; }
-                            .header { text-align: center; border-bottom: 1px dashed #666; padding-bottom: 6px; margin-bottom: 6px; }
-                            .header h2 { margin: 0; font-size: 14px; }
-                            .header p { margin: 2px 0; font-size: 9px; color: #666; }
-                            .info { margin-bottom: 8px; }
-                            .info-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 10px; }
-                            .items { border-bottom: 1px dashed #666; padding-bottom: 8px; margin-bottom: 8px; }
-                            .item { display: flex; justify-content: space-between; margin: 3px 0; }
-                            .totals { margin-bottom: 8px; }
-                            .totals .row { display: flex; justify-content: space-between; }
-                            .total-row { font-weight: bold; font-size: 14px; border-top: 1px dashed #666; padding-top: 5px; margin-top: 5px; }
-                            .footer { text-align: center; font-size: 9px; color: #666; margin-top: 10px; }
-                            .vat-breakdown { font-size: 8px; color: #888; border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 8px; }
-                          </style>
-                        </head>
-                        <body>
-                          <div class="header">
-                            <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                            <h2>${escapeHtml(businessSettings?.businessName || 'My Restaurant')}</h2>
-                            ${businessSettings?.businessAddress ? `<p>${escapeHtml(businessSettings.businessAddress)}</p>` : ''}
-                            ${(businessSettings?.tin || businessSettings?.branchCode) ? `<p>TIN: ${escapeHtml(businessSettings.tin || '')}${businessSettings?.branchCode ? '-' + escapeHtml(businessSettings.branchCode) : ''}</p>` : ''}
-                            <p>#${escapeHtml(receipt.orderNumber)}</p>
-                          </div>
-                          <div class="info">
-                            <div class="info-row"><span>Date:</span><span>${new Date(receipt.createdAt).toLocaleDateString()}</span></div>
-                            <div class="info-row"><span>Time:</span><span>${new Date(receipt.createdAt).toLocaleTimeString()}</span></div>
-                            ${receipt.customerName ? `<div class="info-row"><span>Customer:</span><span>${escapeHtml(receipt.customerName)}</span></div>` : ''}
-                            ${receipt.tableName ? `<div class="info-row"><span>Table:</span><span>${escapeHtml(receipt.tableName)}</span></div>` : ''}
-                            ${receipt.orderType ? `<div class="info-row"><span>Order:</span><span>${receipt.orderType === 'DINE_IN' ? 'Dine-in' : receipt.orderType === 'TAKEOUT' ? 'Takeout' : 'Delivery'}</span></div>` : ''}
-                            ${receipt.deliveryAddress ? `<div class="info-row"><span>Deliver to:</span><span>${escapeHtml(receipt.deliveryAddress)}</span></div>` : ''}
-                            <div class="info-row"><span>Payment:</span><span>${receipt.paymentMethod}</span></div>
-                          </div>
-                          <div class="items">
-                            ${receipt.items.map(item => `<div class="item"><span>${item.quantity}x ${escapeHtml(item.name)}</span><span>₱${(item.price * item.quantity).toFixed(2)}</span></div>`).join('')}
-                          </div>
-                          <div class="totals">
-                            <div class="row"><span>Subtotal:</span><span>₱${receipt.subtotal.toFixed(2)}</span></div>
-                              ${receiptAdjustments(receipt).map((line) => `<div class="row"><span>${escapeHtml(line.label)}:</span><span>${signedPeso(line.amount)}</span></div>`).join('')}
-                              <div class="row total-row"><span>TOTAL:</span><span>₱${receipt.totalAmount.toFixed(2)}</span></div>
-                            ${receipt.paymentMethod === 'CASH' && receipt.cashReceived !== undefined ? `
-                              <div class="row"><span>Cash:</span><span>₱${receipt.cashReceived.toFixed(2)}</span></div>
-                              ${receipt.change !== undefined && receipt.change > 0 ? `<div class="row"><span>Change:</span><span>₱${receipt.change.toFixed(2)}</span></div>` : ''}
-                            ` : ''}
-                          </div>
-                          <div class="footer">${escapeHtml(businessSettings?.footerMessage || 'Thank you for your visit!')}</div>
-                        </body>
-                        </html>
-                      `);
-                      printWindow.document.close();
-                      printWindow.focus();
-                      setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
-                    }
-                  }
-                  setReceipt(null);
-                }}
-                className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-2xl transition-all duration-200 hover:shadow-lg"
+                onClick={() => { setReceipt(null); setPrintMsg(null); }}
+                className="c-btn c-btn--ghost w-full"
               >
                 Done
               </button>

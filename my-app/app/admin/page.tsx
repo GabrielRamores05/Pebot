@@ -1,5 +1,14 @@
 'use client';
 
+import { printInvoice, printKitchenTicket } from '@/lib/print-documents';
+import type { InvoiceOrder } from '@/lib/invoice';
+
+/** Print failures are shown in the console and as a toast-free status (spec 019). */
+function alertPrint(error?: string) {
+  console.error('Print failed:', error);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pebot:print-failed', { detail: error }));
+}
+
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { formatPeso } from '@/lib/format';
 import { useRouter } from 'next/navigation';
@@ -1068,94 +1077,31 @@ export default function AdminPage() {
                 {/* Print Buttons */}
                 <div className="flex gap-2 mt-4">
                   <button
-                    onClick={() => {
-                      const printWindow = window.open('', '_blank', 'width=350,height=600');
-                      if (printWindow) {
-                        const invVatRate = businessSettings?.vatRate ?? 12;
-                        const invHasVat = invVatRate > 0;
-                        const invSubtotal = invHasVat ? selectedOrder.totalAmount / (1 + invVatRate / 100) : selectedOrder.totalAmount;
-                        const invVatAmount = invHasVat ? selectedOrder.totalAmount - invSubtotal : 0;
-
-                        printWindow.document.write(`
-                          <!DOCTYPE html>
-                          <html>
-                          <head>
-                            <title>Receipt #${selectedOrder.orderNumber}</title>
-                            <style>
-                              @page { margin: 0; size: 80mm auto; }
-                              @media print {
-                                body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                              }
-                              body {
-                                font-family: 'Courier New', monospace;
-                                width: 72mm;
-                                margin: 0 auto;
-                                padding: 5mm;
-                                font-size: 11px;
-                                line-height: 1.3;
-                              }
-                              .header { text-align: center; border-bottom: 1px dashed #666; padding-bottom: 8px; margin-bottom: 8px; }
-                              .header h2 { margin: 0; font-size: 14px; }
-                              .header p { margin: 2px 0; font-size: 9px; color: #666; }
-                              .items { border-bottom: 1px dashed #666; padding-bottom: 8px; margin-bottom: 8px; }
-                              .item { display: flex; justify-content: space-between; margin: 3px 0; }
-                              .item-name { flex: 1; }
-                              .item-qty { color: #666; font-size: 10px; }
-                              .totals { margin-bottom: 8px; }
-                              .totals .row { display: flex; justify-content: space-between; }
-                              .total-row { font-weight: bold; font-size: 14px; border-top: 1px dashed #666; padding-top: 5px; margin-top: 5px; }
-                              .footer { text-align: center; font-size: 9px; color: #666; margin-top: 10px; }
-                              .vat-breakdown { font-size: 8px; color: #888; border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 8px; }
-                            </style>
-                          </head>
-                          <body>
-                            <div class="header">
-                              <p style="font-weight:bold;color:#666;font-size:9px;">OFFICIAL RECEIPT</p>
-                              <h2>${businessSettings?.businessName || 'My Restaurant'}</h2>
-                              ${businessSettings?.businessAddress ? `<p>${businessSettings.businessAddress}</p>` : ''}
-                              ${(businessSettings?.tin || businessSettings?.branchCode) ? `<p>TIN: ${businessSettings.tin || ''}${businessSettings?.branchCode ? '-' + businessSettings.branchCode : ''}</p>` : ''}
-                              <p>#${selectedOrder.orderNumber}</p>
-                            </div>
-                            <div class="items">
-                              ${selectedOrder.items.map(item => `
-                                <div class="item">
-                                  <span class="item-name">${item.quantity}x ${item.product.name}</span>
-                                  <span>₱${item.subtotal.toFixed(2)}</span>
-                                </div>
-                              `).join('')}
-                            </div>
-                            <div class="totals">
-                              <div class="row"><span>Subtotal:</span><span>₱${invSubtotal.toFixed(2)}</span></div>
-                              <div class="row"><span>VAT (${invVatRate}%):</span><span>₱${invVatAmount.toFixed(2)}</span></div>
-                              <div class="row total-row"><span>TOTAL:</span><span>₱${selectedOrder.totalAmount.toFixed(2)}</span></div>
-                              ${(selectedOrder as any).amountPaid ? `<div class="row"><span>Cash:</span><span>₱${(selectedOrder as any).amountPaid.toFixed(2)}</span></div><div class="row"><span>Change:</span><span>₱${((selectedOrder as any).amountPaid - selectedOrder.totalAmount).toFixed(2)}</span></div>` : ''}
-                            </div>
-                            <div class="vat-breakdown">
-                              <strong>VAT Breakdown:</strong><br/>
-                              Total Sales: ₱${selectedOrder.totalAmount.toFixed(2)}<br/>
-                              VATable: ₱${invSubtotal.toFixed(2)}<br/>
-                              VAT: ₱${invVatAmount.toFixed(2)}
-                            </div>
-                            <div class="footer">
-                              ${businessSettings?.footerMessage || 'Thank you for your visit!'}
-                            </div>
-                          </body>
-                          </html>
-                        `);
-                        printWindow.document.close();
-                        printWindow.focus();
-                        setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
-                      }
+                    onClick={async () => {
+                      const r = await printInvoice(selectedOrder as unknown as InvoiceOrder, businessSettings, { copyLabel: 'Reprint' });
+                      if (!r.ok) alertPrint(r.error);
                     }}
-                    className="flex-1 py-2.5 bg-accent hover:bg-amber-500 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
+                    className="c-btn c-btn--primary flex-1"
                   >
-                    Thermal
+                    Print invoice
                   </button>
                   <button
-                    onClick={() => window.print()}
-                    className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5"
+                    onClick={async () => {
+                      const r = await printInvoice(selectedOrder as unknown as InvoiceOrder, businessSettings, { paper: 'A4', copyLabel: 'Reprint' });
+                      if (!r.ok) alertPrint(r.error);
+                    }}
+                    className="c-btn c-btn--ghost flex-1"
                   >
-                    A4/Plain
+                    A4 copy
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const r = await printKitchenTicket(selectedOrder as unknown as InvoiceOrder, businessSettings);
+                      if (!r.ok) alertPrint(r.error);
+                    }}
+                    className="c-btn c-btn--ghost flex-1"
+                  >
+                    Kitchen ticket
                   </button>
                 </div>
               </div>
